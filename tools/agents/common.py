@@ -6,7 +6,8 @@ import urllib.request
 from datetime import datetime, timezone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DATA = os.path.join(ROOT, "data")
+# Для пробних запусків можна задати іншу папку (змінна CRYPTO_DATA_DIR), щоб не чіпати справжні файли даних, які оновлює бот
+DATA = os.environ.get("CRYPTO_DATA_DIR") or os.path.join(ROOT, "data")
 UA = "Mozilla/5.0 (compatible; CryptoSimpleAgents/1.0)"
 
 

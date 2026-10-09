@@ -5,9 +5,9 @@
 ## Файли
 | Що | Файли |
 |---|---|
-| Сторінки | `index.html` (головна: панель із 8 віджетів), `learn.html` (довідка: пояснення, глосарій, запитання), `market.html` (ринок), `news.html` (новини), `analytics.html` (аналітика), `sources.html` (каталог джерел), `news-*.html` (окремі новини) |
+| Сторінки | `index.html` (головна: панель із 8 віджетів), `agents.html` (кожен агент у своїй вкладці: стан, розклад, дані), `learn.html` (довідка: пояснення, глосарій, запитання), `market.html` (ринок), `news.html` (новини), `analytics.html` (аналітика), `sources.html` (каталог джерел), `news-*.html` (окремі новини) |
 | Стилі | `style.css` (змінні — на початку файлу) |
-| Скрипти | `core.js` (усі сторінки), `charts.js` (малювання SVG-графіків) і `widgets.js` (панель головної), сторінка «Ринок» розбита на `market-live/charts/calc/heatmap/alerts.js` + `market.js` (запуск), `news.js`, `learn.js` (довідка), `feed.js`, `analytics.js`, `agent-ui.js` (спільне для сторінок з даними агентів), `chartbg.js` (фон головної) |
+| Скрипти | `core.js` (усі сторінки), `charts.js` (малювання SVG-графіків), `widget-defs.js` (що показує кожен віджет), `widgets.js` (каркас віджетів), `home.js` (головна) і `agents.js` (сторінка «Агенти»), сторінка «Ринок» розбита на `market-live/charts/calc/heatmap/alerts.js` + `market.js` (запуск), `news.js`, `learn.js` (довідка), `feed.js`, `analytics.js`, `agent-ui.js` (спільне для сторінок з даними агентів), `chartbg.js` (фон головної) |
 | Агенти | `tools/run_agents.py` запускає окремих агентів із `tools/agents/` (ринок, настрій, стейблкоїни, мережа біткоїна, регулювання) та `tools/news_agent.py` (новини й аналітика; джерела, теми й словники — у `tools/news_config.py`; спільні `fetch`/`log`/`write_json` — у `tools/agents/common.py`; переклад у `tools/translator.py`); кожен пише власний файл у `data/` |
 | Збірка | `tools/build.py`, шаблони шапки й підвалу в `tools/partials/` |
 
@@ -20,7 +20,7 @@
 
 ## Запуск
 - Сайт: `python -m http.server 8000`, відкрити http://localhost:8000
-- Агенти: `start-agents.bat` (кожен оновлюється зі своєю періодичністю: ринок 5 хв, мережа 3 хв, новини 10 хв, настрій і стейблкоїни 30 хв, регулювання 1 год). Один агент окремо: `python tools/run_agents.py market`. Для перекладу якісним Claude задайте змінну середовища `ANTHROPIC_API_KEY` (ключ ніколи не кладіть у файли сайту).
+- Агенти: `start-agents.bat` (кожен оновлюється зі своєю періодичністю: ринок 5 хв, мережа 3 хв, новини 10 хв, настрій і стейблкоїни 30 хв, регулювання 1 год). Перевірити, що всі агенти працюють і дані свіжі: python tools/check_data.py. Один агент окремо: `python tools/run_agents.py market`. Для перекладу якісним Claude задайте змінну середовища `ANTHROPIC_API_KEY` (ключ ніколи не кладіть у файли сайту).
 
 ## Публікація й автооновлення (GitHub Pages + Actions)
 Ціни йдуть у браузері наживо (Binance). Решту даних щоп'ять–десять хвилин оновлює `.github/workflows/update-data.yml`: запускає `tools/run_agents.py` і комітить `data/*.json`.

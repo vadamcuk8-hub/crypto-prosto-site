@@ -15,6 +15,8 @@
   python tools/run_agents.py --watch    працювати постійно (кожен агент зі своєю періодичністю)
   python tools/run_agents.py market network    лише вказані агенти
 """
+import json
+import os
 import sys
 import threading
 import time
@@ -26,7 +28,7 @@ except Exception:
     pass
 
 from agents import agent_market, agent_network, agent_regulation, agent_sentiment, agent_stablecoins
-from agents.common import log, now_iso, write_json
+from agents.common import DATA, log, now_iso, write_json
 import news_agent
 
 
@@ -41,8 +43,20 @@ class NewsAgent:
 
 
 AGENTS = [agent_market, agent_network, agent_sentiment, agent_stablecoins, agent_regulation, NewsAgent]
-status = {}
 lock = threading.Lock()
+
+
+def load_status():
+    """Попередній стан із data/agents.json: запуск окремих агентів не стирає інших, а збій не губить час останнього успіху."""
+    try:
+        with open(os.path.join(DATA, "agents.json"), encoding="utf-8") as f:
+            old = json.load(f).get("agents", {})
+    except (OSError, ValueError):
+        return {}
+    return {k: v for k, v in old.items() if k in {a.NAME for a in AGENTS}}
+
+
+status = load_status()
 
 
 def run_agent(agent):

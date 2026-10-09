@@ -1424,3 +1424,46 @@ nav a { gap: 10px; }
   .wrow-spark { display: none; }
 }
 
+/* =====================================================
+   Агенти: вкладки, картка стану, таблиця, рядок «Дані оновлено»
+   ===================================================== */
+.freshness { margin: 0 0 14px; font-size: 0.9rem; color: var(--muted); }
+.freshness.bad { color: var(--down); }
+.freshness a { color: inherit; font-weight: 600; }
+.freshness-dot, .tab-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--up); flex: none; }
+.freshness-dot { display: inline-block; margin-right: 8px; vertical-align: middle; }
+.freshness.bad .freshness-dot { background: var(--down); }
+
+.agents-section { max-width: var(--container); margin: 0 auto; padding: 8px 16px 40px; }
+.agent-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.agent-tab {
+  display: inline-flex; align-items: center; gap: 8px; min-height: var(--tap);
+  padding: 8px 16px; border: 1px solid var(--accent); border-radius: 20px;
+  background: transparent; color: var(--accent); font-size: 0.95rem; cursor: pointer;
+}
+.agent-tab:hover { background: var(--accent-soft); }
+.agent-tab[aria-selected="true"] { background: var(--accent); color: var(--hero-text); }
+.agent-tab .tab-dot { background: var(--muted); }
+.agent-tab.ok .tab-dot { background: var(--up); }
+.agent-tab.stale .tab-dot, .agent-tab.failed .tab-dot { background: var(--down); }
+.agent-tab[aria-selected="true"] .tab-dot { box-shadow: 0 0 0 2px var(--hero-text); }
+#tab-all .tab-dot { display: none; }
+
+.agent-card { padding: 18px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); box-shadow: var(--shadow-card); }
+.agent-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.agent-name { font-size: 1.2rem; margin: 0; }
+.agent-task { margin: 8px 0 12px; }
+.agent-facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+.agent-facts dt { color: var(--muted); font-size: 0.9rem; }
+.agent-facts dd { margin: 0; overflow-wrap: anywhere; }
+
+.chip { display: inline-block; padding: 2px 12px; border: 1px solid currentColor; border-radius: 12px; font-size: 0.85rem; font-weight: 600; background: var(--card); color: var(--muted); }
+.chip.ok { color: var(--up); }
+.chip.stale, .chip.failed { color: var(--down); }
+
+.agent-table-wrap { overflow-x: auto; }
+.agent-table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+.agent-table th, .agent-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+.agent-table th { font-size: 0.85rem; color: var(--muted); }
+.link-btn { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; min-height: 0; }
+@media (max-width: 600px) { .agent-facts { grid-template-columns: 1fr; } .agent-facts dd { margin-bottom: 6px; } }

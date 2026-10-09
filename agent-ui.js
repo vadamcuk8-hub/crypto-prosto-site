@@ -33,6 +33,43 @@ async function loadJson(path) {
   return r.json();
 }
 
+// Агент вважається застарілим, якщо від його останнього успішного запуску минуло втричі більше за його інтервал,
+// але не менше ніж STALE_MIN_S: на GitHub усі агенти запускаються за розкладом раз на ~10 хвилин (з можливими затримками).
+const STALE_MIN_S = 2700;
+
+function isStale(st, iso) {
+  if (!iso) return true;
+  const age = (Date.now() - new Date(iso).getTime()) / 1000;
+  return age > Math.max(((st && st.interval) || 0) * 3, STALE_MIN_S);
+}
+
+// Стан одного агента за даними data/agents.json: "ok" | "stale" | "failed" | "none"
+function agentState(st) {
+  if (!st) return "none";
+  if (!st.ok) return "failed";
+  return isStale(st, st.last_ok) ? "stale" : "ok";
+}
+
+// Загальний рядок над панеллю: найстаріше оновлення серед агентів і скільки з них працює
+function renderFreshness(node, agents) {
+  const list = agents && agents.agents ? Object.keys(agents.agents).map(function (k) { return agents.agents[k]; }) : [];
+  node.replaceChildren();
+  if (!list.length) {
+    node.className = "freshness bad";
+    node.textContent = "Дані ще не створено: запустіть агентів (start-agents.bat) або дочекайтеся автооновлення.";
+    return;
+  }
+  const good = list.filter(function (s) { return agentState(s) === "ok"; }).length;
+  const times = list.map(function (s) { return s.last_ok; }).filter(Boolean).sort();
+  node.className = "freshness" + (good === list.length ? "" : " bad");
+  node.appendChild(el("span", "freshness-dot"));
+  node.appendChild(document.createTextNode(
+    (times.length ? "Дані оновлено " + ago(times[0]) : "Дані ще не оновлювалися") + " · агентів без проблем: " + good + " з " + list.length + " · "));
+  const a = el("a", "", "докладно про кожного агента");
+  a.href = "agents.html";
+  node.appendChild(a);
+}
+
 const HELP =
   "Дані ще не створено або сторінку відкрито не через сервер. " +
   "Запустіть файл start-agents.bat (він читає новини й створює папку data), " +

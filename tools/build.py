@@ -28,7 +28,8 @@ PARTIALS = os.path.join(ROOT, "tools", "partials")
 
 # Які скрипти потрібні сторінці (порядок важливий: core.js завжди першим)
 PAGE_SCRIPTS = {
-    "index.html": ["core.js", "agent-ui.js", "charts.js", "widgets.js", "chartbg.js"],
+    "index.html": ["core.js", "agent-ui.js", "charts.js", "widget-defs.js", "widgets.js", "home.js", "chartbg.js"],
+    "agents.html": ["core.js", "agent-ui.js", "charts.js", "widget-defs.js", "widgets.js", "agents.js"],
     "learn.html": ["core.js", "learn.js"],
     "market.html": ["core.js", "market-live.js", "market-charts.js", "market-calc.js",
                     "market-heatmap.js", "market-alerts.js", "market.js"],
@@ -39,7 +40,7 @@ PAGE_SCRIPTS = {
 DEFAULT_SCRIPTS = ["core.js"]          # решта сторінок (news-*.html)
 
 # Підрозділ меню: сторінки новин підсвічують пункт «Новини»
-NAV = [("index.html", "Головна"), ("market.html", "Ринок"), ("news.html", "Новини"), ("analytics.html", "Аналітика"), ("learn.html", "Довідка")]
+NAV = [("index.html", "Головна"), ("market.html", "Ринок"), ("news.html", "Новини"), ("analytics.html", "Аналітика"), ("agents.html", "Агенти"), ("learn.html", "Довідка")]
 
 # Іконки пунктів меню (контури 24×24, колір береться з тексту посилання)
 ICONS = {
@@ -47,6 +48,7 @@ ICONS = {
     "market.html": "M4 19V5M4 19h16M8 15l4-5 3 3 4-6",
     "news.html": "M5 5h11v14H7a2 2 0 0 1-2-2zM16 9h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5",
     "analytics.html": "M5 20V10M12 20V4M19 20v-7",
+    "agents.html": "M12 3v3M12 18v3M3 12h3M18 12h3M7 7l2 2M15 15l2 2M17 7l-2 2M9 15l-2 2M9 9h6v6H9z",
     "learn.html": "M4 5.5A1.5 1.5 0 0 1 5.5 4H12v15H5.5A1.5 1.5 0 0 0 4 20.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H12v15h6.5a1.5 1.5 0 0 1 1.5 1.5z",
 }
 ICON_SVG = ('<svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" '

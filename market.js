@@ -1,5 +1,18 @@
 // Ринок: запуск сторінки та головний цикл (щосекунди). Підключається ПІСЛЯ market-*.js.
 
+// ---------- Графіки на сторінці відкриваються у великому вікні ----------
+const openBtn = document.getElementById("openChart");
+if (openBtn) {
+  openBtn.addEventListener("click", function () { openCoinChart(selectedCoin); });
+  ["liveChart", "btcChart"].forEach(function (boxId) {
+    const box = document.getElementById(boxId);
+    if (box) ChartTool.bind(box, function () {
+      const c = coins[selectedCoin];
+      return { symbol: c.pair.replace("usdt", "").toUpperCase(), name: c.name };
+    }, "Відкрити біржовий графік: свічки наживо, масштаб, лінії, лінійка");
+  });
+}
+
 // ---------- Запуск ----------
 if (document.getElementById("cryptoPrices")) {
   Promise.all([loadFiat(), loadCrypto()]).then(renderPrices); // обидва запити йдуть одночасно

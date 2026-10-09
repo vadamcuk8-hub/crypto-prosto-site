@@ -35,6 +35,7 @@ function renderAlerts() {
     li.innerHTML = '<span>' + (a.done ? "✓ Спрацювало: " : "● Чекаємо: ") + text +
       (a.done ? " (було " + fmtOnlyUsd(a.hit) + ")" : "") + "</span>";
     const del = document.createElement("button");
+    del.setAttribute("data-help", "Видалити це сповіщення");
     del.type = "button";
     del.className = "chip";
     del.textContent = "Видалити";

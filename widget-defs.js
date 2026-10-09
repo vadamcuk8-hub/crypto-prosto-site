@@ -5,9 +5,23 @@
 const WIDGET_DEFS = (function () {
   const { fmtNum, fmtBig, trendColor, lineChart, sparkline, barChart, donut, hBars, stat, note } = Charts;
 
+  // Обгортка: діаграма стає клікабельною й відкривається у великому вікні (масштаб, лінії, лінійка)
+  function openable(chart, getSpec, label) {
+    const w = el("div", "chart-open");
+    w.appendChild(chart);
+    return ChartTool.bind(w, getSpec, label);
+  }
+  // Ряд значень (з часовими мітками, якщо вони є) → опис для вікна графіка
+  function seriesSpec(id, title, values, times, format, source) {
+    return function () {
+      return { id: id, title: title, points: values.map(function (v, i) { return { t: times ? times[i] : null, c: v }; }), format: format, source: source };
+    };
+  }
+  const coinSpec = function (c) { return function () { return { symbol: c.symbol, name: c.name || c.symbol }; }; };
+
   return [
     {
-      id: "overview", title: "Ринок у цифрах", agent: "market", files: ["market"],
+      id: "overview", title: "Ринок у цифрах", help: "Загальна вартість усіх криптовалют, обсяг торгів і частка біткоїна та ефіріуму в ринку. Джерело: CoinGecko.", agent: "market", files: ["market"],
       render: function (b, d) {
         const g = d.market.global;
         const stats = el("div", "wstats");
@@ -28,11 +42,10 @@ const WIDGET_DEFS = (function () {
         });
         row.appendChild(legend);
         b.appendChild(row);
-        b.appendChild(note("Частка кожної групи у загальній капіталізації. Усього монет у обігу: " + fmtNum(g.active_coins) + "."));
       },
     },
     {
-      id: "top", title: "Найбільші монети (за 7 днів)", agent: "market", files: ["market"], wide: true,
+      id: "top", title: "Найбільші монети (за 7 днів)", help: "Зміна за добу показана кольором, мініграфік — 7 днів. Натисніть на рядок, щоб відкрити графік монети наживо з біржі Binance. Стейблкоїни не показано.", agent: "market", files: ["market"], wide: true, skipHome: true,
       render: function (b, d) {
         const list = el("div", "wrows");
         d.market.top.forEach(function (c) {
@@ -46,23 +59,26 @@ const WIDGET_DEFS = (function () {
           const sp = el("div", "wrow-spark");
           sp.appendChild(sparkline(c.spark, trendColor(c.change7d || 0)));
           row.appendChild(sp);
+          ChartTool.bind(row, function () {
+            const now = Date.now(), n = c.spark.length;
+            return { symbol: c.symbol, name: c.name, fallback: c.spark.map(function (v, i) { return { t: now - (n - 1 - i) * 7 * 864e5 / (n - 1), c: v }; }) };
+          }, "Відкрити графік " + c.symbol);
           list.appendChild(row);
         });
         b.appendChild(list);
-        b.appendChild(note("Зміна за добу — у кольоровій плитці, мініграфік показує 7 днів. Стейблкоїни не показано."));
       },
     },
     {
-      id: "movers", title: "Лідери дня серед топ-50", agent: "market", files: ["market"],
+      id: "movers", title: "Лідери дня серед топ-50", help: "Хто найбільше виріс і впав за добу серед 50 найбільших монет. Натисніть на рядок, щоб відкрити графік.", agent: "market", files: ["market"],
       render: function (b, d) {
         b.appendChild(el("h4", "wsub tone-positive", "Зростання"));
-        b.appendChild(hBars(d.market.gainers.map(function (c) { return { label: c.symbol, value: c.change24h, text: pct(c.change24h), color: "var(--up)" }; })));
+        b.appendChild(hBars(d.market.gainers.map(function (c) { return { label: c.symbol, value: c.change24h, text: pct(c.change24h), color: "var(--up)", open: coinSpec(c) }; })));
         b.appendChild(el("h4", "wsub tone-negative", "Падіння"));
-        b.appendChild(hBars(d.market.losers.map(function (c) { return { label: c.symbol, value: c.change24h, text: pct(c.change24h), color: "var(--down)" }; })));
+        b.appendChild(hBars(d.market.losers.map(function (c) { return { label: c.symbol, value: c.change24h, text: pct(c.change24h), color: "var(--down)", open: coinSpec(c) }; })));
       },
     },
     {
-      id: "sentiment", title: "Страх і жадібність", agent: "sentiment", files: ["sentiment"],
+      id: "sentiment", title: "Страх і жадібність", help: "Індекс від 0 до 100: низько означає страх, високо жадібність. Натисніть на графік, щоб відкрити його у великому вікні.", agent: "sentiment", files: ["sentiment"],
       render: function (b, d) {
         const s = d.sentiment;
         const head = el("div", "wbig");
@@ -79,7 +95,9 @@ const WIDGET_DEFS = (function () {
         const scale = el("div", "gauge-scale");
         ["Страх", "Нейтрально", "Жадібність"].forEach(function (t) { scale.appendChild(el("span", "", t)); });
         b.appendChild(scale);
-        b.appendChild(lineChart(s.history.map(function (h) { return h.v; }), { color: "var(--accent)", label: "Індекс страху й жадібності за 30 днів" }));
+        b.appendChild(openable(lineChart(s.history.map(function (h) { return h.v; }), { color: "var(--accent)", label: "Індекс страху й жадібності за 30 днів" }),
+          seriesSpec("sentiment", "Індекс страху й жадібності", s.history.map(function (h) { return h.v; }), s.history.map(function (h) { return h.t * 1000; }),
+            function (v) { return fmtNum(v, 0) + " / 100"; }, "Джерело: Alternative.me."), "Відкрити графік індексу страху й жадібності"));
         const stats = el("div", "wstats");
         stats.appendChild(stat("Вчора", s.yesterday === null ? "—" : String(s.yesterday)));
         stats.appendChild(stat("Тиждень тому", s.week_ago === null ? "—" : String(s.week_ago)));
@@ -88,20 +106,21 @@ const WIDGET_DEFS = (function () {
       },
     },
     {
-      id: "stable", title: "Стейблкоїни", agent: "stablecoins", files: ["stablecoins"],
+      id: "stable", title: "Стейблкоїни", help: "Стейблкоїн — цифрова монета, прив'язана до долара. Тут загальна пропозиція й частки найбільших. Натисніть на графік, щоб відкрити.", agent: "stablecoins", files: ["stablecoins"],
       render: function (b, d) {
         const s = d.stablecoins;
         const stats = el("div", "wstats");
         stats.appendChild(stat("Загальна пропозиція", fmtBig(s.total)));
         stats.appendChild(stat("За 30 днів", s.change30 === null ? "—" : pct(s.change30), s.change30 >= 0 ? "tone-positive" : "tone-negative"));
         b.appendChild(stats);
-        b.appendChild(lineChart(s.history, { color: "var(--up)", label: "Загальна пропозиція стейблкоїнів, останні ~4 місяці" }));
+        b.appendChild(openable(lineChart(s.history, { color: "var(--up)", label: "Загальна пропозиція стейблкоїнів, останні ~4 місяці" }),
+          seriesSpec("stablecoins", "Пропозиція стейблкоїнів", s.history, s.history_t ? s.history_t.map(function (t) { return t * 1000; }) : null, fmtBig, "Джерело: DefiLlama."),
+          "Відкрити графік пропозиції стейблкоїнів"));
         b.appendChild(hBars(s.top.map(function (t) { return { label: t.symbol, value: t.supply, text: fmtNum(t.share, 1) + "%", color: "var(--accent)" }; })));
-        b.appendChild(note("Стейблкоїн — цифрова монета, прив’язана до долара. Частки — від усієї пропозиції."));
       },
     },
     {
-      id: "network", title: "Мережа біткоїна", agent: "network", files: ["network"],
+      id: "network", title: "Мережа біткоїна", help: "Чим довша черга й вища комісія, тим дорожче й повільніше проходять перекази. Натисніть на графік потужності, щоб відкрити.", agent: "network", files: ["network"],
       render: function (b, d) {
         const n = d.network;
         b.appendChild(el("h4", "wsub", "Комісія за переказ (сатоші за байт)"));
@@ -112,13 +131,14 @@ const WIDGET_DEFS = (function () {
         stats.appendChild(stat("Висота блоку", fmtNum(n.height)));
         stats.appendChild(stat("Потужність", fmtNum(n.hashrate_ehs, 0) + " EH/с"));
         b.appendChild(stats);
-        b.appendChild(lineChart(n.hashrate_history, { color: "var(--accent)", label: "Потужність майнінгу за 3 місяці" }));
-        b.appendChild(note("Чим довша черга й вища комісія, тим дорожче й повільніше проходять перекази."));
+        b.appendChild(openable(lineChart(n.hashrate_history, { color: "var(--accent)", label: "Потужність майнінгу за 3 місяці" }),
+          seriesSpec("hashrate", "Потужність майнінгу біткоїна", n.hashrate_history, n.hashrate_t ? n.hashrate_t.map(function (t) { return t * 1000; }) : null,
+            function (v) { return fmtNum(v, 0) + " EH/с"; }, "Джерело: mempool.space."), "Відкрити графік потужності майнінгу"));
       },
     },
     {
-      id: "regulation", title: "Регулювання: документи США", agent: "regulation", files: ["regulation"], wide: true,
-      render: function (b, d) {
+      id: "regulation", title: "Регулювання: документи США", help: "Нові офіційні документи США про крипто з Federal Register. Тему визначено за правилами й вона може помилятися. Назви англійською, як в оригіналі.", agent: "regulation", files: ["regulation"], wide: true,
+      render: function (b, d, opts) {
         const r = d.regulation, s = r.stats || { d7: 0, d30: 0, prev30: 0 };
         const diff = s.d30 - s.prev30;
         const stats = el("div", "wstats");
@@ -138,12 +158,15 @@ const WIDGET_DEFS = (function () {
           return hBars((list || []).map(function (x) { return { label: x.label, value: x.count, text: String(x.count), color: color }; }));
         }
         const cols = el("div", "wcols");
-        cols.appendChild(col("Документи по тижнях (12 тижнів)", barChart(r.weeks, { label: "Кількість документів по тижнях" })));
+        cols.appendChild(col("Документи по тижнях (12 тижнів)", openable(barChart(r.weeks, { label: "Кількість документів по тижнях" }),
+          seriesSpec("regulation", "Документи про крипто по тижнях", r.weeks, r.week_start ? r.week_start.map(function (d) { return Date.parse(d); }) : null,
+            function (v) { return "документів: " + fmtNum(v, 0); }, "Джерело: Federal Register."), "Відкрити графік документів по тижнях")));
         cols.appendChild(col("Типи документів (90 днів)", counts(r.by_type, "var(--accent)")));
         cols.appendChild(col("Які відомства (90 днів)", counts(r.by_agency, "var(--accent)")));
         cols.appendChild(col("Про що (90 днів)", counts(r.by_topic, "var(--accent)")));
         b.appendChild(cols);
 
+        if (opts && opts.compact) return;                        // на головній лише діаграми, без карток документів
         b.appendChild(el("h4", "wsub", "Останні документи"));
         const list = el("div", "doc-list");
         r.latest.slice(0, 6).forEach(function (x) {
@@ -158,38 +181,14 @@ const WIDGET_DEFS = (function () {
           a.lang = "en"; a.title = x.title_full || x.title;
           card.appendChild(a);
           card.appendChild(el("p", "doc-agency", x.agency));
-          card.appendChild(el("p", "small", x.topic_hint + " " + x.type_hint));
           list.appendChild(card);
         });
         b.appendChild(list);
-        const teach = r.to_teach || [], stale = r.stale_rules || [];
-        if (teach.length || stale.length) {
-          const box = el("details", "teach");
-          box.appendChild(el("summary", "", "База знань: " + teach.length + " документів без теми" + (stale.length ? ", застарілих правил: " + stale.length : "")));
-          if (teach.length) {
-            box.appendChild(el("p", "small", "Агент не знайшов для них правила. Щоб навчити його, додайте слово з назви й тему у файл knowledge/regulation.json (розділ «overrides»)."));
-            const ul = el("ul", "wlinks");
-            teach.forEach(function (x) {
-              const li = el("li", "", x.title);
-              li.appendChild(el("span", "small", " — " + x.agency + ", " + x.date));
-              ul.appendChild(li);
-            });
-            box.appendChild(ul);
-          }
-          if (stale.length) {
-            box.appendChild(el("p", "small", "Ці виправлення не спрацьовували понад 180 днів. Їх можна видалити з файлу, щоб база не розросталась:"));
-            const ul = el("ul", "wlinks");
-            stale.forEach(function (x) { ul.appendChild(el("li", "", "«" + x.contains + "» → " + x.topic + " (останній збіг: " + x.last_matched + ")")); });
-            box.appendChild(ul);
-          }
-          b.appendChild(box);
-        }
-        b.appendChild(note("Назви документів — англійською, як в оригіналі. Тема й пояснення визначені за правилами (не ШІ) і можуть помилятися; відкрийте оригінал, щоб перевірити."));
       },
     },
     {
-      id: "signals", title: "Сигнали по монетах (інформація, не порада)", agent: "signals", files: ["signals"], wide: true,
-      render: function (b, d) {
+      id: "signals", title: "Сигнали по монетах", help: "Сигнал за індикаторами: тренд, імпульс, перегрів. Це інформація, а не фінансова порада й не прогноз. Натисніть на рядок, щоб відкрити біржовий графік.", agent: "signals", files: ["signals"], wide: true,
+      render: function (b, d, opts) {
         const s = d.signals;
         const list = el("div", "wrows sig-rows");
         s.coins.forEach(function (c) {
@@ -200,10 +199,11 @@ const WIDGET_DEFS = (function () {
           row.appendChild(name);
           row.appendChild(Charts.signalGauge(c.score, c.signal));
           row.appendChild(el("span", "sig-label " + (c.tilt ? "tilt" : c.signal), c.tilt ? s.labels["tilt_" + c.tilt] : s.labels[c.signal]));
+          ChartTool.bind(row, coinSpec(c), "Відкрити графік " + c.symbol);
           list.appendChild(row);
         });
         b.appendChild(list);
-        b.appendChild(note(s.disclaimer));
+        if (opts && opts.compact) return;
         const more = el("p", "small");
         const l = el("a", "", "Докладно по кожній монеті"); l.href = "analytics.html#signals";
         more.appendChild(l);
@@ -211,11 +211,12 @@ const WIDGET_DEFS = (function () {
       },
     },
     {
-      id: "news", title: "Новини: головне зараз", agent: "news", files: ["analytics"], wide: true,
-      render: function (b, d) {
+      id: "news", title: "Новини: головне зараз", help: "Найважливіші історії за оцінкою агента й активність новин за добу. Клік по графіку відкриває його у великому вікні.", agent: "news", files: ["analytics"], wide: true, skipHome: true,
+      render: function (b, d, opts) {
         const a = d.analytics;
+        const compact = !!(opts && opts.compact);
         const ul = el("ul", "wlinks");
-        a.top.slice(0, 5).forEach(function (s) {
+        a.top.slice(0, compact ? 0 : 5).forEach(function (s) {
           const li = el("li", "");
           const link = el("a", "", s.title_uk || s.title);
           link.href = safeUrl(s.link); link.target = "_blank"; link.rel = "noopener noreferrer";
@@ -224,9 +225,13 @@ const WIDGET_DEFS = (function () {
           li.appendChild(el("span", "small", " — " + s.source + ", " + ago(s.published)));
           ul.appendChild(li);
         });
-        b.appendChild(ul);
-        b.appendChild(el("h4", "wsub", "Скільки матеріалів виходило щогодини за добу"));
-        b.appendChild(barChart(a.activity_24h, { label: "Активність новин за останні 24 години" }));
+        if (!compact) b.appendChild(ul);
+        b.appendChild(el("h4", "wsub", "Матеріалів щогодини за добу"));
+        const nowT = Date.parse(a.generated_at) || Date.now();
+        b.appendChild(openable(barChart(a.activity_24h, { label: "Активність новин за останні 24 години" }),
+          seriesSpec("news-activity", "Матеріалів у новинах щогодини", a.activity_24h, a.activity_24h.map(function (v, i) { return nowT - (23 - i) * 36e5; }),
+            function (v) { return "матеріалів: " + fmtNum(v, 0); }, "Джерело: новинний агент сайту."), "Відкрити графік активності новин"));
+        if (compact) return;
         if (a.conclusions && a.conclusions[1]) b.appendChild(note(a.conclusions[1]));
         const more = el("p", "small");
         const l1 = el("a", "", "Усі новини"); l1.href = "news.html";

@@ -28,19 +28,20 @@ PARTIALS = os.path.join(ROOT, "tools", "partials")
 
 # Які скрипти потрібні сторінці (порядок важливий: core.js завжди першим)
 PAGE_SCRIPTS = {
-    "index.html": ["core.js", "agent-ui.js", "charts.js", "widget-defs.js", "widgets.js", "home.js", "chartbg.js"],
-    "agents.html": ["core.js", "agent-ui.js", "charts.js", "widget-defs.js", "widgets.js", "agents.js"],
+    "index.html": ["core.js", "agent-ui.js", "charts.js", "chart-tool.js", "widget-defs.js", "widgets.js", "home.js", "chartbg.js"],
+    "simulation.html": ["core.js", "agent-ui.js", "simulation.js"],
+    "agents.html": ["core.js", "agent-ui.js", "charts.js", "chart-tool.js", "widget-defs.js", "widgets.js", "agents.js"],
     "learn.html": ["core.js", "learn.js"],
-    "market.html": ["core.js", "market-live.js", "market-charts.js", "market-calc.js",
+    "market.html": ["core.js", "agent-ui.js", "chart-tool.js", "market-live.js", "market-charts.js", "market-calc.js",
                     "market-heatmap.js", "market-alerts.js", "market.js"],
     "news.html": ["core.js", "news.js", "agent-ui.js", "feed.js"],
-    "analytics.html": ["core.js", "agent-ui.js", "charts.js", "analytics.js", "signals.js"],
+    "analytics.html": ["core.js", "agent-ui.js", "charts.js", "chart-tool.js", "analytics.js", "signals.js", "outlook.js", "report.js"],
     "sources.html": ["core.js"],
 }
 DEFAULT_SCRIPTS = ["core.js"]          # решта сторінок (news-*.html)
 
 # Підрозділ меню: сторінки новин підсвічують пункт «Новини»
-NAV = [("index.html", "Головна"), ("market.html", "Ринок"), ("news.html", "Новини"), ("analytics.html", "Аналітика"), ("agents.html", "Агенти"), ("learn.html", "Довідка")]
+NAV = [("index.html", "Головна"), ("market.html", "Ринок"), ("news.html", "Новини"), ("analytics.html", "Аналітика"), ("simulation.html", "Симуляція"), ("agents.html", "Агенти"), ("learn.html", "Довідка")]
 
 # Іконки пунктів меню (контури 24×24, колір береться з тексту посилання)
 ICONS = {
@@ -48,6 +49,7 @@ ICONS = {
     "market.html": "M4 19V5M4 19h16M8 15l4-5 3 3 4-6",
     "news.html": "M5 5h11v14H7a2 2 0 0 1-2-2zM16 9h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5",
     "analytics.html": "M5 20V10M12 20V4M19 20v-7",
+    "simulation.html": "M3 17l6-6 4 4 8-8M15 7h6v6",
     "agents.html": "M12 3v3M12 18v3M3 12h3M18 12h3M7 7l2 2M15 15l2 2M17 7l-2 2M9 15l-2 2M9 9h6v6H9z",
     "learn.html": "M4 5.5A1.5 1.5 0 0 1 5.5 4H12v15H5.5A1.5 1.5 0 0 0 4 20.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H12v15h6.5a1.5 1.5 0 0 1 1.5 1.5z",
 }
@@ -76,6 +78,11 @@ def file_hash(name):
         return hashlib.sha1(f.read().replace(b"\r\n", b"\n")).hexdigest()[:8]
 
 
+THEME_BTN = ('<button type="button" class="theme-toggle" id="themeToggle" aria-label="Темна або світла тема" title="Темна / світла тема" aria-pressed="false">'
+             '<svg class="ico-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>'
+             '<svg class="ico-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>')
+
+
 def render_header(page):
     tpl = read(os.path.join(PARTIALS, "header.html")).rstrip("\n")
     section = next((target for prefix, target in SECTION_OF_PREFIX.items() if page.startswith(prefix)), None)
@@ -86,12 +93,16 @@ def render_header(page):
             mark = ' aria-current="page"'
         elif href == section:
             mark = ' aria-current="true"'
-        links.append('      <a href="%s"%s>%s<span>%s</span></a>' % (href, mark, ICON_SVG % ICONS[href], label))
+        link = '      <a href="%s"%s>%s<span>%s</span></a>' % (href, mark, ICON_SVG % ICONS[href], label)
+        if href == "index.html":                           # кнопка теми стоїть поруч із «Головна»
+            link = '      <div class="nav-first">\n  %s\n      %s\n      </div>' % (link, THEME_BTN)
+        links.append(link)
     return tpl.replace("{{nav}}", "\n".join(links))
 
 
 def render_scripts(page):
-    names = PAGE_SCRIPTS.get(page, DEFAULT_SCRIPTS)
+    names = list(PAGE_SCRIPTS.get(page, DEFAULT_SCRIPTS))
+    names.insert(1, "help.js")            # підказки-помічник потрібні кожній сторінці (одразу після core.js)
     return "\n".join('  <script src="%s"></script>' % n for n in names)
 
 

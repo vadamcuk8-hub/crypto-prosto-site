@@ -18,7 +18,7 @@ except Exception:
     pass
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA = os.path.join(ROOT, "data")
+DATA = os.environ.get("CRYPTO_DATA_DIR") or os.path.join(ROOT, "data")
 STALE_MIN_S = 2700   # те саме правило, що isStale() у agent-ui.js
 MAX_DATA_MB = 20     # якщо папка data виросла більше, щось не прибирає за собою
 
@@ -30,6 +30,12 @@ CHECKS = {
     "stablecoins": {"stablecoins": ["total", "history", "top", "insights"]},
     "regulation": {"regulation": ["weeks", "latest", "insights"]},
     "signals": {"signals": ["coins", "backtest", "insights"]},
+    "outlook": {"outlook": ["coins", "market", "insights"]},
+    "report": {"report": ["headline", "sections", "archive", "insights"]},
+    "trader": {"trader": ["insights"]},
+    "analyst": {"analyst": ["insights"]},
+    "notify": {"notify": ["insights"]},
+    "simulation": {"simulation": ["paper", "strategies", "insights"], "simulation_history": ["coins"]},
     "news": {"news": ["items"], "analytics": ["top", "activity_24h", "conclusions"]},
 }
 

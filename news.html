@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Новини — Крипто простими словами</title>
-  <link rel="stylesheet" href="style.css?v=eae9ccdb">
+  <link rel="stylesheet" href="style.css?v=f66d95e5">
 </head>
 <body>
 
@@ -12,10 +12,14 @@
   <header>
     <button class="menu-btn" id="menuBtn" aria-label="Відкрити меню" aria-expanded="false" aria-controls="mainNav"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <nav id="mainNav" aria-label="Основне меню">
-      <a href="index.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg><span>Головна</span></a>
+      <div class="nav-first">
+        <a href="index.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg><span>Головна</span></a>
+      <button type="button" class="theme-toggle" id="themeToggle" aria-label="Темна або світла тема" title="Темна / світла тема" aria-pressed="false"><svg class="ico-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><svg class="ico-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+      </div>
       <a href="market.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l4-5 3 3 4-6"/></svg><span>Ринок</span></a>
       <a href="news.html" aria-current="page"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h11v14H7a2 2 0 0 1-2-2zM16 9h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5"/></svg><span>Новини</span></a>
       <a href="analytics.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Аналітика</span></a>
+      <a href="simulation.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg><span>Симуляція</span></a>
       <a href="agents.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M7 7l2 2M15 15l2 2M17 7l-2 2M9 15l-2 2M9 9h6v6H9z"/></svg><span>Агенти</span></a>
       <a href="learn.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H12v15H5.5A1.5 1.5 0 0 0 4 20.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H12v15h6.5a1.5 1.5 0 0 1 1.5 1.5z"/></svg><span>Довідка</span></a>
     </nav>
@@ -24,7 +28,6 @@
 
   <section class="page-title">
     <h1>Новини</h1>
-    <p>Жива стрічка з автоматично оновлюваних джерел і головні сюжети місяця, пояснені простими словами. Висновки за стрічкою зібрано у розділі <a href="analytics.html">«Аналітика»</a>. Живі ціни й аналіз дивіться на сторінці <a href="market.html">«Ринок»</a>.</p>
     <div class="subtabs" role="navigation" aria-label="Розділи сторінки">
       <a href="#live">Жива стрічка</a>
       <a href="#news">Головні сюжети</a>
@@ -34,10 +37,7 @@
   </section>
 <!-- Жива стрічка: заповнюється скриптом feed.js з файлу data/news.json -->
   <section id="live">
-    <h2>Жива стрічка</h2>
-    <p class="muted">Новини з CoinDesk, The Block, Decrypt, Cointelegraph, Bitcoin Magazine, Forklog UA та офіційних джерел (SEC, Federal Register).
-    Новинний агент відсіює рекламу й «хайп», зливає повтори й показує, скільки видань підтвердили історію.
-    Англомовні заголовки автоматично перекладено українською (машинний переклад, може бути неточним), оригінал завжди видно під заголовком. Власних українських матеріалів про крипто у відкритих стрічках небагато. Висновки за стрічкою дивіться в розділі <a href="analytics.html">«Аналітика»</a>.</p>
+    <h2 data-hinfo="Джерела: CoinDesk, The Block, Decrypt, Cointelegraph, Bitcoin Magazine, Forklog UA та офіційні SEC і Federal Register. Агент відсіює рекламу, зливає повтори й показує, скільки видань підтвердили історію. Англомовні заголовки перекладено автоматично (може бути неточно), оригінал видно під заголовком. Відсіювання може помилятися: перед рішеннями про гроші перевіряйте новину в першоджерелі.">Жива стрічка</h2>
 
     <p class="feed-status" id="liveStatus" role="status">Завантаження стрічки…</p>
     <p class="note feed-stale" id="feedStale" hidden></p>
@@ -106,7 +106,6 @@
     <div class="feed" id="liveFeed" aria-live="polite"></div>
     <p class="small" id="feedCount"></p>
     <button type="button" class="chip" id="feedMore" hidden>Показати ще</button>
-    <p class="small">Заголовки та короткі описи належать їхнім видавцям; натискання веде на оригінальну сторінку. Автоматичне відсіювання може помилятися: перед рішеннями про гроші перевіряйте новину в першоджерелі.</p>
   </section>
 
   <!-- Новини -->
@@ -308,10 +307,11 @@
   </footer>
   <!-- @/footer -->
   <!-- @scripts -->
-  <script src="core.js?v=f8e9e184"></script>
+  <script src="core.js?v=7eb40fca"></script>
+  <script src="help.js?v=9d22fa8f"></script>
   <script src="news.js?v=f6b5731c"></script>
   <script src="agent-ui.js?v=9259d765"></script>
-  <script src="feed.js?v=d5bb36f0"></script>
+  <script src="feed.js?v=e3cb2506"></script>
   <!-- @/scripts -->
 </body>
 </html>

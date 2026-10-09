@@ -123,6 +123,7 @@
         box.innerHTML = "";
         Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; }).forEach(function (key) {
           const b = el("button", "fchip", "");
+          b.setAttribute("data-help", "Відфільтрувати стрічку за цим пунктом; ще раз натисніть, щоб прибрати");
           b.type = "button";
           b.dataset.key = key;
           b.setAttribute("aria-pressed", set.has(key) ? "true" : "false");
@@ -184,6 +185,7 @@
       activeBox.innerHTML = "";
       pills.forEach(function (p) {
         const b = el("button", "pill", p.text + " ×");
+        b.setAttribute("data-help", "Прибрати цей фільтр");
         b.type = "button";
         b.setAttribute("aria-label", "Прибрати фільтр: " + p.text);
         b.addEventListener("click", function () { p.clear(); changed(); });
@@ -191,6 +193,7 @@
       });
       if (pills.length > 1) {
         const r = el("button", "pill pill-reset", "Скинути все");
+        r.setAttribute("data-help", "Прибрати всі фільтри й пошук");
         r.type = "button";
         r.addEventListener("click", function () { resetAll(); changed(); });
         activeBox.appendChild(r);
@@ -356,6 +359,7 @@
         const box = el("div", "feed-empty");
         box.appendChild(el("p", "", "За цими умовами новин немає."));
         const b = el("button", "chip", "Скинути фільтри");
+        b.setAttribute("data-help", "Прибрати всі фільтри й пошук, щоб побачити всю стрічку");
         b.type = "button";
         b.addEventListener("click", function () { resetAll(); changed(); });
         box.appendChild(b);

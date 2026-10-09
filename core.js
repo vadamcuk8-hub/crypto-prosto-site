@@ -6,13 +6,29 @@ const root = document.documentElement;
 // ---------- Тема: сайт сам повторює налаштування системи (світла або темна) ----------
 const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
+// Вибір користувача (кнопка біля «Головна») зберігається в браузері й має перевагу над системною темою
+function savedTheme() { try { const v = localStorage.getItem("theme"); return v === "dark" || v === "light" ? v : null; } catch (e) { return null; } }
+
 function applyTheme() {
-  root.setAttribute("data-theme", darkQuery.matches ? "dark" : "light");
+  const theme = savedTheme() || (darkQuery.matches ? "dark" : "light");
+  root.setAttribute("data-theme", theme);
+  const btn = document.getElementById("themeToggle");
+  if (btn) { btn.setAttribute("aria-pressed", theme === "dark" ? "true" : "false"); btn.title = theme === "dark" ? "Увімкнути світлу тему" : "Увімкнути темну тему"; }
   document.dispatchEvent(new Event("themechange"));   // модулі сторінок (наприклад, теплова карта) можуть оновити свої кольори
 }
 
 applyTheme();
 if (darkQuery.addEventListener) darkQuery.addEventListener("change", applyTheme);
+document.addEventListener("DOMContentLoaded", function () {
+  const btn = document.getElementById("themeToggle");
+  if (!btn) return;
+  applyTheme();
+  btn.addEventListener("click", function () {
+    const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    try { localStorage.setItem("theme", next); } catch (e) { /* без збереження: діє до перезавантаження */ }
+    applyTheme();
+  });
+});
 
 // ---------- Спільні помічники ----------
 
@@ -79,6 +95,7 @@ if (menuBtn && mainNav) {
 // ---------- Кнопка «Нагору» (на всіх сторінках) ----------
 (function () {
   const up = document.createElement("button");
+  up.setAttribute("data-help", "Прокрутити сторінку нагору");
   up.className = "to-top";
   up.type = "button";
   up.setAttribute("aria-label", "Нагору");

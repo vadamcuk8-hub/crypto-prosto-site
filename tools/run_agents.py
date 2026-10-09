@@ -5,6 +5,10 @@
   sentiment    Настрій: індекс страху й жадібності за 30 днів (Alternative.me)                кожні 30 хв
   stablecoins  Стейблкоїни: пропозиція, лідери, динаміка (DefiLlama)                           кожні 30 хв
   network      Мережа біткоїна: комісії, черга, потужність (mempool.space)                     кожні 3 хв
+  trader       Тестова біржа: автоматично купує й продає на Binance Testnet (ненастоящі гроші) за правилом із «Симуляції»
+  simulation   Симуляція: 7-денний паперовий рахунок на 100, 1000, 10000 $ і перевірка правил на історії цін (щоразу)
+  report       Звіт: щоденний звіт по ринку з розділами, застереженнями й архівом (після «Картини»)
+  outlook      Картина: зводить сигнали, новини, настрій і потоки грошей у фон по кожній монеті (без порад)  після решти
   signals      Сигнали: тренд, RSI, MACD по 8 популярних монетах і перевірка на минулому (Binance) кожну годину
   regulation   Регулювання: нові офіційні документи США про крипто (Federal Register)          щогодини
   news         Новини й аналітика: стрічки видань, фільтрація, переклад, висновки (news_agent)  кожні 10 хв
@@ -28,7 +32,7 @@ try:
 except Exception:
     pass
 
-from agents import agent_signals, ai_summary, agent_market, agent_network, agent_regulation, agent_sentiment, agent_stablecoins
+from agents import agent_outlook, agent_report, agent_signals, agent_simulation, agent_trader, agent_analyst, agent_notify, ai_summary, agent_market, agent_network, agent_regulation, agent_sentiment, agent_stablecoins
 from agents.common import DATA, log, now_iso, record_history, write_json
 import news_agent
 
@@ -53,7 +57,7 @@ class NewsAgent:
                 "positive_share": round(100 * s.get("positive", 0) / n)}
 
 
-AGENTS = [agent_market, agent_network, agent_sentiment, agent_stablecoins, agent_regulation, agent_signals, NewsAgent]
+AGENTS = [agent_market, agent_network, agent_sentiment, agent_stablecoins, agent_regulation, agent_signals, NewsAgent, agent_outlook, agent_report, agent_simulation, agent_trader, agent_analyst, agent_notify]
 lock = threading.Lock()
 
 
@@ -105,7 +109,11 @@ def main():
 
     with ThreadPoolExecutor(max_workers=len(chosen)) as pool:
         if not watch:
-            list(pool.map(run_agent, chosen))
+            # агент «Картина» читає файли решти, тому в разовому запуску іде останнім
+            list(pool.map(run_agent, [a for a in chosen if not getattr(a, "RUNS_LAST", False)]))
+            for a in chosen:
+                if getattr(a, "RUNS_LAST", False):
+                    run_agent(a)
             return
         log("керує", "агенти працюють постійно: %s. Зупинити: Ctrl+C." % ", ".join(a.NAME for a in chosen))
         next_run = {a.NAME: 0 for a in chosen}

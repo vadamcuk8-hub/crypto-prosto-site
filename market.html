@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ринок — Крипто простими словами</title>
-  <link rel="stylesheet" href="style.css?v=eae9ccdb">
+  <link rel="stylesheet" href="style.css?v=f66d95e5">
 </head>
 <body>
 
@@ -12,10 +12,14 @@
   <header>
     <button class="menu-btn" id="menuBtn" aria-label="Відкрити меню" aria-expanded="false" aria-controls="mainNav"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <nav id="mainNav" aria-label="Основне меню">
-      <a href="index.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg><span>Головна</span></a>
+      <div class="nav-first">
+        <a href="index.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg><span>Головна</span></a>
+      <button type="button" class="theme-toggle" id="themeToggle" aria-label="Темна або світла тема" title="Темна / світла тема" aria-pressed="false"><svg class="ico-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><svg class="ico-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+      </div>
       <a href="market.html" aria-current="page"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l4-5 3 3 4-6"/></svg><span>Ринок</span></a>
       <a href="news.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h11v14H7a2 2 0 0 1-2-2zM16 9h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5"/></svg><span>Новини</span></a>
       <a href="analytics.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Аналітика</span></a>
+      <a href="simulation.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg><span>Симуляція</span></a>
       <a href="agents.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M7 7l2 2M15 15l2 2M17 7l-2 2M9 15l-2 2M9 9h6v6H9z"/></svg><span>Агенти</span></a>
       <a href="learn.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H12v15H5.5A1.5 1.5 0 0 0 4 20.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H12v15h6.5a1.5 1.5 0 0 1 1.5 1.5z"/></svg><span>Довідка</span></a>
     </nav>
@@ -24,7 +28,6 @@
 
   <section class="page-title">
     <h1>Ринок: курси й аналіз</h1>
-    <p>Живі курси, графіки, автоматичний огляд, настрій і теплова карта ринку, калькулятор та сповіщення про ціну. Новини зібрані окремо на сторінці <a href="news.html">«Новини»</a>.</p>
     <div class="subtabs" role="navigation" aria-label="Розділи сторінки">
       <a href="#market">Курси і графіки</a>
       <a href="#heatmap">Теплова карта ринку</a>
@@ -35,8 +38,7 @@
   </section>
   <!-- Живі курси: заповнюються скриптом script.js -->
   <section id="market">
-    <h2>Курси сьогодні</h2>
-    <p class="muted">Ціни криптовалют у доларах і курс гривні за даними Національного банку України. Оновлюються автоматично.</p>
+    <h2 data-hinfo="Ціни монет у вибраній валюті. Оновлюються щосекунди з біржі Binance; гривня й євро за курсом Національного банку України.">Курси сьогодні</h2>
 
     <div class="filters" id="currencyTabs" role="group" aria-label="Валюта цін">
       <button class="currency-tab" data-cur="usd">Долар $</button>
@@ -52,17 +54,16 @@
 
     <!-- Автоматичний аналіз: скрипт пише висновки за живими цінами (без ШІ, за простими правилами) -->
     <div class="analysis" id="analysis" hidden>
-      <h3>Автоматичний огляд ринку</h3>
+      <h3 data-hinfo="Огляд створює програма за простими правилами з поточних цін. Це не прогноз і не фінансова порада.">Автоматичний огляд ринку</h3>
       <ul id="analysisList"></ul>
-      <p class="small">Огляд створює програма за простими правилами з поточних цін. Це не прогноз і не фінансова порада.</p>
     </div>
 
-    <h3 class="sub">Настрій ринку: страх чи жадібність</h3>
+    <h3 class="sub" data-hinfo="Індекс від 0 до 100: низько означає страх, високо жадібність. Джерело: Alternative.me.">Настрій ринку: страх чи жадібність</h3>
     <div class="chart" id="fng">
       <p class="muted">Завантаження…</p>
     </div>
 
-    <h3 class="sub">Графіки: оберіть монету</h3>
+    <h3 class="sub" data-hinfo="Оберіть монету, потім період. Кнопка «Відкрити на весь екран» відкриває біржовий графік: свічки наживо, масштаб, лінії, лінійка. Клік по самому графіку теж його відкриває.">Графіки: оберіть монету</h3>
     <div class="filters" id="coinTabs">
       <button class="coin-tab active" data-coin="bitcoin">Біткоїн</button>
       <button class="coin-tab" data-coin="ethereum">Ефіріум</button>
@@ -80,13 +81,14 @@
       <button class="period-tab" data-days="1">1 день</button>
       <button class="period-tab active" data-days="7">7 днів</button>
       <button class="period-tab" data-days="30">30 днів</button>
-      <button type="button" class="chip" id="csvBtn" title="Зберегти дані графіка у файл для Excel">Завантажити CSV</button>
+      <button type="button" class="chip" id="csvBtn">Завантажити CSV</button>
+      <button type="button" class="chip chip-main" id="openChart">Відкрити на весь екран</button>
     </div>
     <div class="chart" id="btcChart">
       <p class="muted">Завантаження графіка…</p>
     </div>
 
-    <h3 class="sub" id="calc">Калькулятор: скільки це коштує</h3>
+    <h3 class="sub" id="calc" data-hinfo="Рахує в обидва боки: з монети в гроші або з гривні чи доларів у монету. Курс поточний, гривня за НБУ. Це орієнтир, а не пропозиція купити чи продати.">Калькулятор: скільки це коштує</h3>
     <div class="calc">
       <div class="calc-row">
         <input type="text" inputmode="decimal" id="calcAmt" value="0,01" aria-label="Кількість">
@@ -125,10 +127,9 @@
         <button type="button" class="chip" data-v="100">100</button>
         <button type="button" class="chip" data-v="1000">1000</button>
       </div>
-      <p class="small">Можна рахувати в обидва боки: з монети в гроші або з гривні чи доларів у монету. Курс — поточний, гривня — за НБУ. Це орієнтир, а не пропозиція купити чи продати.</p>
     </div>
 
-    <h3 class="sub" id="alerts">Сповіщення про ціну</h3>
+    <h3 class="sub" id="alerts" data-hinfo="Працюють, лише поки ця сторінка відкрита: сайт не має сервера, який стежив би за ціною за вас. Налаштування зберігаються у вашому браузері.">Сповіщення про ціну</h3>
     <div class="calc" id="alertsBox">
       <div class="calc-row">
         <select id="alertCoin" aria-label="Монета для сповіщення">
@@ -150,7 +151,6 @@
       <div class="calc-row">
         <button type="button" class="chip" id="alertPerm" hidden>Дозволити сповіщення браузера</button>
       </div>
-      <p class="small">Сповіщення працюють, лише поки ця сторінка відкрита: сайт не має сервера, який стежив би за ціною за вас. Налаштування зберігаються у вашому браузері.</p>
     </div>
 
     <h3 class="sub">Курс гривні (НБУ)</h3>
@@ -162,8 +162,7 @@
 
   <!-- Теплова карта ринку -->
   <section id="heatmap">
-    <h2>Теплова карта ринку</h2>
-    <p class="muted">Зміна ціни кожної монети за останні 24 години. Чим насиченіший колір, тим сильніший рух: зелений означає зростання, червоний падіння. Оновлюється щосекунди.</p>
+    <h2 data-hinfo="Зміна ціни кожної монети за 24 години. Чим насиченіший колір, тим сильніший рух: зелений зростання, червоний падіння. Оновлюється щосекунди. Клік по плитці відкриває графік монети.">Теплова карта ринку</h2>
     <div class="heatmap" id="heatmapBox">
       <div class="heat-tile">Завантаження…</div>
     </div>
@@ -172,7 +171,6 @@
       <span class="heat-bar"></span>
       <span>+8% і більше</span>
     </div>
-    <p class="small">Клікніть на плитку, щоб побачити графіки цієї монети. Це довідкова інформація, а не порада щось купувати.</p>
   </section>
 
   
@@ -228,13 +226,16 @@
   </footer>
   <!-- @/footer -->
   <!-- @scripts -->
-  <script src="core.js?v=f8e9e184"></script>
-  <script src="market-live.js?v=c626a45a"></script>
+  <script src="core.js?v=7eb40fca"></script>
+  <script src="help.js?v=9d22fa8f"></script>
+  <script src="agent-ui.js?v=9259d765"></script>
+  <script src="chart-tool.js?v=997c0a3a"></script>
+  <script src="market-live.js?v=999ea961"></script>
   <script src="market-charts.js?v=e182b348"></script>
   <script src="market-calc.js?v=34d186b8"></script>
   <script src="market-heatmap.js?v=55ae7df0"></script>
-  <script src="market-alerts.js?v=d328177c"></script>
-  <script src="market.js?v=235c43a3"></script>
+  <script src="market-alerts.js?v=bbee1be4"></script>
+  <script src="market.js?v=fe709a83"></script>
   <!-- @/scripts -->
 </body>
 </html>

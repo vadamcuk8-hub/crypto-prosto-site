@@ -20,15 +20,16 @@ def run():
     top = [dict(x, share=round(100 * x["supply"] / total, 2)) for x in usd[:6]]
 
     chart = get_json("https://stablecoins.llama.fi/stablecoincharts/all")
-    series = []
+    series, stamps = [], []
     for p in chart[-120:]:
         v = (p.get("totalCirculatingUSD") or {}).get("peggedUSD")
         if v:
             series.append(v)
+            stamps.append(int(p["date"]))
     change30 = round(100 * (series[-1] / series[-31] - 1), 2) if len(series) > 31 else None
     result = {
         "total": total, "count": len(usd), "top": top,
-        "history": [round(v) for v in downsample(series, 60)], "change30": change30,
+        "history": [round(v) for v in downsample(series, 60)], "history_t": downsample(stamps, 60), "change30": change30,
         "updated": now_iso(),
     }
     result["insights"] = insights(result)

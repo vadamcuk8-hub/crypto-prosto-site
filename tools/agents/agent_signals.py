@@ -151,11 +151,11 @@ GECKO = "CoinGecko (агрегатор, не біржа)"             # запа
 used_source = {}                                       # монета → звідки реально взято її дані (для показу на сайті)
 
 
-def fetch_series(pair):
+def fetch_series(pair, limit=400):
     """Денні ціни закриття й обсяги торгів (у доларах) з Binance; None, якщо даних замало чи біржа недоступна."""
     for host in HOSTS:
         try:
-            rows = get_json("%s/api/v3/klines?symbol=%s&interval=1d&limit=400" % (host, pair), retries=0)
+            rows = get_json("%s/api/v3/klines?symbol=%s&interval=1d&limit=%d" % (host, pair, limit), retries=0)
             if len(rows) >= MIN_CANDLES:
                 used_source[pair[:-4]] = EXCHANGE
                 return [float(r[4]) for r in rows], [float(r[7]) for r in rows]

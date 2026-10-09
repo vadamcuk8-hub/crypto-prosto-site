@@ -29,6 +29,23 @@
       knowledge: "knowledge/signals.json",
       history: [{ key: "avg_score", title: "Середня оцінка сигналів (-100…100)", fmt: "int" }, { key: "buyers", title: "Монет з перевагою покупців", fmt: "int" },
         { key: "sellers", title: "Монет з перевагою продавців", fmt: "int" }] },
+    { id: "outlook", label: "Картина", task: "Зводить сигнали, новини, настрій і потоки грошей у загальний фон по монетах (без порад).", files: ["outlook"], insights: "outlook",
+      knowledge: "knowledge/outlook.json",
+      history: [{ key: "avg_score", title: "Середня оцінка фону (-100…100)", fmt: "int" }, { key: "favorable", title: "Монет зі сприятливим фоном", fmt: "int" },
+        { key: "unfavorable", title: "Монет із несприятливим фоном", fmt: "int" }] },
+    { id: "report", label: "Звіт", task: "Щодня складає звіт по ринку: підсумок, настрій, монети, новини, застереження й архів.", files: ["report"], insights: "report",
+      knowledge: "knowledge/report.json",
+      history: [{ key: "avg_score", title: "Середня оцінка фону за днями", fmt: "int" }, { key: "watch", title: "Кількість застережень у звіті", fmt: "int" }] },
+    { id: "simulation", label: "Симуляція", task: "Перевіряє, чи заробляли б сигнали: 7-денний паперовий рахунок і симуляція на історії цін.", files: ["simulation"], insights: "simulation",
+      knowledge: "knowledge/simulation.json",
+      history: [{ key: "median_ret", title: "Медіанний результат правила за 365 днів, %", fmt: "pct" }, { key: "median_hold", title: "Медіанний результат «просто тримати», %", fmt: "pct" }] },
+    { id: "trader", label: "Тестова біржа", task: "Автоматично купує й продає на тестовій біржі (ненастоящі гроші) за сигналами.", files: ["trader"], insights: "trader",
+      knowledge: "knowledge/trader.json",
+      history: [{ key: "ret", title: "Результат тестового рахунку, %", fmt: "pct" }, { key: "orders", title: "Ордерів усього", fmt: "int" }] },
+    { id: "analyst", label: "Аналітик рішень", task: "Перевіряє, чи окупаються угоди різної тривалості після комісій, і підбирає параметри для асистента.", files: ["analyst"], insights: "analyst",
+      knowledge: "knowledge/analyst.json" },
+    { id: "notify", label: "Сповіщення Telegram", task: "Надсилає в Telegram рішення віртуальної симуляції (потрібні секрети TELEGRAM_BOT_TOKEN і TELEGRAM_CHAT_ID).", files: ["notify"], insights: "notify",
+      knowledge: "knowledge/notify.json" },
     { id: "news", label: "Новини", task: "Про що пишуть видання й який тон новин.", files: ["news", "analytics"], insights: "analytics",
       history: [{ key: "total", title: "Матеріалів у стрічці за добу", fmt: "int" }, { key: "negative_share", title: "Частка негативних заголовків", fmt: "pct" },
         { key: "positive_share", title: "Частка позитивних заголовків", fmt: "pct" }] },
@@ -63,6 +80,7 @@
     const b = el("button", "agent-tab");
     b.type = "button";
     b.id = "tab-" + id;
+    b.setAttribute("data-help", id === "all" ? "Огляд: головний висновок кожного агента одним рядком" : "Відкрити аналітику цього агента: висновки, графіки й історія");
     b.setAttribute("role", "tab");
     b.setAttribute("aria-controls", "panel-" + id);
     b.appendChild(el("span", "tab-dot"));
@@ -141,7 +159,9 @@
 
   function renderInsights(v) {
     const list = insightData[v.info.id] || [];
-    v.insights.replaceChildren(el("h3", "agent-sub", "Висновки"));
+    const h = el("h3", "agent-sub", "Висновки");
+    h.appendChild(Help.icon("Висновки складено автоматично за правилами й можуть помилятися. Це не фінансова порада."));
+    v.insights.replaceChildren(h);
     if (!list.length) { v.insights.appendChild(el("p", "small", "Висновків поки немає: агент ще не створив дані.")); return; }
     const ul = el("ul", "insights");
     list.forEach(function (x) {
@@ -158,10 +178,9 @@
       const box = el("div", "ai-note");
       box.appendChild(el("h4", "wsub", "Пояснення простими словами (ШІ)"));
       box.appendChild(el("p", "", ai.text));
-      box.appendChild(el("p", "small", "Написано автоматично моделлю " + ai.model + " на основі висновків вище, " + ago(ai.at) + ". Може помилятися."));
+      box.appendChild(el("p", "small", ai.model + " · " + ago(ai.at)));
       v.insights.appendChild(box);
     }
-    v.insights.appendChild(el("p", "small", "Висновки складено автоматично за правилами й можуть помилятися. Це не фінансова порада."));
   }
 
   // Історія агента: одна точка на день (data/history/<агент>.json). Поки точок мало, пояснюємо, що вона накопичується.
@@ -179,13 +198,18 @@
       if (vals.length < 2) return;
       const c = el("div", "wcol");
       c.appendChild(el("h4", "wsub", h.title));
-      c.appendChild(Charts.lineChart(vals, { color: "var(--accent)", label: h.title, h: 80 }));
+      const pts = rows.filter(function (r) { return typeof r.values[h.key] === "number"; }).map(function (r) { return { t: Date.parse(r.date), c: r.values[h.key] }; });
+      const wrap = el("div", "chart-open");
+      wrap.appendChild(Charts.lineChart(vals, { color: "var(--accent)", label: h.title, h: 80 }));
+      ChartTool.bind(wrap, function () {
+        return { id: "hist-" + v.info.id + "-" + h.key, title: h.title, points: pts, format: function (x) { return fmtValue(h.fmt, x); }, source: "Історія агента по днях." };
+      }, "Відкрити графік: " + h.title);
+      c.appendChild(wrap);
       c.appendChild(el("p", "small", "Зараз " + fmtValue(h.fmt, vals[vals.length - 1]) + " · від " + fmtValue(h.fmt, Math.min.apply(null, vals)) +
         " до " + fmtValue(h.fmt, Math.max.apply(null, vals))));
       grid.appendChild(c);
     });
     v.hist.appendChild(grid);
-    v.hist.appendChild(el("p", "small", "З " + rows[0].date + " по " + rows[rows.length - 1].date + " (" + rows.length + " точок; старіші дані стискаються самі)."));
   }
 
   function renderTech(v) {
@@ -204,6 +228,28 @@
     if (v.info.knowledge) fact("База знань (пороги й тексти)", v.info.knowledge, v.info.knowledge);
     v.tech.appendChild(dl);
     if (st && st.error) v.tech.appendChild(el("p", "note", "Остання помилка: " + st.error));
+    if (v.info.id === "regulation") renderTeach(v);
+  }
+
+  // База знань «Регулювання»: документи, для яких агент не знайшов теми, і застарілі виправлення (службова інформація)
+  async function renderTeach(v) {
+    let r;
+    try { r = await loadJson("data/regulation.json"); } catch (e) { return; }
+    const teach = r.to_teach || [], stale = r.stale_rules || [];
+    if (!teach.length && !stale.length) return;
+    v.tech.appendChild(el("h4", "wsub", "База знань: " + teach.length + " документів без теми" + (stale.length ? ", застарілих правил: " + stale.length : "")));
+    if (teach.length) {
+      v.tech.appendChild(el("p", "small", "Агент не знайшов для них правила. Щоб навчити його, додайте слово з назви й тему у файл knowledge/regulation.json (розділ «overrides»)."));
+      const ul = el("ul", "wlinks");
+      teach.forEach(function (x) { const li = el("li", "", x.title); li.appendChild(el("span", "small", " — " + x.agency + ", " + x.date)); ul.appendChild(li); });
+      v.tech.appendChild(ul);
+    }
+    if (stale.length) {
+      v.tech.appendChild(el("p", "small", "Ці виправлення не спрацьовували понад 180 днів. Їх можна видалити з файлу:"));
+      const ul = el("ul", "wlinks");
+      stale.forEach(function (x) { ul.appendChild(el("li", "", "«" + x.contains + "» → " + x.topic + " (останній збіг: " + x.last_matched + ")")); });
+      v.tech.appendChild(ul);
+    }
   }
 
   function renderOverview() {

@@ -1,0 +1,9 @@
+{
+  "_help": "База знань агента «Тестова біржа». Він торгує ЛИШЕ на тестовій біржі Binance Testnet (ненастоящі гроші) за рішеннями вибраного правила з агента «Симуляція». strategy — яке правило виконувати (id із knowledge/simulation.json), coins — на яких монетах, allocation — яку частину капіталу пускати в торгівлю, min_order_usdt — мінімальна сума ордера. Ключі до тестової біржі беруться зі змінних середовища BINANCE_TESTNET_API_KEY і BINANCE_TESTNET_API_SECRET (на GitHub це секрети Actions), у файли їх не пишіть.",
+  "base_url": "https://testnet.binance.vision",
+  "strategy": "trend_1h",
+  "coins": ["BTC", "ETH", "SOL"],
+  "allocation": 0.95,
+  "min_order_usdt": 10,
+  "log_size": 200
+}

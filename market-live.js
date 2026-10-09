@@ -106,17 +106,24 @@ function connectLive() {
   socket.onerror = function () { socket.close(); };
 }
 
-// Робить елемент кнопкою «показати графіки цієї монети» (картки цін і плитки теплової карти)
+// Відкриває біржовий графік монети (chart-tool.js): свічки наживо, масштаб, лінії, лінійка
+function openCoinChart(id) {
+  const c = coins[id];
+  if (!c || !c.pair || typeof ChartTool === "undefined") return;
+  ChartTool.open({ symbol: c.pair.replace("usdt", "").toUpperCase(), name: c.name });
+}
+
+// Робить елемент кнопкою «відкрити графік цієї монети» (картки цін і плитки теплової карти)
 function makeCoinPicker(el, id, title) {
   el.classList.add("clickable");
   el.tabIndex = 0;
   el.setAttribute("role", "button");
-  el.title = title;
+  el.setAttribute("data-help", "Відкрити графік " + coins[id].name + " наживо: свічки з біржі Binance, масштаб, лінії, лінійка");
+  el.setAttribute("aria-label", "Відкрити графік " + coins[id].name);
   function pick() {
     const tab = document.querySelector('.coin-tab[data-coin="' + id + '"]');
-    if (tab) tab.click();
-    const target = document.getElementById("coinTabs");
-    if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (tab) tab.click();                              // графіки на сторінці теж перемикаємо на цю монету
+    openCoinChart(id);                                 // і відкриваємо біржовий графік у великому вікні
   }
   el.addEventListener("click", pick);
   el.addEventListener("keydown", function (e) {
@@ -175,10 +182,7 @@ function renderPrices() {
   const meta = document.getElementById("cryptoMeta");
   if (meta && any) {
     const live = state.bitcoin && Date.now() - state.bitcoin.liveAt < LIVE_MS;
-    setText(meta, (live
-      ? "● Наживо, оновлення щосекунди (Binance). "
-      : "Оновлення раз на хвилину (CoinGecko). ") +
-      "Це довідкова інформація, а не порада щось купувати.");
+    setText(meta, live ? "● Наживо, щосекунди (Binance)" : "Оновлення раз на хвилину (CoinGecko)");
   }
 }
 

@@ -1,25 +1,32 @@
-name: Оновлення даних
+name: Оновлення даних і публікація
 
-# Раз на 10 хвилин запускає агентів (tools/run_agents.py) і зберігає свіжі data/*.json у репозиторій.
-# GitHub Pages віддає сайт із цієї гілки, тому відвідувачі бачать нові дані без вашого комп'ютера.
-# Запустити вручну: вкладка Actions → «Оновлення даних» → Run workflow.
+# Раз на ~10 хвилин запускає агентів і публікує сайт зі свіжими даними.
+# Щоб репозиторій не розростався, дані НЕ комітяться в main: стан агентів зберігається в окремій гілці «data»,
+# яка щоразу перезаписується одним комітом (історії немає), а сайт публікується напряму через GitHub Pages (Actions).
+# Також запускається при зміні коду в main і вручну: вкладка Actions → Run workflow.
+#
+# ОДИН РАЗ перед першим запуском: Settings → Pages → Build and deployment → Source: «GitHub Actions».
 on:
   schedule:
     - cron: "*/10 * * * *"
   workflow_dispatch:
+  push:
+    branches: [main]
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
-# Два запуски одночасно не потрібні: черга з одного
+# Один запуск за раз: черга з одного
 concurrency:
-  group: update-data
+  group: site-update
   cancel-in-progress: false
 
 jobs:
-  update:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
 
@@ -27,26 +34,64 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Запустити агентів
-        env:
-          # Необов'язково: якщо додати секрет ANTHROPIC_API_KEY (Settings → Secrets → Actions),
-          # переклад новин буде якіснішим. Без нього працює безкоштовний переклад.
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python tools/run_agents.py
-
-      - name: Зберегти оновлені дані
+      - name: Підтягнути стан даних із гілки data
         run: |
-          git config user.name "data-bot"
-          git config user.email "data-bot@users.noreply.github.com"
-          git add data
-          if git diff --cached --quiet; then
-            echo "Змін немає"
+          if git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
+            git fetch --depth=1 origin data
+            mkdir -p /tmp/databranch
+            git archive FETCH_HEAD | tar -x -C /tmp/databranch
+            rm -rf data && mkdir data
+            cp -a /tmp/databranch/. data/
+            echo "Дані взято з гілки data"
           else
-            git commit -m "Оновлення даних $(date -u +'%Y-%m-%d %H:%M') UTC"
-            git pull --rebase origin "${GITHUB_REF_NAME}"
-            git push
+            echo "Гілки data ще немає: стартуємо з файлів у main"
+            mkdir -p data
           fi
 
-      # Після збереження: якщо якийсь агент зламався чи його дані порожні, запуск стане червоним
+      - name: Запустити агентів
+        env:
+          # Необов'язково: секрет ANTHROPIC_API_KEY (Settings → Secrets → Actions) дає якісніший переклад і ШІ-пояснення
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Необов'язково: ключі ТЕСТОВОЇ біржі Binance Testnet (ненастоящі гроші); без них агент «Тестова біржа» нічого не робить
+          BINANCE_TESTNET_API_KEY: ${{ secrets.BINANCE_TESTNET_API_KEY }}
+          BINANCE_TESTNET_API_SECRET: ${{ secrets.BINANCE_TESTNET_API_SECRET }}
+          # Необов'язково: Telegram-сповіщення (секрети, не пишіть їх у файли чи чат)
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python tools/run_agents.py
+
       - name: Перевірити агентів
         run: python tools/check_data.py
+
+      - name: Зберегти дані в гілку data (один коміт, без історії)
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          cd data
+          rm -rf .git
+          git init -q -b data
+          git config user.name "data-bot"
+          git config user.email "data-bot@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Дані $(date -u +'%Y-%m-%d %H:%M') UTC"
+          git push -q --force "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
+          rm -rf .git
+
+      - name: Зібрати сайт
+        run: |
+          mkdir _site
+          rsync -a --exclude '.git' --exclude '.github' --exclude 'tools' --exclude '_site' --exclude '*.bat' --exclude 'README.md' ./ _site/
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

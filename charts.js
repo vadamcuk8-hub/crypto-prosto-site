@@ -92,6 +92,7 @@
     const max = Math.max.apply(null, items.map(function (i) { return Math.abs(i.value); }).concat([0.0001]));
     items.forEach(function (i) {
       const row = el("div", "bar-row");
+      if (i.open) ChartTool.bind(row, i.open, "Відкрити графік " + i.label);      // клік по рядку відкриває графік монети
       row.appendChild(el("span", "bar-label", i.label));
       const track = el("span", "bar-track");
       const fill = el("span", "bar-fill");

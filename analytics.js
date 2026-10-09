@@ -56,7 +56,8 @@
 
     const TONE = { positive: "Позитивні", neutral: "Нейтральні", negative: "Негативні" };
     const TONE_COLOR = { positive: "var(--up)", neutral: "var(--accent)", negative: "var(--down)" };
-    let lastGenerated = "";   // коли агент востаннє оновлював аналітику (щоб не перебудовувати однакове)
+    let lastGenerated = "";
+    let lastHours = [];   // коли агент востаннє оновлював аналітику (щоб не перебудовувати однакове)
 
     async function refresh() {
       try {
@@ -99,6 +100,7 @@
         Object.entries(a.coins).slice(0, 8).forEach(function (e) {
           const s = e[1].sentiment;
           const d = el("div", "plan-card");
+          if (e[0] !== "USDT" && e[0] !== "USDC") ChartTool.bind(d, function () { return { symbol: e[0], name: e[0] }; }, "Відкрити графік " + e[0] + " наживо");
           d.appendChild(el("div", "plan-big", e[0]));
           d.appendChild(el("div", "small", "згадок: " + e[1].count));
           d.appendChild(el("div", "small " + (s > 1 ? "tone-positive" : s < -1 ? "tone-negative" : ""), s > 1 ? "новини радше позитивні" : s < -1 ? "новини радше негативні" : "новини нейтральні"));
@@ -106,6 +108,15 @@
         });
 
         activityChart(document.getElementById("activity"), a.activity_24h);
+        const actBox = document.getElementById("activityBox");
+        if (actBox && !actBox.classList.contains("ct-open")) {
+          ChartTool.bind(actBox, function () {
+            const t0 = Date.parse(lastGenerated) || Date.now();
+            return { id: "news-activity", title: "Матеріалів у новинах щогодини", format: function (v) { return "матеріалів: " + v.toLocaleString("uk-UA"); },
+              points: lastHours.map(function (v, i) { return { t: t0 - (23 - i) * 36e5, c: v }; }), source: "Джерело: новинний агент сайту." };
+          }, "Відкрити графік активності новин");
+        }
+        lastHours = a.activity_24h;
         storyList(document.getElementById("topStories"), a.top, true);
         storyList(document.getElementById("needsCheck"), a.needs_check, false);
 

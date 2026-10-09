@@ -1,0 +1,107 @@
+{
+  "_help": "База знань агента «Регулювання». Редагуйте цей файл, щоб навчити агента: додавайте теми, відомства, шум і виправлення. Регулярні вирази (pattern) шукаються в назві документа без урахування регістру. Порядок має значення: перша, що збіглась, перемагає.",
+  "other_label": "Лише згадує крипто",
+  "other_hint": "У назві немає крипто: документ лише згадує його в тексті. Відкрийте оригінал, щоб побачити, як саме.",
+  "noise_pattern": "arms sales|sunshine act|unified agenda|regulatory flexibility agenda",
+  "type_hints": {
+    "Правило": "Остаточне правило: набуває чинності й обов’язкове для виконання.",
+    "Проєкт правила": "Чернетка: державні органи збирають думки перед ухваленням.",
+    "Повідомлення": "Службове повідомлення: заявка, розгляд чи роз’яснення, ще не закон.",
+    "Президентський документ": "Рішення президента США: задає напрям для відомств."
+  },
+  "types": {
+    "Rule": "Правило",
+    "Proposed Rule": "Проєкт правила",
+    "Notice": "Повідомлення",
+    "Presidential Document": "Президентський документ"
+  },
+  "agencies": [
+    {
+      "pattern": "securities and exchange",
+      "short": "SEC (цінні папери)"
+    },
+    {
+      "pattern": "commodity futures",
+      "short": "CFTC (товарні ф’ючерси)"
+    },
+    {
+      "pattern": "treasury|internal revenue|comptroller|financial crimes",
+      "short": "Мінфін США"
+    },
+    {
+      "pattern": "federal reserve",
+      "short": "ФРС США"
+    },
+    {
+      "pattern": "deposit insurance",
+      "short": "FDIC (страхування вкладів)"
+    },
+    {
+      "pattern": "consumer financial",
+      "short": "CFPB (споживачі)"
+    },
+    {
+      "pattern": "executive office of the president|presidential",
+      "short": "Президент США"
+    },
+    {
+      "pattern": "justice|homeland|state department",
+      "short": "Юстиція та безпека"
+    }
+  ],
+  "topics": [
+    {
+      "pattern": "exchange-traded|\\betf|trust|options on|commodity-based|self-regulatory|listing",
+      "label": "Біржові фонди й біржі",
+      "hint": "Про те, як фонди й опціони, пов’язані з крипто, можуть торгуватися на звичайних біржах."
+    },
+    {
+      "pattern": "tax|internal revenue|\\birs\\b|1099|broker reporting",
+      "label": "Податки",
+      "hint": "Про те, як держава рахує й збирає податки з криптооперацій."
+    },
+    {
+      "pattern": "money laundering|sanction|ofac|fincen|terror|illicit|ransom|special measure|transmittal of funds",
+      "label": "Відмивання й санкції",
+      "hint": "Про боротьбу з відмиванням грошей і санкції, пов’язані з криптовалютами."
+    },
+    {
+      "pattern": "custody|custodian",
+      "label": "Зберігання активів",
+      "hint": "Про те, хто й за якими правилами може зберігати чужі криптоактиви."
+    },
+    {
+      "pattern": "bank|deposit|federal reserve|capital",
+      "label": "Банки",
+      "hint": "Про те, як банкам дозволяють (або обмежують) працювати з криптоактивами."
+    },
+    {
+      "pattern": "stablecoin|payment",
+      "label": "Стейблкоїни й платежі",
+      "hint": "Про правила для цифрових монет, прив’язаних до долара, і платежів ними."
+    },
+    {
+      "pattern": "commodity futures|swap|derivative|futures",
+      "label": "Ф’ючерси й похідні",
+      "hint": "Про торгівлю контрактами на майбутню ціну криптовалют."
+    },
+    {
+      "pattern": "digital asset|crypto|virtual currenc",
+      "label": "Криптоактиви загалом",
+      "hint": "Загальні правила для цифрових активів і тих, хто з ними працює."
+    }
+  ],
+  "overrides": [],
+  "thresholds": {
+    "change_notable": 3
+  },
+  "texts": {
+    "activity_up": "За 30 днів вийшло документів про крипто: {d30}, це на {diff} більше, ніж за попередні 30 днів: регулятори активізувалися.",
+    "activity_down": "За 30 днів вийшло документів про крипто: {d30}, це на {diff} менше, ніж за попередні 30 днів: регулятори затихли.",
+    "activity_flat": "За 30 днів вийшло документів про крипто: {d30}, приблизно стільки ж, як за попередні 30 днів.",
+    "top_agency": "Найбільше документів від відомства «{agency}»: {n} за 90 днів.",
+    "top_topic": "Найчастіша тема за 90 днів: «{topic}» (документів: {n}).",
+    "binding": "За 90 днів документів вийшло {n}, з них остаточних правил лише {r}: решта — повідомлення й чернетки, які ще не є обов’язковими.",
+    "unknown": "Для {u} документів агент не визначив тему: їх перелічено в блоці «База знань»."
+  }
+}

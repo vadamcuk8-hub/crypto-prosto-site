@@ -20,14 +20,16 @@ except Exception:
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "data")
 STALE_MIN_S = 2700   # те саме правило, що isStale() у agent-ui.js
+MAX_DATA_MB = 20     # якщо папка data виросла більше, щось не прибирає за собою
 
 # агент → які файли він пише і які поля в них обов'язкові (ті, що читає сайт)
 CHECKS = {
-    "market": {"market": ["global", "top", "gainers", "losers"]},
-    "network": {"network": ["fees", "mempool", "height", "hashrate_ehs", "hashrate_history"]},
-    "sentiment": {"sentiment": ["value", "label", "history"]},
-    "stablecoins": {"stablecoins": ["total", "history", "top"]},
-    "regulation": {"regulation": ["weeks", "latest"]},
+    "market": {"market": ["global", "top", "gainers", "losers", "insights"]},
+    "network": {"network": ["fees", "mempool", "height", "hashrate_ehs", "hashrate_history", "insights"]},
+    "sentiment": {"sentiment": ["value", "label", "history", "insights"]},
+    "stablecoins": {"stablecoins": ["total", "history", "top", "insights"]},
+    "regulation": {"regulation": ["weeks", "latest", "insights"]},
+    "signals": {"signals": ["coins", "backtest", "insights"]},
     "news": {"news": ["items"], "analytics": ["top", "activity_24h", "conclusions"]},
 }
 
@@ -81,6 +83,9 @@ def main():
         elif not quiet:
             last = status[name]["last_ok"]
             print("ok        %-12s оновлено %d хв тому" % (name, age_seconds(last) / 60))
+    size = sum(os.path.getsize(os.path.join(p, f)) for p, _, fs in os.walk(DATA) for f in fs)
+    print("Розмір папки data: %.1f МБ%s" % (size / 1e6, "  (забагато: перевірте історію й _store.json)" if size > MAX_DATA_MB * 1e6 else ""))
+    bad += size > MAX_DATA_MB * 1e6
     print("Агентів з проблемами: %d з %d" % (bad, len(CHECKS)))
     sys.exit(1 if bad else 0)
 

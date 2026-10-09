@@ -114,6 +114,17 @@
 
   function note(text) { return el("p", "small", text); }
 
-  window.Charts = { sv: sv, fmtNum: fmtNum, fmtBig: fmtBig, trendColor: trendColor, lineChart: lineChart,
+  // Шкала сигналу: від «продавці» (-100) до «покупці» (+100), посередині рівновага. Маркер показує оцінку.
+  function signalGauge(score, signal) {
+    const g = el("div", "sgauge " + signal);
+    g.setAttribute("role", "img");
+    g.setAttribute("aria-label", "Оцінка сигналу " + score + " від -100 до 100");
+    const marker = el("span", "sgauge-marker");
+    marker.style.left = Math.max(2, Math.min(98, (score + 100) / 2)) + "%";
+    g.appendChild(marker);
+    return g;
+  }
+
+  window.Charts = { signalGauge: signalGauge, sv: sv, fmtNum: fmtNum, fmtBig: fmtBig, trendColor: trendColor, lineChart: lineChart,
     sparkline: sparkline, barChart: barChart, donut: donut, hBars: hBars, stat: stat, note: note };
 })();

@@ -1467,3 +1467,60 @@ nav a { gap: 10px; }
 .agent-table th { font-size: 0.85rem; color: var(--muted); }
 .link-btn { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; min-height: 0; }
 @media (max-width: 600px) { .agent-facts { grid-template-columns: 1fr; } .agent-facts dd { margin-bottom: 6px; } }
+
+/* Регулювання: колонки з діаграмами й картки документів */
+.wcols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.wcol { min-width: 0; }
+.doc-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.doc-card { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.doc-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
+.doc-title { display: block; color: var(--accent); font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.doc-agency { margin: 4px 0 0; font-size: 0.85rem; color: var(--muted); }
+.wcol .bar-row { grid-template-columns: minmax(110px, 1.3fr) 1fr 28px; }
+.wcol .bar-label { white-space: normal; line-height: 1.2; }
+
+.teach { margin-top: 12px; padding: 10px 14px; border: 1px dashed var(--line); border-radius: 12px; }
+.teach summary { cursor: pointer; font-weight: 600; min-height: var(--tap); display: flex; align-items: center; }
+.agent-history { margin-top: 14px; }
+
+/* Агенти: висновки, підзаголовки, технічні дані */
+.agent-sub { font-size: 1.05rem; margin: 0 0 10px; }
+.insights { list-style: none; margin: 0; padding: 0; }
+.insight { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line); line-height: 1.45; }
+.insight:last-child { border-bottom: 0; }
+.insight-mark { flex: none; width: 1.2em; text-align: center; font-size: 0.85rem; color: var(--muted); }
+.insight.positive .insight-mark { color: var(--up); }
+.insight.negative .insight-mark { color: var(--down); }
+.agent-tech { margin-top: 16px; padding: 10px 14px; border: 1px dashed var(--line); border-radius: 12px; }
+.agent-tech summary { cursor: pointer; font-weight: 600; min-height: var(--tap); display: flex; align-items: center; }
+.agent-panel > .dash { margin-bottom: 16px; }
+
+.ai-note { margin-top: 12px; padding: 12px 14px; border-left: 4px solid var(--accent); border-radius: 6px; background: var(--accent-soft); }
+.ai-note p { margin: 0 0 6px; }
+
+/* Аналітика: сигнали по монетах */
+.sig-disclaimer { margin: 0 0 12px; }
+.sig-insights { margin: 12px 0; }
+.sig-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; margin-top: 16px; }
+.sig-card { padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); box-shadow: var(--shadow-card); min-width: 0; }
+.sig-card.is-live .sig-price b { transition: color 0.3s; }
+.sig-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.sig-sym { font-size: 1.25rem; margin: 0; }
+.sig-price { text-align: right; display: flex; flex-direction: column; }
+.sig-price b { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.sig-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 0; }
+.sig-labelrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 10px 0 6px; }
+.sig-label { font-weight: 700; font-size: 0.95rem; }
+.sig-label.buyers { color: var(--up); }
+.sig-label.sellers { color: var(--down); }
+.sig-label.balance { color: var(--muted); }
+.sgauge { position: relative; height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--down), var(--line) 50%, var(--up)); opacity: 0.85; }
+.sgauge-marker { position: absolute; top: -4px; width: 6px; height: 18px; margin-left: -3px; border-radius: 3px; background: var(--text); box-shadow: 0 0 0 2px var(--card); transition: left 0.6s ease-out; }
+.sig-more { margin-top: 10px; }
+.sig-more summary { cursor: pointer; font-weight: 600; min-height: var(--tap); display: flex; align-items: center; }
+.sig-rows { gap: 4px; }
+.sig-row { display: grid; grid-template-columns: 110px 1fr 150px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.sig-row:last-child { border-bottom: 0; }
+@media (max-width: 520px) { .sig-row { grid-template-columns: 90px 1fr; } .sig-row .sig-label { grid-column: 1 / -1; } }
+.sig-label.tilt { color: var(--muted); font-weight: 600; }
+.sig-tldr { margin: 10px 0 4px; font-size: 0.95rem; line-height: 1.45; }

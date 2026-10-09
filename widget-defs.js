@@ -117,22 +117,97 @@ const WIDGET_DEFS = (function () {
       },
     },
     {
-      id: "regulation", title: "Регулювання: документи США", agent: "regulation", files: ["regulation"],
+      id: "regulation", title: "Регулювання: документи США", agent: "regulation", files: ["regulation"], wide: true,
       render: function (b, d) {
-        const r = d.regulation;
-        b.appendChild(el("h4", "wsub", "Нові документи про крипто по тижнях (12 тижнів)"));
-        b.appendChild(barChart(r.weeks, { label: "Кількість документів про крипто в Federal Register по тижнях" }));
-        const list = el("ul", "wlinks");
-        r.latest.slice(0, 5).forEach(function (x) {
-          const li = el("li", "");
-          const a = el("a", "", x.title);
+        const r = d.regulation, s = r.stats || { d7: 0, d30: 0, prev30: 0 };
+        const diff = s.d30 - s.prev30;
+        const stats = el("div", "wstats");
+        stats.appendChild(stat("За 7 днів", String(s.d7)));
+        stats.appendChild(stat("За 30 днів", String(s.d30)));
+        stats.appendChild(stat("Проти попередніх 30 днів", (diff > 0 ? "+" : "") + diff));
+        stats.appendChild(stat("Усього в базі", fmtNum(r.total_all_time)));
+        b.appendChild(stats);
+
+        function col(title, node) {
+          const c = el("div", "wcol");
+          c.appendChild(el("h4", "wsub", title));
+          c.appendChild(node);
+          return c;
+        }
+        function counts(list, color) {
+          return hBars((list || []).map(function (x) { return { label: x.label, value: x.count, text: String(x.count), color: color }; }));
+        }
+        const cols = el("div", "wcols");
+        cols.appendChild(col("Документи по тижнях (12 тижнів)", barChart(r.weeks, { label: "Кількість документів по тижнях" })));
+        cols.appendChild(col("Типи документів (90 днів)", counts(r.by_type, "var(--accent)")));
+        cols.appendChild(col("Які відомства (90 днів)", counts(r.by_agency, "var(--accent)")));
+        cols.appendChild(col("Про що (90 днів)", counts(r.by_topic, "var(--accent)")));
+        b.appendChild(cols);
+
+        b.appendChild(el("h4", "wsub", "Останні документи"));
+        const list = el("div", "doc-list");
+        r.latest.slice(0, 6).forEach(function (x) {
+          const card = el("article", "doc-card");
+          const tags = el("div", "doc-tags");
+          tags.appendChild(el("span", "chip", x.type));
+          tags.appendChild(el("span", "chip", x.topic));
+          tags.appendChild(el("span", "small", x.date));
+          card.appendChild(tags);
+          const a = el("a", "doc-title", x.title);
           a.href = safeUrl(x.url); a.target = "_blank"; a.rel = "noopener noreferrer";
-          li.appendChild(a);
-          li.appendChild(el("span", "small", " — " + x.type + ", " + x.date));
-          list.appendChild(li);
+          a.lang = "en"; a.title = x.title_full || x.title;
+          card.appendChild(a);
+          card.appendChild(el("p", "doc-agency", x.agency));
+          card.appendChild(el("p", "small", x.topic_hint + " " + x.type_hint));
+          list.appendChild(card);
         });
         b.appendChild(list);
-        b.appendChild(note("Назви документів — англійською, як в оригіналі. Усього в базі: " + fmtNum(r.total_all_time) + "."));
+        const teach = r.to_teach || [], stale = r.stale_rules || [];
+        if (teach.length || stale.length) {
+          const box = el("details", "teach");
+          box.appendChild(el("summary", "", "База знань: " + teach.length + " документів без теми" + (stale.length ? ", застарілих правил: " + stale.length : "")));
+          if (teach.length) {
+            box.appendChild(el("p", "small", "Агент не знайшов для них правила. Щоб навчити його, додайте слово з назви й тему у файл knowledge/regulation.json (розділ «overrides»)."));
+            const ul = el("ul", "wlinks");
+            teach.forEach(function (x) {
+              const li = el("li", "", x.title);
+              li.appendChild(el("span", "small", " — " + x.agency + ", " + x.date));
+              ul.appendChild(li);
+            });
+            box.appendChild(ul);
+          }
+          if (stale.length) {
+            box.appendChild(el("p", "small", "Ці виправлення не спрацьовували понад 180 днів. Їх можна видалити з файлу, щоб база не розросталась:"));
+            const ul = el("ul", "wlinks");
+            stale.forEach(function (x) { ul.appendChild(el("li", "", "«" + x.contains + "» → " + x.topic + " (останній збіг: " + x.last_matched + ")")); });
+            box.appendChild(ul);
+          }
+          b.appendChild(box);
+        }
+        b.appendChild(note("Назви документів — англійською, як в оригіналі. Тема й пояснення визначені за правилами (не ШІ) і можуть помилятися; відкрийте оригінал, щоб перевірити."));
+      },
+    },
+    {
+      id: "signals", title: "Сигнали по монетах (інформація, не порада)", agent: "signals", files: ["signals"], wide: true,
+      render: function (b, d) {
+        const s = d.signals;
+        const list = el("div", "wrows sig-rows");
+        s.coins.forEach(function (c) {
+          const row = el("div", "sig-row");
+          const name = el("div", "wrow-name");
+          name.appendChild(el("b", "", c.symbol));
+          name.appendChild(el("span", "small", c.name));
+          row.appendChild(name);
+          row.appendChild(Charts.signalGauge(c.score, c.signal));
+          row.appendChild(el("span", "sig-label " + (c.tilt ? "tilt" : c.signal), c.tilt ? s.labels["tilt_" + c.tilt] : s.labels[c.signal]));
+          list.appendChild(row);
+        });
+        b.appendChild(list);
+        b.appendChild(note(s.disclaimer));
+        const more = el("p", "small");
+        const l = el("a", "", "Докладно по кожній монеті"); l.href = "analytics.html#signals";
+        more.appendChild(l);
+        b.appendChild(more);
       },
     },
     {

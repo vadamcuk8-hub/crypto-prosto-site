@@ -5,6 +5,7 @@
   sentiment    Настрій: індекс страху й жадібності за 30 днів (Alternative.me)                кожні 30 хв
   stablecoins  Стейблкоїни: пропозиція, лідери, динаміка (DefiLlama)                           кожні 30 хв
   network      Мережа біткоїна: комісії, черга, потужність (mempool.space)                     кожні 3 хв
+  signals      Сигнали: тренд, RSI, MACD по 8 популярних монетах і перевірка на минулому (Binance) кожну годину
   regulation   Регулювання: нові офіційні документи США про крипто (Federal Register)          щогодини
   news         Новини й аналітика: стрічки видань, фільтрація, переклад, висновки (news_agent)  кожні 10 хв
 
@@ -27,8 +28,8 @@ try:
 except Exception:
     pass
 
-from agents import agent_market, agent_network, agent_regulation, agent_sentiment, agent_stablecoins
-from agents.common import DATA, log, now_iso, write_json
+from agents import agent_signals, ai_summary, agent_market, agent_network, agent_regulation, agent_sentiment, agent_stablecoins
+from agents.common import DATA, log, now_iso, record_history, write_json
 import news_agent
 
 
@@ -41,8 +42,18 @@ class NewsAgent:
         news_agent.run_once()
         return None
 
+    @staticmethod
+    def summary(_result):
+        """Числа для історії: скільки матеріалів і яка частка негативних/позитивних заголовків (з data/analytics.json)."""
+        with open(os.path.join(DATA, "analytics.json"), encoding="utf-8") as f:
+            a = json.load(f)
+        n = a.get("total") or 1
+        s = a.get("sentiment", {})
+        return {"total": a.get("total", 0), "negative_share": round(100 * s.get("negative", 0) / n),
+                "positive_share": round(100 * s.get("positive", 0) / n)}
 
-AGENTS = [agent_market, agent_network, agent_sentiment, agent_stablecoins, agent_regulation, NewsAgent]
+
+AGENTS = [agent_market, agent_network, agent_sentiment, agent_stablecoins, agent_regulation, agent_signals, NewsAgent]
 lock = threading.Lock()
 
 
@@ -65,7 +76,12 @@ def run_agent(agent):
     try:
         result = agent.run()
         if result is not None:
+            ai = ai_summary.summarize(name, result.get("insights"))      # None без ключа ANTHROPIC_API_KEY
+            if ai:
+                result["ai_summary"] = ai
             write_json(name + ".json", dict(result, agent=name, title=agent.TITLE, source=agent.SOURCE, generated_at=now_iso()))
+        if hasattr(agent, "summary"):           # агент, що веде історію, віддає числа для щоденної точки
+            record_history(name, agent.summary(result))
         with lock:
             status[name] = {"title": agent.TITLE, "source": agent.SOURCE, "interval": agent.INTERVAL, "ok": True,
                             "last_ok": now_iso(), "error": ""}

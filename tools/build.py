@@ -34,7 +34,7 @@ PAGE_SCRIPTS = {
     "market.html": ["core.js", "market-live.js", "market-charts.js", "market-calc.js",
                     "market-heatmap.js", "market-alerts.js", "market.js"],
     "news.html": ["core.js", "news.js", "agent-ui.js", "feed.js"],
-    "analytics.html": ["core.js", "agent-ui.js", "analytics.js"],
+    "analytics.html": ["core.js", "agent-ui.js", "charts.js", "analytics.js", "signals.js"],
     "sources.html": ["core.js"],
 }
 DEFAULT_SCRIPTS = ["core.js"]          # решта сторінок (news-*.html)

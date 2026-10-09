@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Аналітика — Крипто простими словами</title>
-  <link rel="stylesheet" href="style.css?v=109a9aad">
+  <link rel="stylesheet" href="style.css?v=eae9ccdb">
 </head>
 <body>
 
@@ -23,19 +23,36 @@
   <!-- @/header -->
 
   <section class="page-title">
-    <h1>Аналітика новин</h1>
-    <p>Автоматичний аналіз стрічки новин: що обговорюють найбільше, який тон, що підтверджено кількома джерелами, а що варто перевіряти.
-    Це робить програма за правилами та словниками, а не експерт чи штучний інтелект, тому висновки орієнтовні.</p>
-    <p class="feed-status" id="anStatus" role="status">Завантаження…</p>
+    <h1>Аналітика</h1>
+    <p>Сигнали по найпопулярніших монетах за публічними індикаторами та автоматичний аналіз новин. Усе рахує програма за правилами,
+    а не експерт чи штучний інтелект, тому це орієнтир, а не порада.</p>
     <div class="subtabs" role="navigation" aria-label="Розділи сторінки">
-      <a href="#conclusions-box">Висновки</a>
-      <a href="#how">Як працює агент</a>
+      <a href="#signals">Сигнали по монетах</a>
+      <a href="#sig-check">Перевірка сигналів</a>
+      <a href="#conclusions-box">Аналітика новин</a>
       <a href="news.html">Жива стрічка →</a>
     </div>
   </section>
 
+  <section id="signals">
+    <h2>Сигнали по монетах</h2>
+    <p class="note sig-disclaimer" id="sigNote">Це інформаційні сигнали, а не фінансова порада й не прогноз.</p>
+    <p class="feed-status" id="sigStatus" role="status">Завантаження…</p>
+    <div class="sig-insights" id="sigInsights"></div>
+    <div class="agent-card" id="sigSelection"></div>
+    <div class="sig-grid" id="sigGrid"><p class="muted">Завантаження…</p></div>
+    <noscript><p class="note">Для сигналів потрібен JavaScript.</p></noscript>
+  </section>
+
+  <section id="sig-check">
+    <h2>Чи справджувались такі сигнали</h2>
+    <p class="muted">Агент перевіряє себе на минулому: для кожного дня за останній рік рахує, який був би сигнал, і дивиться, що сталося з ціною далі. Якщо «перевага покупців» не краща за випадкову монету, на сигнал не варто покладатися. Дні перекриваються, тому це орієнтир, а не точна наука.</p>
+    <div class="agent-table-wrap" id="sigBacktest"></div>
+  </section>
+
   <section id="conclusions-box">
-    <h2>Висновки агента</h2>
+    <h2>Аналітика новин</h2>
+    <p class="feed-status" id="anStatus" role="status">Завантаження…</p>
     <ul class="conclusions" id="conclusions"><li class="muted">Завантаження…</li></ul>
     <div class="plan-grid" id="anTiles"></div>
   </section>
@@ -155,7 +172,9 @@
   <!-- @scripts -->
   <script src="core.js?v=f8e9e184"></script>
   <script src="agent-ui.js?v=9259d765"></script>
+  <script src="charts.js?v=7c27f4ff"></script>
   <script src="analytics.js?v=af2e7a30"></script>
+  <script src="signals.js?v=a8b94a42"></script>
   <!-- @/scripts -->
 </body>
 </html>

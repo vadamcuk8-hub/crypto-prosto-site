@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Новини — Крипто простими словами</title>
+  <link rel="stylesheet" href="style.css?v=7c828bad">
+</head>
+<body>
+
+  <!-- @header -->
+  <header>
+    <button class="menu-btn" id="menuBtn" aria-label="Відкрити меню" aria-expanded="false" aria-controls="mainNav"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <nav id="mainNav" aria-label="Основне меню">
+      <a href="index.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg><span>Головна</span></a>
+      <a href="market.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l4-5 3 3 4-6"/></svg><span>Ринок</span></a>
+      <a href="news.html" aria-current="page"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h11v14H7a2 2 0 0 1-2-2zM16 9h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5"/></svg><span>Новини</span></a>
+      <a href="analytics.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Аналітика</span></a>
+      <a href="learn.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H12v15H5.5A1.5 1.5 0 0 0 4 20.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H12v15h6.5a1.5 1.5 0 0 1 1.5 1.5z"/></svg><span>Довідка</span></a>
+    </nav>
+  </header>
+  <!-- @/header -->
+
+  <section class="page-title">
+    <h1>Новини</h1>
+    <p>Жива стрічка з автоматично оновлюваних джерел і головні сюжети місяця, пояснені простими словами. Висновки за стрічкою зібрано у розділі <a href="analytics.html">«Аналітика»</a>. Живі ціни й аналіз дивіться на сторінці <a href="market.html">«Ринок»</a>.</p>
+    <div class="subtabs" role="navigation" aria-label="Розділи сторінки">
+      <a href="#live">Жива стрічка</a>
+      <a href="#news">Головні сюжети</a>
+      <a href="#timeline">Що сталося за 30 днів</a>
+      <a href="analytics.html">Аналітика →</a>
+    </div>
+  </section>
+<!-- Жива стрічка: заповнюється скриптом feed.js з файлу data/news.json -->
+  <section id="live">
+    <h2>Жива стрічка</h2>
+    <p class="muted">Новини з CoinDesk, The Block, Decrypt, Cointelegraph, Bitcoin Magazine, Forklog UA та офіційних джерел (SEC, Federal Register).
+    Новинний агент відсіює рекламу й «хайп», зливає повтори й показує, скільки видань підтвердили історію.
+    Англомовні заголовки автоматично перекладено українською (машинний переклад, може бути неточним), оригінал завжди видно під заголовком. Власних українських матеріалів про крипто у відкритих стрічках небагато. Висновки за стрічкою дивіться в розділі <a href="analytics.html">«Аналітика»</a>.</p>
+
+    <p class="feed-status" id="liveStatus" role="status">Завантаження стрічки…</p>
+    <p class="note feed-stale" id="feedStale" hidden></p>
+
+    <div class="toolbar" role="search">
+      <div class="search-field">
+        <svg class="search-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input type="search" id="feedSearch" placeholder="Пошук: біткоїн, SEC, ETF… (клавіша /)" aria-label="Пошук у стрічці" autocomplete="off">
+        <button type="button" class="search-clear" id="feedClear" aria-label="Очистити пошук" hidden>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <button type="button" class="chip" id="filtersToggle" aria-expanded="false" aria-controls="filtersPanel">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+        Фільтри <span class="badge" id="filtersBadge" hidden></span>
+      </button>
+      <label class="sort-field">Порядок
+        <select id="feedSort" aria-label="Порядок новин">
+          <option value="new">Спочатку нові</option>
+          <option value="imp">Найважливіші</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="filters-panel" id="filtersPanel" hidden>
+      <fieldset>
+        <legend>Тема</legend>
+        <div class="fchips" id="topicChips"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Джерело</legend>
+        <div class="fchips" id="sourceChips"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Період</legend>
+        <div class="seg" id="periodSeg" role="group" aria-label="Період">
+          <button type="button" data-v="1">1 год</button>
+          <button type="button" data-v="6">6 год</button>
+          <button type="button" data-v="24">Доба</button>
+          <button type="button" data-v="72">3 доби</button>
+          <button type="button" data-v="all">Весь час</button>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Мова оригіналу</legend>
+        <div class="seg" id="langSeg" role="group" aria-label="Мова оригіналу">
+          <button type="button" data-v="all">Будь-яка</button>
+          <button type="button" data-v="uk">Українська</button>
+          <button type="button" data-v="en">English</button>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Показати лише</legend>
+        <label class="feed-check"><input type="checkbox" id="fConfirmed"> підтверджені двома й більше джерелами</label>
+        <label class="feed-check"><input type="checkbox" id="fOfficial"> офіційні джерела (SEC, Federal Register)</label>
+        <label class="feed-check"><input type="checkbox" id="fFresh"> нові (за останні 30 хвилин)</label>
+      </fieldset>
+      <fieldset>
+        <legend>Вигляд</legend>
+        <label class="feed-check"><input type="checkbox" id="feedTranslate" checked> заголовки українською (автопереклад)</label>
+      </fieldset>
+    </div>
+
+    <div class="active-filters" id="activeFilters" aria-live="polite"></div>
+
+    <div class="feed" id="liveFeed" aria-live="polite"></div>
+    <p class="small" id="feedCount"></p>
+    <button type="button" class="chip" id="feedMore" hidden>Показати ще</button>
+    <p class="small">Заголовки та короткі описи належать їхнім видавцям; натискання веде на оригінальну сторінку. Автоматичне відсіювання може помилятися: перед рішеннями про гроші перевіряйте новину в першоджерелі.</p>
+  </section>
+
+  <!-- Новини -->
+  <section id="news">
+    <h2>Головні сюжети простими словами</h2>
+
+    <!-- Пошук по новинах: скрипт ховає картки, де немає введеного слова -->
+    <div class="search-box">
+      <input type="search" id="newsSearch" placeholder="Пошук: біткоїн, SEC, стейблкоїн…" aria-label="Пошук по новинах" autocomplete="off">
+    </div>
+    <p class="small" id="searchInfo" role="status"></p>
+
+    <div class="news-tools">
+      <label for="newsSort" class="small" style="margin:0">Порядок:</label>
+      <select id="newsSort" aria-label="Порядок новин">
+        <option value="default">Як на сайті</option>
+        <option value="new">Спочатку новіші</option>
+        <option value="old">Спочатку старіші</option>
+      </select>
+      <button type="button" class="chip" id="newsReset">Скинути</button>
+    </div>
+
+    <!-- Кнопки фільтра: data-filter відповідає темі картки (див. script.js) -->
+    <div class="filters">
+      <button class="filter active" data-filter="all">Усі</button>
+      <button class="filter" data-filter="us">Регулювання США</button>
+      <button class="filter" data-filter="eu">Регулювання ЄС</button>
+      <button class="filter" data-filter="invest">Інвестиції</button>
+      <button class="filter" data-filter="market">Ринок і держави</button>
+    </div>
+
+    <div class="cards">
+
+      <article class="card">
+        <span class="tag">Біржа</span>
+        <h3><a href="news-okx.html">OKX оцінили у 25 мільярдів доларів</a></h3>
+        <p>
+          Криптобіржа OKX завершила великий раунд фінансування. Серед
+          інвесторів — Standard Chartered і Circle. Дані поки що
+          з одного джерела, тому варто дочекатися офіційного підтвердження.
+        </p>
+      </article>
+
+      <article class="card">
+        <span class="tag">Платежі</span>
+        <h3><a href="news-jeeves.html">Jeeves залучив 110 мільйонів</a></h3>
+        <p>
+          Фінтех-компанія Jeeves отримала 110 мільйонів доларів. Раунд
+          очолив фонд CoinFund. Це найбільша публічно відома крипто-угода
+          кінця вересня — початку жовтня.
+        </p>
+      </article>
+
+      <article class="card">
+        <span class="tag">Стейблкоїни</span>
+        <h3><a href="news-noah.html">Noah: гроші між країнами через стейблкоїни</a></h3>
+        <p>
+          Стартап Noah допомагає бізнесу швидко переказувати гроші за кордон
+          через стейблкоїни. Він отримав ще 16 мільйонів доларів
+          на розвиток.
+        </p>
+      </article>
+
+      <article class="card">
+        <span class="tag">Старт-апи</span>
+        <h3><a href="news-startups.html">Менші проєкти теж отримують гроші</a></h3>
+        <p>
+          Walapay залучив 4,6 мільйона доларів. Платформа Umia зібрала
+          6 мільйонів доларів через аукціон власного токена.
+        </p>
+      </article>
+
+      <article class="card">
+        <span class="tag">Ринок</span>
+        <h3><a href="news-bitcoin.html">Біткоїн подешевшав із 86 до 81 тисячі</a></h3>
+        <p>
+          5–6 жовтня біткоїн коштував близько 86 тисяч доларів. Увечері
+          8 жовтня — близько 81 тисячі, мінус майже 3% за добу. Ефір, Solana
+          і XRP впали сильніше.
+        </p>
+      </article>
+
+      <article class="card">
+        <span class="tag">Держави</span>
+        <h3><a href="news-salvador.html">МВФ і біткоїн Сальвадору</a></h3>
+        <p>
+          Міжнародний валютний фонд схвалив для Сальвадору виплату
+          139 мільйонів доларів. Умова: країна більше не купує біткоїн.
+        </p>
+      </article>
+
+      <article class="card">
+        <span class="tag">Регулювання США</span>
+        <h3><a href="news-sec.html">SEC пропонує нові правила для крипто-випусків</a></h3>
+        <p>
+          Регулятор запропонував, як компаніям збирати гроші, продаючи
+          криптоактиви: до 5 і до 75 мільйонів доларів за спрощеними правилами.
+        </p>
+      </article>
+
+      <article class="card">
+        <span class="tag">Регулювання США</span>
+        <h3><a href="news-genius.html">Мінфін США: правила для стейблкоїнів</a></h3>
+        <p>
+          Опубліковано проєкт правил до закону GENIUS Act. Ліцензії
+          для емітентів стануть обов’язковими з 18 січня 2027.
+        </p>
+      </article>
+
+      <article class="card">
+        <span class="tag">Регулювання ЄС</span>
+        <h3><a href="news-mica.html">Європа: що змінилося з правилами MiCA</a></h3>
+        <p>
+          З 1 липня криптокомпанії в ЄС мають працювати лише з ліцензією.
+          У реєстрі ESMA вже 321 ліцензований постачальник.
+        </p>
+      </article>
+
+      <article class="card">
+        <span class="tag">Інвестиції</span>
+        <h3><a href="news-q3.html">Скільки вклали в крипто у 3 кварталі 2026</a></h3>
+        <p>
+          Близько 4,4 мільярда доларів у 224 раундах. Угод менше, але
+          найбільші з них зросли.
+        </p>
+      </article>
+
+    </div>
+  </section>
+
+<!-- Хронологія за 30 днів -->
+  <section id="timeline">
+    <h2>Що сталося за останні 30 днів</h2>
+    <p>Основні події з 8 вересня до 8 жовтня 2026. Деякі пов’язані події трохи раніше теж згадані, бо вони досі впливають на ринок.</p>
+    <ol class="timeline">
+      <li><strong>9 вересня.</strong> Circle купує платіжну компанію Tazapay за 400 мільйонів доларів. <a href="news-q3.html">Докладніше</a></li>
+      <li><strong>Середина вересня.</strong> Триває обговорення закону CLARITY у Сенаті США. Джерела розходяться щодо статусу; результат голосування ми не змогли підтвердити. <a href="news-sec.html">Докладніше</a></li>
+      <li><strong>17 вересня.</strong> SEC дозволила торгівлю токенізованими акціями США на спеціальних майданчиках (за оглядом BTSE). <a href="news-sec.html">Докладніше</a></li>
+      <li><strong>26 вересня — 2 жовтня.</strong> Jeeves залучив 110 мільйонів доларів; загалом за тиждень оголошено близько 178,6 мільйона. <a href="news-jeeves.html">Докладніше</a></li>
+      <li><strong>2 жовтня.</strong> МВФ схвалив виплату Сальвадору за умови, що країна не купує біткоїн. <a href="news-salvador.html">Докладніше</a></li>
+      <li><strong>2 жовтня.</strong> Вийшов звіт Architect Partners про 3 квартал: близько 4,4 мільярда доларів у 224 раундах. <a href="news-q3.html">Докладніше</a></li>
+      <li><strong>5–6 жовтня.</strong> Біткоїн торгується біля 86 тисяч доларів. <a href="news-bitcoin.html">Докладніше</a></li>
+      <li><strong>Жовтень.</strong> OKX завершила раунд із оцінкою 25 мільярдів (одне джерело). <a href="news-okx.html">Докладніше</a></li>
+    </ol>
+    <p class="note">
+      <strong>Що ще діє з серпня.</strong> 17–18 серпня Мінфін США і SEC опублікували
+      проєкти правил, і період коментарів триває. Правила стейблкоїнів
+      дивіться <a href="news-genius.html">тут</a>, правила для крипто-випусків
+      <a href="news-sec.html">тут</a>. У Європі діє MiCA, <a href="news-mica.html">докладніше</a>.
+    </p>
+  </section>
+
+  <!-- @footer -->
+  <footer>
+    <details class="footer-sources" id="sources">
+      <summary>Джерела</summary>
+      <div class="fs-body">
+        <div class="fs-col">
+          <h3>Офіційні</h3>
+          <ul>
+            <li><a href="https://www.sec.gov/newsroom/press-releases" target="_blank" rel="noopener">SEC (США)</a></li>
+            <li><a href="https://www.federalregister.gov" target="_blank" rel="noopener">Federal Register</a></li>
+            <li><a href="https://home.treasury.gov" target="_blank" rel="noopener">Мінфін США</a></li>
+            <li><a href="https://www.esma.europa.eu" target="_blank" rel="noopener">ESMA (ЄС)</a></li>
+            <li><a href="https://bank.gov.ua" target="_blank" rel="noopener">Національний банк України</a></li>
+            <li><a href="https://itd.rada.gov.ua" target="_blank" rel="noopener">Верховна Рада</a></li>
+          </ul>
+        </div>
+        <div class="fs-col">
+          <h3>Ціни й дані</h3>
+          <ul>
+            <li><a href="https://developers.binance.com" target="_blank" rel="noopener">Binance (ціни наживо)</a></li>
+            <li><a href="https://www.coingecko.com" target="_blank" rel="noopener">CoinGecko (історія цін)</a></li>
+            <li><a href="https://alternative.me/crypto/fear-and-greed-index" target="_blank" rel="noopener">Alternative.me (страх і жадібність)</a></li>
+            <li><a href="https://defillama.com/stablecoins" target="_blank" rel="noopener">DefiLlama (стейблкоїни)</a></li>
+            <li><a href="https://mempool.space" target="_blank" rel="noopener">mempool.space (мережа біткоїна)</a></li>
+            <li><a href="https://architectpartners.com" target="_blank" rel="noopener">Architect Partners (інвестиції)</a></li>
+            <li><a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory (автопереклад)</a></li>
+          </ul>
+        </div>
+        <div class="fs-col">
+          <h3>Новини</h3>
+          <ul>
+            <li><a href="https://www.coindesk.com" target="_blank" rel="noopener">CoinDesk</a></li>
+            <li><a href="https://www.theblock.co" target="_blank" rel="noopener">The Block</a></li>
+            <li><a href="https://decrypt.co" target="_blank" rel="noopener">Decrypt</a></li>
+            <li><a href="https://cointelegraph.com" target="_blank" rel="noopener">Cointelegraph</a></li>
+            <li><a href="https://bitcoinmagazine.com" target="_blank" rel="noopener">Bitcoin Magazine</a></li>
+            <li><a href="https://forklog.com.ua" target="_blank" rel="noopener">Forklog UA</a></li>
+            <li><a href="https://itc.ua" target="_blank" rel="noopener">ITC.ua</a></li>
+            <li><a href="https://www.rbc.ua" target="_blank" rel="noopener">РБК-Україна</a></li>
+          </ul>
+        </div>
+        <p class="fs-note">Заголовки й описи належать їхнім видавцям. Інформація на сайті має освітній характер і не є фінансовою порадою.
+          <a href="sources.html">Повний каталог джерел з оцінками надійності →</a></p>
+      </div>
+    </details>
+    <p class="footer-line">© 2026 Крипто простими словами</p>
+  </footer>
+  <!-- @/footer -->
+  <!-- @scripts -->
+  <script src="core.js?v=f8e9e184"></script>
+  <script src="news.js?v=f6b5731c"></script>
+  <script src="agent-ui.js?v=5fc8c00d"></script>
+  <script src="feed.js?v=d5bb36f0"></script>
+  <!-- @/scripts -->
+</body>
+</html>

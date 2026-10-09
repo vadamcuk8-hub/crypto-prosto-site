@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ринок — Крипто простими словами</title>
+  <link rel="stylesheet" href="style.css?v=7c828bad">
+</head>
+<body>
+
+  <!-- @header -->
+  <header>
+    <button class="menu-btn" id="menuBtn" aria-label="Відкрити меню" aria-expanded="false" aria-controls="mainNav"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <nav id="mainNav" aria-label="Основне меню">
+      <a href="index.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg><span>Головна</span></a>
+      <a href="market.html" aria-current="page"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l4-5 3 3 4-6"/></svg><span>Ринок</span></a>
+      <a href="news.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h11v14H7a2 2 0 0 1-2-2zM16 9h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5"/></svg><span>Новини</span></a>
+      <a href="analytics.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Аналітика</span></a>
+      <a href="learn.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H12v15H5.5A1.5 1.5 0 0 0 4 20.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H12v15h6.5a1.5 1.5 0 0 1 1.5 1.5z"/></svg><span>Довідка</span></a>
+    </nav>
+  </header>
+  <!-- @/header -->
+
+  <section class="page-title">
+    <h1>Ринок: курси й аналіз</h1>
+    <p>Живі курси, графіки, автоматичний огляд, настрій і теплова карта ринку, калькулятор та сповіщення про ціну. Новини зібрані окремо на сторінці <a href="news.html">«Новини»</a>.</p>
+    <div class="subtabs" role="navigation" aria-label="Розділи сторінки">
+      <a href="#market">Курси і графіки</a>
+      <a href="#heatmap">Теплова карта ринку</a>
+      <a href="#calc">Калькулятор</a>
+      <a href="#alerts">Сповіщення про ціну</a>
+      <a href="news.html">Новини →</a>
+    </div>
+  </section>
+  <!-- Живі курси: заповнюються скриптом script.js -->
+  <section id="market">
+    <h2>Курси сьогодні</h2>
+    <p class="muted">Ціни криптовалют у доларах і курс гривні за даними Національного банку України. Оновлюються автоматично.</p>
+
+    <div class="filters" id="currencyTabs" role="group" aria-label="Валюта цін">
+      <button class="currency-tab" data-cur="usd">Долар $</button>
+      <button class="currency-tab" data-cur="uah">Гривня ₴</button>
+      <button class="currency-tab" data-cur="eur">Євро €</button>
+    </div>
+
+    <h3 class="sub">Криптовалюти</h3>
+    <div class="prices" id="cryptoPrices">
+      <div class="price loading">Завантаження…</div>
+    </div>
+    <p class="small" id="cryptoMeta"></p>
+
+    <!-- Автоматичний аналіз: скрипт пише висновки за живими цінами (без ШІ, за простими правилами) -->
+    <div class="analysis" id="analysis" hidden>
+      <h3>Автоматичний огляд ринку</h3>
+      <ul id="analysisList"></ul>
+      <p class="small">Огляд створює програма за простими правилами з поточних цін. Це не прогноз і не фінансова порада.</p>
+    </div>
+
+    <h3 class="sub">Настрій ринку: страх чи жадібність</h3>
+    <div class="chart" id="fng">
+      <p class="muted">Завантаження…</p>
+    </div>
+
+    <h3 class="sub">Графіки: оберіть монету</h3>
+    <div class="filters" id="coinTabs">
+      <button class="coin-tab active" data-coin="bitcoin">Біткоїн</button>
+      <button class="coin-tab" data-coin="ethereum">Ефіріум</button>
+      <button class="coin-tab" data-coin="solana">Solana</button>
+      <button class="coin-tab" data-coin="ripple">XRP</button>
+    </div>
+
+    <h3 class="sub"><span class="coin-name">Біткоїн</span> наживо (останні 2 хвилини)</h3>
+    <div class="chart" id="liveChart">
+      <p class="muted">Збираємо дані… графік з'явиться за кілька секунд.</p>
+    </div>
+
+    <h3 class="sub"><span class="coin-name">Біткоїн</span> за <span class="period-name">7 днів</span></h3>
+    <div class="filters" id="periodTabs" role="group" aria-label="Період графіка">
+      <button class="period-tab" data-days="1">1 день</button>
+      <button class="period-tab active" data-days="7">7 днів</button>
+      <button class="period-tab" data-days="30">30 днів</button>
+      <button type="button" class="chip" id="csvBtn" title="Зберегти дані графіка у файл для Excel">Завантажити CSV</button>
+    </div>
+    <div class="chart" id="btcChart">
+      <p class="muted">Завантаження графіка…</p>
+    </div>
+
+    <h3 class="sub" id="calc">Калькулятор: скільки це коштує</h3>
+    <div class="calc">
+      <div class="calc-row">
+        <input type="text" inputmode="decimal" id="calcAmt" value="0,01" aria-label="Кількість">
+        <select id="calcFrom" aria-label="Із чого рахуємо">
+          <option value="bitcoin">BTC · біткоїн</option>
+          <option value="ethereum">ETH · ефіріум</option>
+          <option value="solana">SOL · Solana</option>
+          <option value="ripple">XRP</option>
+          <option value="tether">USDT · Tether</option>
+          <option value="usd">USD · долар</option>
+          <option value="eur">EUR · євро</option>
+          <option value="uah">UAH · гривня</option>
+        </select>
+        <button type="button" class="swap-btn" id="calcSwap" aria-label="Поміняти місцями" title="Поміняти місцями">⇄</button>
+        <select id="calcTo" aria-label="У що рахуємо">
+          <option value="bitcoin">BTC · біткоїн</option>
+          <option value="ethereum">ETH · ефіріум</option>
+          <option value="solana">SOL · Solana</option>
+          <option value="ripple">XRP</option>
+          <option value="tether">USDT · Tether</option>
+          <option value="usd">USD · долар</option>
+          <option value="eur">EUR · євро</option>
+          <option value="uah" selected>UAH · гривня</option>
+        </select>
+      </div>
+      <div class="calc-row calc-result">
+        <span class="calc-eq">=</span>
+        <span class="calc-out" id="calcOut" role="status">Чекаємо на ціни…</span>
+        <button type="button" class="chip" id="calcCopy">Копіювати</button>
+      </div>
+      <div class="calc-row" id="calcChips" aria-label="Швидкі суми">
+        <span class="small" style="margin:0">Швидко:</span>
+        <button type="button" class="chip" data-v="0,01">0,01</button>
+        <button type="button" class="chip" data-v="0,1">0,1</button>
+        <button type="button" class="chip" data-v="1">1</button>
+        <button type="button" class="chip" data-v="100">100</button>
+        <button type="button" class="chip" data-v="1000">1000</button>
+      </div>
+      <p class="small">Можна рахувати в обидва боки: з монети в гроші або з гривні чи доларів у монету. Курс — поточний, гривня — за НБУ. Це орієнтир, а не пропозиція купити чи продати.</p>
+    </div>
+
+    <h3 class="sub" id="alerts">Сповіщення про ціну</h3>
+    <div class="calc" id="alertsBox">
+      <div class="calc-row">
+        <select id="alertCoin" aria-label="Монета для сповіщення">
+          <option value="bitcoin">BTC · біткоїн</option>
+          <option value="ethereum">ETH · ефіріум</option>
+          <option value="solana">SOL · Solana</option>
+          <option value="ripple">XRP</option>
+        </select>
+        <select id="alertDir" aria-label="Умова">
+          <option value="above">стане вищою за</option>
+          <option value="below">стане нижчою за</option>
+        </select>
+        <input type="text" inputmode="decimal" id="alertPrice" placeholder="ціна в $" aria-label="Цільова ціна у доларах">
+        <button type="button" class="chip chip-main" id="alertAdd">Додати</button>
+      </div>
+      <p class="small" id="alertNow"></p>
+      <p class="small alert-error" id="alertError" role="alert"></p>
+      <ul class="alert-list" id="alertList"></ul>
+      <div class="calc-row">
+        <button type="button" class="chip" id="alertPerm" hidden>Дозволити сповіщення браузера</button>
+      </div>
+      <p class="small">Сповіщення працюють, лише поки ця сторінка відкрита: сайт не має сервера, який стежив би за ціною за вас. Налаштування зберігаються у вашому браузері.</p>
+    </div>
+
+    <h3 class="sub">Курс гривні (НБУ)</h3>
+    <div class="prices" id="fiatPrices">
+      <div class="price loading">Завантаження…</div>
+    </div>
+    <p class="small" id="fiatMeta"></p>
+  </section>
+
+  <!-- Теплова карта ринку -->
+  <section id="heatmap">
+    <h2>Теплова карта ринку</h2>
+    <p class="muted">Зміна ціни кожної монети за останні 24 години. Чим насиченіший колір, тим сильніший рух: зелений означає зростання, червоний падіння. Оновлюється щосекунди.</p>
+    <div class="heatmap" id="heatmapBox">
+      <div class="heat-tile">Завантаження…</div>
+    </div>
+    <div class="heat-legend" aria-hidden="true">
+      <span>−8% і менше</span>
+      <span class="heat-bar"></span>
+      <span>+8% і більше</span>
+    </div>
+    <p class="small">Клікніть на плитку, щоб побачити графіки цієї монети. Це довідкова інформація, а не порада щось купувати.</p>
+  </section>
+
+  
+
+  
+
+  <!-- @footer -->
+  <footer>
+    <details class="footer-sources" id="sources">
+      <summary>Джерела</summary>
+      <div class="fs-body">
+        <div class="fs-col">
+          <h3>Офіційні</h3>
+          <ul>
+            <li><a href="https://www.sec.gov/newsroom/press-releases" target="_blank" rel="noopener">SEC (США)</a></li>
+            <li><a href="https://www.federalregister.gov" target="_blank" rel="noopener">Federal Register</a></li>
+            <li><a href="https://home.treasury.gov" target="_blank" rel="noopener">Мінфін США</a></li>
+            <li><a href="https://www.esma.europa.eu" target="_blank" rel="noopener">ESMA (ЄС)</a></li>
+            <li><a href="https://bank.gov.ua" target="_blank" rel="noopener">Національний банк України</a></li>
+            <li><a href="https://itd.rada.gov.ua" target="_blank" rel="noopener">Верховна Рада</a></li>
+          </ul>
+        </div>
+        <div class="fs-col">
+          <h3>Ціни й дані</h3>
+          <ul>
+            <li><a href="https://developers.binance.com" target="_blank" rel="noopener">Binance (ціни наживо)</a></li>
+            <li><a href="https://www.coingecko.com" target="_blank" rel="noopener">CoinGecko (історія цін)</a></li>
+            <li><a href="https://alternative.me/crypto/fear-and-greed-index" target="_blank" rel="noopener">Alternative.me (страх і жадібність)</a></li>
+            <li><a href="https://defillama.com/stablecoins" target="_blank" rel="noopener">DefiLlama (стейблкоїни)</a></li>
+            <li><a href="https://mempool.space" target="_blank" rel="noopener">mempool.space (мережа біткоїна)</a></li>
+            <li><a href="https://architectpartners.com" target="_blank" rel="noopener">Architect Partners (інвестиції)</a></li>
+            <li><a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory (автопереклад)</a></li>
+          </ul>
+        </div>
+        <div class="fs-col">
+          <h3>Новини</h3>
+          <ul>
+            <li><a href="https://www.coindesk.com" target="_blank" rel="noopener">CoinDesk</a></li>
+            <li><a href="https://www.theblock.co" target="_blank" rel="noopener">The Block</a></li>
+            <li><a href="https://decrypt.co" target="_blank" rel="noopener">Decrypt</a></li>
+            <li><a href="https://cointelegraph.com" target="_blank" rel="noopener">Cointelegraph</a></li>
+            <li><a href="https://bitcoinmagazine.com" target="_blank" rel="noopener">Bitcoin Magazine</a></li>
+            <li><a href="https://forklog.com.ua" target="_blank" rel="noopener">Forklog UA</a></li>
+            <li><a href="https://itc.ua" target="_blank" rel="noopener">ITC.ua</a></li>
+            <li><a href="https://www.rbc.ua" target="_blank" rel="noopener">РБК-Україна</a></li>
+          </ul>
+        </div>
+        <p class="fs-note">Заголовки й описи належать їхнім видавцям. Інформація на сайті має освітній характер і не є фінансовою порадою.
+          <a href="sources.html">Повний каталог джерел з оцінками надійності →</a></p>
+      </div>
+    </details>
+    <p class="footer-line">© 2026 Крипто простими словами</p>
+  </footer>
+  <!-- @/footer -->
+  <!-- @scripts -->
+  <script src="core.js?v=f8e9e184"></script>
+  <script src="market-live.js?v=c626a45a"></script>
+  <script src="market-charts.js?v=e182b348"></script>
+  <script src="market-calc.js?v=34d186b8"></script>
+  <script src="market-heatmap.js?v=55ae7df0"></script>
+  <script src="market-alerts.js?v=d328177c"></script>
+  <script src="market.js?v=235c43a3"></script>
+  <!-- @/scripts -->
+</body>
+</html>

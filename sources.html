@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Каталог джерел — Крипто простими словами</title>
+  <link rel="stylesheet" href="style.css?v=7c828bad">
+</head>
+<body>
+  <!-- @header -->
+  <header>
+    <button class="menu-btn" id="menuBtn" aria-label="Відкрити меню" aria-expanded="false" aria-controls="mainNav"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <nav id="mainNav" aria-label="Основне меню">
+      <a href="index.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg><span>Головна</span></a>
+      <a href="market.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l4-5 3 3 4-6"/></svg><span>Ринок</span></a>
+      <a href="news.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h11v14H7a2 2 0 0 1-2-2zM16 9h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5"/></svg><span>Новини</span></a>
+      <a href="analytics.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Аналітика</span></a>
+      <a href="learn.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H12v15H5.5A1.5 1.5 0 0 0 4 20.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H12v15h6.5a1.5 1.5 0 0 1 1.5 1.5z"/></svg><span>Довідка</span></a>
+    </nav>
+  </header>
+  <!-- @/header -->
+
+  <main class="article wide">
+    <span class="tag">Каталог</span>
+    <h1>Де брати надійну інформацію про крипто</h1>
+    <p class="date">Перевірено 8 жовтня 2026 · три дослідники-«агенти» перевіряли джерела за реальними запитами, а не з пам'яті</p>
+
+    <p>Ми порівняли відкриті джерела за трьома напрямами й оцінили надійність за шкалою від 1 до 5.
+    Усе, що не вдалося перевірити, позначено <em>«не перевірено»</em>. Оцінки — це судження дослідників, а не офіційний рейтинг.</p>
+
+    <h2>1. Ціни й дані ринку</h2>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Джерело</th><th>Що дає</th><th>Доступ</th><th>З браузера?</th><th>Оцінка</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://docs.cdp.coinbase.com/exchange" target="_blank" rel="noopener">Coinbase</a></td><td>Ціна, тикер, свічки</td><td>Без ключа</td><td>Так</td><td class="score">5</td></tr>
+        <tr><td><a href="https://developers.binance.com" target="_blank" rel="noopener">Binance</a></td><td>Ціни, WebSocket, 24-годинна зміна</td><td>Без ключа; у частині країн заблоковано (США)</td><td>Так</td><td class="score">4</td></tr>
+        <tr><td><a href="https://api-docs.defillama.com" target="_blank" rel="noopener">DefiLlama</a></td><td>Стейблкоїни, TVL, обсяги DEX</td><td>Безкоштовно, без ключа</td><td>Так</td><td class="score">4</td></tr>
+        <tr><td><a href="https://mempool.space/docs/api/rest" target="_blank" rel="noopener">mempool.space</a></td><td>Комісії та черга мережі біткоїна</td><td>Без ключа</td><td>Так</td><td class="score">4</td></tr>
+        <tr><td><a href="https://docs.coingecko.com" target="_blank" rel="noopener">CoinGecko</a></td><td>Ціни, капіталізація, історія</td><td>Безкоштовний ключ (до 10 тис. викликів/міс.)</td><td>Не підтверджено; безключовий доступ часто дає помилку 429</td><td class="score">4</td></tr>
+        <tr><td><a href="https://alternative.me/crypto/fear-and-greed-index" target="_blank" rel="noopener">Alternative.me</a></td><td>Індекс страху й жадібності</td><td>Без ключа</td><td>Так</td><td class="score">3</td></tr>
+        <tr><td><a href="https://docs.kraken.com/api" target="_blank" rel="noopener">Kraken</a></td><td>Ціни, свічки</td><td>Без ключа</td><td>Частково</td><td class="score">4</td></tr>
+        <tr><td>Glassnode, Coinglass, CryptoCompare, Messari</td><td>Ончейн і похідні інструменти</td><td>Платні або потрібен ключ</td><td>Ні</td><td class="score">—</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="note"><strong>Що використовує цей сайт:</strong> Binance (ціни щосекунди), CoinGecko (історія й запасний варіант), Національний банк України (курс гривні). Запасна ціна з Coinbase можлива, але ще не підключена.</p>
+
+    <h2>2. Фінансування та інвестиції</h2>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Джерело</th><th>Що дає</th><th>Доступ</th><th>Частота</th><th>Оцінка</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://architectpartners.com" target="_blank" rel="noopener">Architect Partners</a></td><td>Приватні раунди, злиття й поглинання</td><td>Звіти на сайті; API немає</td><td>Щотижня й щокварталу</td><td class="score">4</td></tr>
+        <tr><td><a href="https://coinshares.com/insights/research-data" target="_blank" rel="noopener">CoinShares</a></td><td>Потоки в крипто-фонди</td><td>Безкоштовний звіт</td><td>Щопонеділка</td><td class="score">4</td></tr>
+        <tr><td><a href="https://farside.co.uk" target="_blank" rel="noopener">Farside Investors</a></td><td>Потоки в ETF на біткоїн і ефір у США</td><td>Безкоштовні таблиці</td><td>Щодня (не перевірено)</td><td class="score">4</td></tr>
+        <tr><td><a href="https://cryptorank.io" target="_blank" rel="noopener">CryptoRank</a></td><td>Раунди, квартальні звіти</td><td>Обмежений безкоштовний API</td><td>Щодня; звіти щокварталу</td><td class="score">3,5</td></tr>
+        <tr><td><a href="https://www.galaxy.com/insights/research" target="_blank" rel="noopener">Galaxy Research</a></td><td>Квартальні звіти про венчур</td><td>Безкоштовно (не перевірено)</td><td>Щокварталу, із запізненням</td><td class="score">4</td></tr>
+        <tr><td><a href="https://defillama.com" target="_blank" rel="noopener">DefiLlama</a> (раунди, ETF)</td><td>Раунди й потоки</td><td>Лише платний Pro</td><td>—</td><td class="score">2</td></tr>
+        <tr><td>Crunchbase, Dealroom, PitchBook</td><td>Загальні дані про стартапи</td><td>Обмежено або платно</td><td>—</td><td class="score">2,5–4</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="note"><strong>Увага, цифри різних трекерів не додаються.</strong> Одні рахують лише венчурні раунди, інші ще й злиття, борг, продаж токенів і позабіржові покупки.
+    Для другого кварталу 2026 CryptoRank дав $4,99 млрд лише для венчурних раундів і $12,86 млрд за всіма видами збору, а Galaxy — $5,68 млрд. Усі три цифри правильні, але для різних наборів даних.
+    Тому ми завжди пишемо одне джерело й дату біля кожної цифри.</p>
+
+    <h2>3. Регулювання та новини</h2>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Джерело</th><th>Тип</th><th>Для чого</th><th>Оцінка</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://www.federalregister.gov" target="_blank" rel="noopener">Federal Register</a></td><td>Офіційне (США)</td><td>Тексти правил; є відкритий API</td><td class="score">5</td></tr>
+        <tr><td><a href="https://www.sec.gov/newsroom/press-releases" target="_blank" rel="noopener">SEC</a></td><td>Офіційне (США)</td><td>Прес-релізи й рішення; RSS працює</td><td class="score">5</td></tr>
+        <tr><td><a href="https://bank.gov.ua" target="_blank" rel="noopener">Національний банк України</a></td><td>Офіційне (Україна)</td><td>Офіційні курси, позиція НБУ</td><td class="score">5</td></tr>
+        <tr><td><a href="https://itd.rada.gov.ua" target="_blank" rel="noopener">Верховна Рада</a></td><td>Офіційне (Україна)</td><td>Єдине місце, де видно справжній статус законопроєкту</td><td class="score">5</td></tr>
+        <tr><td><a href="https://www.esma.europa.eu" target="_blank" rel="noopener">ESMA</a></td><td>Офіційне (ЄС)</td><td>Реєстр MiCA, заяви регулятора</td><td class="score">5</td></tr>
+        <tr><td>МВФ, BIS, FSB, FATF</td><td>Офіційне (міжнародне)</td><td>Повільний, але ґрунтовний аналіз</td><td class="score">5</td></tr>
+        <tr><td><a href="https://www.coindesk.com" target="_blank" rel="noopener">CoinDesk</a></td><td>Новини</td><td>Швидко й з джерелами; належить біржі Bullish, є спонсорські матеріали</td><td class="score">4</td></tr>
+        <tr><td><a href="https://www.theblock.co" target="_blank" rel="noopener">The Block</a></td><td>Новини</td><td>Сильні дані й політика</td><td class="score">4</td></tr>
+        <tr><td><a href="https://decrypt.co" target="_blank" rel="noopener">Decrypt</a></td><td>Новини</td><td>Зрозуміло для новачків; є спонсорські та партнерські матеріали</td><td class="score">3,5</td></tr>
+        <tr><td><a href="https://forklog.com.ua" target="_blank" rel="noopener">Forklog UA</a></td><td>Новини українською</td><td>Основне українське крипто-видання; свіжість стрічки не перевірена</td><td class="score">3,5</td></tr>
+        <tr><td><a href="https://cointelegraph.com" target="_blank" rel="noopener">Cointelegraph</a></td><td>Новини</td><td>Дуже швидко, але є платні «партнерські» матеріали й ризик галасу</td><td class="score">3</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="note"><strong>Reuters і Bloomberg</strong> мають найкращий стандарт перевірки фактів, але не мають відкритої стрічки, тому на них слід лише посилатися.</p>
+
+    <h2>Український закон про віртуальні активи</h2>
+    <p>За даними дослідника, станом на 8 жовтня 2026 законопроєкт № 10225-д <strong>не ухвалений остаточно</strong>.
+    Перше читання пройшло 3 вересня 2025 року, друге читання досі очікується. Остаточно не визначено й орган, який регулюватиме ринок:
+    НКЦПФР, НБУ чи Мінцифри. Дослідник не зміг відкрити картку законопроєкту на сайті Ради, тому це
+    <em>не підтверджено з першоджерела</em>. Перевірте статус на <a href="https://itd.rada.gov.ua" target="_blank" rel="noopener">itd.rada.gov.ua</a>.
+    Ставки податку, про які пишуть у ЗМІ (18% або 5% на 2026 рік), поки що лише проєкти.</p>
+
+    <h2>Як перевірити крипто-новину: 5 кроків</h2>
+    <ol class="steps">
+      <li><strong>Знайдіть першоджерело.</strong> Закон, судовий документ чи заява регулятора. Чи є на нього посилання?</li>
+      <li><strong>Перевірте дату.</strong> Старі історії повторюють. Законопроєкт, який «ухвалили», міг пройти лише перше читання.</li>
+      <li><strong>Підтвердіть у двох незалежних джерелах.</strong> Коли одне видання переказує інше, це не підтвердження.</li>
+      <li><strong>Шукайте інтерес автора.</strong> Чи це спонсорований матеріал, партнерське посилання або текст компанії, що продає монету?</li>
+      <li><strong>Остерігайтеся поспіху й обіцянок</strong> («гарантовано», «останній шанс»). Перевіряйте реальний статус на сайті регулятора.</li>
+    </ol>
+
+    <p class="note">Ця сторінка допомагає орієнтуватись у джерелах і не є фінансовою порадою. Ліміти безкоштовних API змінюються, тому перед використанням перевіряйте актуальні умови.</p>
+
+    <p><a href="index.html">← На головну</a></p>
+  </main>
+
+  <!-- @footer -->
+  <footer>
+    <details class="footer-sources" id="sources">
+      <summary>Джерела</summary>
+      <div class="fs-body">
+        <div class="fs-col">
+          <h3>Офіційні</h3>
+          <ul>
+            <li><a href="https://www.sec.gov/newsroom/press-releases" target="_blank" rel="noopener">SEC (США)</a></li>
+            <li><a href="https://www.federalregister.gov" target="_blank" rel="noopener">Federal Register</a></li>
+            <li><a href="https://home.treasury.gov" target="_blank" rel="noopener">Мінфін США</a></li>
+            <li><a href="https://www.esma.europa.eu" target="_blank" rel="noopener">ESMA (ЄС)</a></li>
+            <li><a href="https://bank.gov.ua" target="_blank" rel="noopener">Національний банк України</a></li>
+            <li><a href="https://itd.rada.gov.ua" target="_blank" rel="noopener">Верховна Рада</a></li>
+          </ul>
+        </div>
+        <div class="fs-col">
+          <h3>Ціни й дані</h3>
+          <ul>
+            <li><a href="https://developers.binance.com" target="_blank" rel="noopener">Binance (ціни наживо)</a></li>
+            <li><a href="https://www.coingecko.com" target="_blank" rel="noopener">CoinGecko (історія цін)</a></li>
+            <li><a href="https://alternative.me/crypto/fear-and-greed-index" target="_blank" rel="noopener">Alternative.me (страх і жадібність)</a></li>
+            <li><a href="https://defillama.com/stablecoins" target="_blank" rel="noopener">DefiLlama (стейблкоїни)</a></li>
+            <li><a href="https://mempool.space" target="_blank" rel="noopener">mempool.space (мережа біткоїна)</a></li>
+            <li><a href="https://architectpartners.com" target="_blank" rel="noopener">Architect Partners (інвестиції)</a></li>
+            <li><a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory (автопереклад)</a></li>
+          </ul>
+        </div>
+        <div class="fs-col">
+          <h3>Новини</h3>
+          <ul>
+            <li><a href="https://www.coindesk.com" target="_blank" rel="noopener">CoinDesk</a></li>
+            <li><a href="https://www.theblock.co" target="_blank" rel="noopener">The Block</a></li>
+            <li><a href="https://decrypt.co" target="_blank" rel="noopener">Decrypt</a></li>
+            <li><a href="https://cointelegraph.com" target="_blank" rel="noopener">Cointelegraph</a></li>
+            <li><a href="https://bitcoinmagazine.com" target="_blank" rel="noopener">Bitcoin Magazine</a></li>
+            <li><a href="https://forklog.com.ua" target="_blank" rel="noopener">Forklog UA</a></li>
+            <li><a href="https://itc.ua" target="_blank" rel="noopener">ITC.ua</a></li>
+            <li><a href="https://www.rbc.ua" target="_blank" rel="noopener">РБК-Україна</a></li>
+          </ul>
+        </div>
+        <p class="fs-note">Заголовки й описи належать їхнім видавцям. Інформація на сайті має освітній характер і не є фінансовою порадою.
+          <a href="sources.html">Повний каталог джерел з оцінками надійності →</a></p>
+      </div>
+    </details>
+    <p class="footer-line">© 2026 Крипто простими словами</p>
+  </footer>
+  <!-- @/footer -->
+  <!-- @scripts -->
+  <script src="core.js?v=f8e9e184"></script>
+  <!-- @/scripts -->
+</body>
+</html>
+
+

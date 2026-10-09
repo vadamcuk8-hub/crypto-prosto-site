@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Довідка — Крипто простими словами</title>
+  <link rel="stylesheet" href="style.css?v=7c828bad">
+</head>
+<body>
+
+  <!-- @header -->
+  <header>
+    <button class="menu-btn" id="menuBtn" aria-label="Відкрити меню" aria-expanded="false" aria-controls="mainNav"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <nav id="mainNav" aria-label="Основне меню">
+      <a href="index.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg><span>Головна</span></a>
+      <a href="market.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l4-5 3 3 4-6"/></svg><span>Ринок</span></a>
+      <a href="news.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h11v14H7a2 2 0 0 1-2-2zM16 9h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5"/></svg><span>Новини</span></a>
+      <a href="analytics.html"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Аналітика</span></a>
+      <a href="learn.html" aria-current="page"><svg class="nav-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H12v15H5.5A1.5 1.5 0 0 0 4 20.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H12v15h6.5a1.5 1.5 0 0 1 1.5 1.5z"/></svg><span>Довідка</span></a>
+    </nav>
+  </header>
+  <!-- @/header -->
+
+  <section class="page-title">
+    <h1>Довідка</h1>
+    <p>Що таке криптофінансування, прості пояснення складних слів, відповіді на часті запитання й правила обережності.</p>
+    <nav class="subtabs" aria-label="Розділи сторінки">
+      <a href="#basics">Що це</a>
+      <a href="#glossary">Глосарій</a>
+      <a href="#faq">Запитання</a>
+      <a href="#tips">Поради</a>
+    </nav>
+  </section>
+
+  <!-- Основи -->
+  <section id="basics">
+    <h2>Що таке «криптофінансування»?</h2>
+    <p>
+      Коли в нову компанію вкладають гроші, щоб вона росла, це називають
+      <strong>фінансуванням</strong>. Криптокомпанії працюють з цифровими
+      грошима, наприклад з біткоїном. Вони теж шукають інвесторів: фонди,
+      банки або навіть звичайних людей.
+    </p>
+    <div class="words">
+      <div><strong>Раунд</strong> — один етап збору грошей від інвесторів.</div>
+      <div><strong>Оцінка</strong> — скільки, на думку інвесторів, коштує вся компанія.</div>
+      <div><strong>Стейблкоїн</strong> — цифрова монета, ціна якої прив’язана до звичайної валюти, наприклад до долара.</div>
+      <div><strong>Біржа</strong> — місце, де люди купують і продають криптовалюту.</div>
+    </div>
+  </section>
+
+  <!-- Глосарій -->
+  <section id="glossary">
+    <h2>Глосарій: складні слова простою мовою</h2>
+    <div class="search-box">
+      <input type="search" id="glossSearch" placeholder="Знайти слово: ключ, стейблкоїн, комісія…" aria-label="Пошук у глосарії" autocomplete="off">
+    </div>
+    <p class="small" id="glossInfo" role="status"></p>
+    <dl class="glossary" id="glossList">
+      <div class="term"><dt>Альткоїн</dt><dd>Будь-яка криптовалюта, крім біткоїна. Наприклад, ефіріум чи Solana.</dd></div>
+      <div class="term"><dt>Біржа</dt><dd>Сервіс, де люди купують і продають криптовалюту, як обмінник чи ринок.</dd></div>
+      <div class="term"><dt>Біткоїн (BTC)</dt><dd>Перша й найвідоміша криптовалюта. Існує лише в цифровому вигляді, випуск обмежений 21 мільйоном монет.</dd></div>
+      <div class="term"><dt>Блокчейн</dt><dd>Спільний цифровий журнал записів, який зберігають багато комп’ютерів одночасно. Підробити в ньому запис дуже складно.</dd></div>
+      <div class="term"><dt>Венчурний фонд</dt><dd>Фонд, що вкладає гроші в молоді компанії в надії, що вони виростуть і подорожчають. Високий ризик, але й потенційно високий дохід.</dd></div>
+      <div class="term"><dt>Волатильність</dt><dd>Наскільки сильно й швидко змінюється ціна. Висока волатильність означає різкі стрибки вгору й вниз.</dd></div>
+      <div class="term"><dt>Гаманець (криптогаманець)</dt><dd>Програма або пристрій, де зберігаються ключі до вашої криптовалюти. Самі монети лежать у блокчейні, а гаманець дає доступ до них.</dd></div>
+      <div class="term"><dt>Капіталізація</dt><dd>Вартість усіх монет певної криптовалюти разом: ціна однієї монети, помножена на їх кількість.</dd></div>
+      <div class="term"><dt>Комісія</dt><dd>Плата за операцію: біржі за купівлю й продаж або мережі за переказ. Вона зменшує вашу суму.</dd></div>
+      <div class="term"><dt>Ліквідність</dt><dd>Наскільки легко швидко продати або купити без сильної зміни ціни. Популярні монети ліквідні, маленькі часто ні.</dd></div>
+      <div class="term"><dt>Оцінка компанії</dt><dd>Сума, в яку інвестори оцінюють усю компанію під час залучення грошей.</dd></div>
+      <div class="term"><dt>Приватний ключ</dt><dd>Секретний код, що дає повний доступ до вашої криптовалюти. Хто його знає, той і розпоряджається монетами. Нікому його не показуйте.</dd></div>
+      <div class="term"><dt>Раунд фінансування</dt><dd>Один етап збору грошей від інвесторів. Раунди бувають стартові («посівні»), середні та пізні.</dd></div>
+      <div class="term"><dt>Регулятор</dt><dd>Державний орган, що встановлює правила для ринку й стежить за їх виконанням. Наприклад, SEC у США чи ESMA в ЄС.</dd></div>
+      <div class="term"><dt>Сід-фраза</dt><dd>Набір із 12–24 слів для відновлення гаманця. Втрата фрази означає втрату доступу до грошей, а її розголошення означає, що гроші можуть вкрасти.</dd></div>
+      <div class="term"><dt>Стейблкоїн</dt><dd>Цифрова монета, ціна якої прив’язана до звичайної валюти, найчастіше до долара. Тому вона майже не стрибає.</dd></div>
+      <div class="term"><dt>Токен</dt><dd>Цифровий «жетон» проєкту. Може давати право голосу, доступ до послуг або просто торгуватися.</dd></div>
+      <div class="term"><dt>Токенізація</dt><dd>Перетворення реальних активів, наприклад акцій, на цифрові токени, якими можна торгувати в блокчейні.</dd></div>
+      <div class="term"><dt>Фішинг</dt><dd>Шахрайство, коли підроблений сайт або лист виманює паролі, ключі чи сід-фразу. Завжди перевіряйте адресу сайту.</dd></div>
+      <div class="term"><dt>Фінансова піраміда</dt><dd>Схема, де «прибуток» старим учасникам платять з внесків нових. Рано чи пізно вона обвалюється. Обіцянка гарантованого доходу головна ознака.</dd></div>
+      <div class="term"><dt>DeFi</dt><dd>Децентралізовані фінанси: фінансові послуги (позики, обмін), що працюють на програмах у блокчейні без банку.</dd></div>
+      <div class="term"><dt>ETF (біржовий фонд)</dt><dd>Фонд, акції якого торгуються на біржі. Крипто-ETF дозволяє вкластися в біткоїн без прямого володіння монетами.</dd></div>
+      <div class="term"><dt>HODL</dt><dd>Жаргон: тримати монети довго, не продаючи під час падіння. Походить від друкарської помилки в слові «hold».</dd></div>
+      <div class="term"><dt>KYC</dt><dd>Перевірка особи клієнта (паспорт, фото) перед відкриттям рахунку на біржі. Потрібна за вимогами закону.</dd></div>
+      <div class="term"><dt>MiCA</dt><dd>Закон Євросоюзу про криптоактиви. Криптокомпанії мають мати ліцензію, щоб працювати в ЄС.</dd></div>
+    </dl>
+  </section>
+
+  <!-- Запитання і відповіді:тег <details> розкривається по кліку без жодного JavaScript -->
+  <section id="faq">
+    <h2>Запитання і відповіді</h2>
+    <div class="filters"><button type="button" class="chip" id="faqToggle">Розгорнути всі</button></div>
+
+    <details>
+      <summary>Що таке криптовалюта?</summary>
+      <p>Це цифрові гроші, які існують лише в інтернеті. Їх не випускає банк чи держава. Найвідоміша з них — біткоїн.</p>
+    </details>
+
+    <details>
+      <summary>Що таке стейблкоїн?</summary>
+      <p>Це цифрова монета, ціна якої прив’язана до звичайної валюти, найчастіше до долара. Тому її ціна майже не стрибає.</p>
+    </details>
+
+    <details>
+      <summary>Навіщо компаніям потрібне фінансування?</summary>
+      <p>Щоб наймати людей, розробляти продукти й рости. Інвестори дають гроші й сподіваються, що компанія з часом стане дорожчою.</p>
+    </details>
+
+    <details>
+      <summary>Що означає «оцінка компанії»?</summary>
+      <p>Це сума, в яку інвестори оцінюють усю компанію. Наприклад, оцінка 25 мільярдів означає, що саме стільки, на їхню думку, вона коштує.</p>
+    </details>
+
+    <details>
+      <summary>Чи безпечно вкладати гроші в крипту?</summary>
+      <p>Гарантій немає. Ціни можуть сильно падати, а шахраїв у цій сфері багато. Вкладайте тільки ті гроші, які готові втратити, і ніколи не ділитеся паролями.</p>
+    </details>
+
+    <details>
+      <summary>Чи є тут фінансові поради?</summary>
+      <p>Ні. Сайт лише пояснює новини простою мовою. Для рішень про гроші зверніться до фахівця.</p>
+    </details>
+  </section>
+
+  <!-- Поради -->
+  <section id="tips">
+    <h2>Прості правила обережності</h2>
+    <ul>
+      <li>Вкладайте лише ті гроші, які ви готові втратити.</li>
+      <li>Ціни криптовалют можуть різко рости й падати за один день.</li>
+      <li>Ніколи не передавайте нікому паролі та секретні фрази від гаманця.</li>
+      <li>Якщо обіцяють «гарантований прибуток», це ознака шахрайства.</li>
+      <li>Перевіряйте новини в кількох джерелах.</li>
+    </ul>
+    <p class="note">
+      Цей сайт має освітній характер і не є фінансовою порадою.
+      Цифри можуть відрізнятися в різних джерелах і швидко застарівати.
+    </p>
+  </section>
+
+  <!-- @footer -->
+  <footer>
+    <details class="footer-sources" id="sources">
+      <summary>Джерела</summary>
+      <div class="fs-body">
+        <div class="fs-col">
+          <h3>Офіційні</h3>
+          <ul>
+            <li><a href="https://www.sec.gov/newsroom/press-releases" target="_blank" rel="noopener">SEC (США)</a></li>
+            <li><a href="https://www.federalregister.gov" target="_blank" rel="noopener">Federal Register</a></li>
+            <li><a href="https://home.treasury.gov" target="_blank" rel="noopener">Мінфін США</a></li>
+            <li><a href="https://www.esma.europa.eu" target="_blank" rel="noopener">ESMA (ЄС)</a></li>
+            <li><a href="https://bank.gov.ua" target="_blank" rel="noopener">Національний банк України</a></li>
+            <li><a href="https://itd.rada.gov.ua" target="_blank" rel="noopener">Верховна Рада</a></li>
+          </ul>
+        </div>
+        <div class="fs-col">
+          <h3>Ціни й дані</h3>
+          <ul>
+            <li><a href="https://developers.binance.com" target="_blank" rel="noopener">Binance (ціни наживо)</a></li>
+            <li><a href="https://www.coingecko.com" target="_blank" rel="noopener">CoinGecko (історія цін)</a></li>
+            <li><a href="https://alternative.me/crypto/fear-and-greed-index" target="_blank" rel="noopener">Alternative.me (страх і жадібність)</a></li>
+            <li><a href="https://defillama.com/stablecoins" target="_blank" rel="noopener">DefiLlama (стейблкоїни)</a></li>
+            <li><a href="https://mempool.space" target="_blank" rel="noopener">mempool.space (мережа біткоїна)</a></li>
+            <li><a href="https://architectpartners.com" target="_blank" rel="noopener">Architect Partners (інвестиції)</a></li>
+            <li><a href="https://mymemory.translated.net" target="_blank" rel="noopener">MyMemory (автопереклад)</a></li>
+          </ul>
+        </div>
+        <div class="fs-col">
+          <h3>Новини</h3>
+          <ul>
+            <li><a href="https://www.coindesk.com" target="_blank" rel="noopener">CoinDesk</a></li>
+            <li><a href="https://www.theblock.co" target="_blank" rel="noopener">The Block</a></li>
+            <li><a href="https://decrypt.co" target="_blank" rel="noopener">Decrypt</a></li>
+            <li><a href="https://cointelegraph.com" target="_blank" rel="noopener">Cointelegraph</a></li>
+            <li><a href="https://bitcoinmagazine.com" target="_blank" rel="noopener">Bitcoin Magazine</a></li>
+            <li><a href="https://forklog.com.ua" target="_blank" rel="noopener">Forklog UA</a></li>
+            <li><a href="https://itc.ua" target="_blank" rel="noopener">ITC.ua</a></li>
+            <li><a href="https://www.rbc.ua" target="_blank" rel="noopener">РБК-Україна</a></li>
+          </ul>
+        </div>
+        <p class="fs-note">Заголовки й описи належать їхнім видавцям. Інформація на сайті має освітній характер і не є фінансовою порадою.
+          <a href="sources.html">Повний каталог джерел з оцінками надійності →</a></p>
+      </div>
+    </details>
+    <p class="footer-line">© 2026 Крипто простими словами</p>
+  </footer>
+  <!-- @/footer -->
+  <!-- @scripts -->
+  <script src="core.js?v=f8e9e184"></script>
+  <script src="learn.js?v=667914d2"></script>
+  <!-- @/scripts -->
+</body>
+</html>

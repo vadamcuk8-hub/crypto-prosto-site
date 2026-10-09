@@ -1,0 +1,48 @@
+name: Оновлення даних
+
+# Раз на 10 хвилин запускає агентів (tools/run_agents.py) і зберігає свіжі data/*.json у репозиторій.
+# GitHub Pages віддає сайт із цієї гілки, тому відвідувачі бачать нові дані без вашого комп'ютера.
+# Запустити вручну: вкладка Actions → «Оновлення даних» → Run workflow.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Два запуски одночасно не потрібні: черга з одного
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Запустити агентів
+        env:
+          # Необов'язково: якщо додати секрет ANTHROPIC_API_KEY (Settings → Secrets → Actions),
+          # переклад новин буде якіснішим. Без нього працює безкоштовний переклад.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python tools/run_agents.py
+
+      - name: Зберегти оновлені дані
+        run: |
+          git config user.name "data-bot"
+          git config user.email "data-bot@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then
+            echo "Змін немає"
+          else
+            git commit -m "Оновлення даних $(date -u +'%Y-%m-%d %H:%M') UTC"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push
+          fi

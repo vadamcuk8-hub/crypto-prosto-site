@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Аналітика гаманців — Крипто простими словами</title>
-  <link rel="stylesheet" href="style.css?v=70352a83">
+  <link rel="stylesheet" href="style.css?v=4d4ac73b">
 </head>
 <body class="page-wallets">
 
@@ -29,86 +29,13 @@
 
   <section class="page-title">
     <h1>Аналітика гаманців</h1>
-    <p class="small muted wallets-lead">Один бот у трьох гаманцях з різними монетами: порівняння, найвигідніша угода і чому, живий бот у браузері. <a href="simulation.html">← До симуляції</a></p>
+    <p class="small muted wl-lead">Три віртуальні гаманці (100, 1 000 і 10 000 $) і 16 ботів: порівняння результатів симуляції. <a href="simulation.html">← До симуляції</a></p>
   </section>
 
-  <section id="paper">
-    <div class="rep-bar">
-      <select id="paperStrategy" aria-label="Правило торгівлі" data-help="Обрати правило, за яким бот віртуально торгує. Гроші віртуальні, це не порада й не прогноз."></select>    </div>
-    <div class="ov-grid" id="paperTiles"></div>
-    <div class="wallet-views" id="walletViews" role="tablist" aria-label="Розділи гаманця"></div>
-    <div class="wallet-details" id="decisions">
-      <div class="wallet-pane" data-view="feed" id="walletFeed"></div>
-      <div class="wallet-pane" data-view="analytics" id="walletAnalytics" hidden></div>
-      <div class="wallet-pane" data-view="pos">
-        <h4 class="sub" data-hinfo="Монети, які бот тримає просто зараз за вибраним правилом: скільки, за якою ціною куплено й який поточний результат за живою ціною (комісію ще не враховано).">Зараз у позиції</h4>
-        <div class="agent-table-wrap" id="decOpen"></div>
-      </div>
-      <div class="wallet-pane" data-view="stats">
-        <h4 class="sub" data-hinfo="Закриті угоди (купівля, а потім продаж) за вибраним правилом: скільки було прибуткових, середній результат, найкраща й найгірша. Результат угоди враховує комісію.">Статистика закритих угод</h4>
-        <div class="ov-grid" id="decStats"></div>
-      </div>
-      <div class="wallet-pane" data-view="journal">
-      <h4 class="sub" data-hinfo="Журнал рішень бота для вибраного гаманця: коли саме правило купило чи продало, за якою ціною, скільки монет це було на цьому рахунку, чому (яка умова спрацювала) і на які індикатори воно спиралось, з їхніми значеннями. «Контекст» (новини, фон) показано лише для довідки: правила його не використовують. Для тестової біржі показано фактичне виконання ордера: середню ціну, суму й комісію.">Журнал рішень: що купив бот і чому</h4>
-      <div class="rep-bar">
-        <select id="decSource" aria-label="Джерело рішень" data-help="Чиї рішення показувати: віртуального правила (обране вище) чи бота на тестовій біржі">
-          <option value="paper">Віртуальне правило (обране вище)</option><option value="testnet">Бот на тестовій біржі</option>
-        </select>
-        <select id="decCoin" aria-label="Монета" data-help="Показати рішення лише по цій монеті"><option value="">Усі монети</option></select>
-        <select id="decSide" aria-label="Дія" data-help="Показати лише купівлі чи лише продажі">
-          <option value="">Купівлі й продажі</option><option value="BUY">Лише купівлі</option><option value="SELL">Лише продажі</option>
-        </select>
-        <button type="button" class="chip" id="decCsv" data-help="Зберегти журнал у файл CSV: відкривається в Excel">Завантажити CSV</button>
-      </div>
-      <div class="dec-list" id="decList"></div>
-      </div>
-      <div class="wallet-pane" data-view="chart">
-        <h4 class="sub">Рахунок бота проти «просто тримати»</h4>
-        <div class="sim-chart" id="paperChart" role="img" aria-label="Графік віртуального рахунку проти «просто тримати»"></div>
-        <p class="sim-readout small" id="paperReadout" aria-live="off"></p>
-      </div>
-      <div class="wallet-pane" data-view="arena">
-        <h4 class="sub" data-hinfo="Усі правила працюють паралельно на тих самих віртуальних грошах і тих самих монетах. Діаграма показує результат кожного бота від старту раунду (кольорові лінії) проти «просто тримати» (пунктир сірим). Крапка зліва в рейтингу ховає чи показує лінію, клік по назві показує бота в гаманці. Оновлюється щосекунди. «Обернені» правила купують навпаки (там, де сигнал каже продавати): якщо вони виходять не гірше за звичайні, сигнал нічого не додає.">Арена ботів: хто зараз попереду</h4>
-        <div class="agent-table-wrap" id="paperBoard"></div>
-        <p class="sim-readout small" id="paperVerdict"></p>
-      </div>
-      <div class="wallet-pane" data-view="rounds">
-        <h4 class="sub" data-hinfo="Попередні 7-денні раунди: скільки відсотків дало правило проти «просто тримати» тих самих монет.">Попередні раунди</h4>
-        <div class="agent-table-wrap" id="paperHistory"></div>
-      </div>
-    </div>
-  </section>
-
-  <section id="history">
-    <h2 data-hinfo="Що було б на реальних цінах Binance, якби торгувати за правилом: купувати, коли сигнал каже «покупці», і тримати гроші готівкою в іншому випадку. Порівняно з «просто тримати» і з випадковою торгівлею з такою самою часткою часу в ринку. Увага: за період, коли ринок падав, правило, яке часто сидить у готівці, виглядає краще не тому, що заробляє. Минуле не гарантує майбутнього.">А якби торгувати в минулому</h2>
-    <div class="rep-bar">
-      <select id="simCoin" aria-label="Монета" data-help="Обрати монету для симуляції"></select>
-      <select id="simStrategy" aria-label="Правило торгівлі" data-help="Обрати правило торгівлі"></select>
-      <span class="ct-group sim-periods" id="simPeriods" role="group" aria-label="Період"></span>
-      <select id="simCapital" aria-label="Початкова сума" data-help="Скільки віртуальних доларів вкласти на початку (відсотки не залежать від суми)">
-        <option value="100">100 $</option><option value="1000" selected>1 000 $</option><option value="10000">10 000 $</option>
-      </select>
-    </div>
-    <div class="ov-grid" id="simTiles"></div>
-    <h3 class="sub" data-hinfo="Усі денні правила для вибраної монети й періоду поруч: підсумок, порівняння з «просто тримати», найбільше просідання, чи краще за випадкову торгівлю й кількість угод.">Усі правила для цієї монети</h3>
-    <div class="agent-table-wrap" id="simStratTable"></div>
-    <div class="sim-chart" id="simChart" role="img" aria-label="Графік віртуального рахунку проти «просто тримати»"></div>
-    <p class="sim-readout small" id="simReadout" aria-live="off"></p>
-    <h3 class="sub" data-hinfo="Результат того самого правила й періоду для всіх монет. Зелене: правило обійшло «просто тримати». Натисніть на монету, щоб подивитись її докладно вище.">Усі монети: правило проти «просто тримати»</h3>
-    <div class="agent-table-wrap" id="simTable"></div>
-  </section>
-
-  <section id="testnet">
-    <h2 data-hinfo="Бот САМ купує й продає на тестовій біржі Binance Testnet за рішеннями вибраного правила. Це справжні ордери зі стаканом, комісіями й балансом, але гроші ненастоящі: так видно реальний прибуток чи збиток без ризику. Сайт не торгує реальними грошима і ніколи не отримує ваші ключі до справжньої біржі. Ключі тестової біржі зберігаються лише як секрети GitHub.">Тестова біржа: справжні ордери, ненастоящі гроші</h2>
-    <div id="trSetup"></div>
-    <div class="ov-grid" id="trTiles"></div>
-    <div class="agent-table-wrap" id="trOrders"></div>
-  </section>
-
-  <section id="simAgent">
-    <h2>Агент «Симуляція»</h2>
-    <div class="agent-card" id="simAgentCard"><p class="muted">Завантаження…</p></div>
-  </section>
+  <main id="wlRoot" class="wl-root">
+    <noscript><p class="muted">Для аналітики гаманців потрібен JavaScript.</p></noscript>
+    <p class="muted">Завантаження…</p>
+  </main>
 
   <!-- @footer -->
   <footer>
@@ -162,12 +89,11 @@
   <script src="core.js?v=ac775059"></script>
   <script src="help.js?v=9d22fa8f"></script>
   <script src="agent-ui.js?v=9259d765"></script>
-  <script src="chart-indicators.js?v=ecb3a06b"></script>
-  <script src="chart-scale.js?v=7df9ca17"></script>
-  <script src="chart-layout.js?v=d29579b7"></script>
-  <script src="chart-data.js?v=53157b0e"></script>
-  <script src="chart-tool.js?v=2863d5db"></script>
-  <script src="simulation.js?v=2ecf8204"></script>
+  <script src="wallets-data.js?v=6aab88b3"></script>
+  <script src="wallets-chart.js?v=30a746ca"></script>
+  <script src="live-feed-core.js?v=9e3252e2"></script>
+  <script src="live-feed.js?v=7ad7c10f"></script>
+  <script src="wallets.js?v=49a275ce"></script>
   <!-- @/scripts -->
 </body>
 </html>

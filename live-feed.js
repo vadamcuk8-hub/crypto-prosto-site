@@ -56,7 +56,7 @@ const LiveFeed = (function () {
     host.appendChild(wrap);
 
     // кнопка «Події» (телефон) і кнопка повернення панелі після згортання
-    const fab = el("button", "lf-fab", "Події"); fab.type = "button"; fab.setAttribute("aria-expanded", "false");
+    const fab = el("button", "lf-fab", opts.fabLabel || "Події"); fab.type = "button"; fab.setAttribute("aria-expanded", "false");
     const fabBadge = el("span", "lf-fab-badge", ""); fabBadge.hidden = true; fab.appendChild(fabBadge);
     const reopen = el("button", "lf-reopen", "Події"); reopen.type = "button"; reopen.setAttribute("aria-label", "Показати панель подій");
     const reopenBadge = el("span", "lf-fab-badge", ""); reopenBadge.hidden = true; reopen.appendChild(reopenBadge);

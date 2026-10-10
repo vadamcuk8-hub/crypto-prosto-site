@@ -30,7 +30,7 @@ PARTIALS = os.path.join(ROOT, "tools", "partials")
 PAGE_SCRIPTS = {
     "index.html": ["core.js", "agent-ui.js", "charts.js", "chart-tool.js", "widget-defs.js", "widgets.js", "home.js", "chartbg.js"],
     "simulation.html": ["core.js", "agent-ui.js", "chart-tool.js", "simulation.js", "live-feed.js", "simulation-feed.js"],
-    "wallets.html": ["core.js", "agent-ui.js", "chart-tool.js", "simulation.js"],
+    "wallets.html": ["core.js", "agent-ui.js", "wallets-data.js", "wallets-chart.js", "live-feed.js", "wallets.js"],
     "agents.html": ["core.js", "agent-ui.js", "charts.js", "chart-tool.js", "widget-defs.js", "widgets.js", "agents.js"],
     "learn.html": ["core.js", "learn.js"],
     "market.html": ["core.js", "agent-ui.js", "chart-tool.js", "market-live.js", "market-charts.js", "market-terminal.js", "market-calc.js",
@@ -139,25 +139,8 @@ def build_page(page):
     return version_assets(text)
 
 
-def sync_wallets_page():
-    """wallets.html = та сама розмітка й той самий simulation.js, але показує лише «Аналітику гаманців»: так не доводиться дублювати код.
-    Сторінку створює збірка з simulation.html (правте розмітку там, а не в wallets.html)."""
-    src = read(os.path.join(ROOT, "simulation.html"))
-    t = src.replace("<title>Симуляція — Крипто простими словами</title>", "<title>Аналітика гаманців — Крипто простими словами</title>", 1)
-    t = t.replace("<body>", '<body class="page-wallets">', 1)
-    t = t.replace("<h1>Симуляція</h1>", "<h1>Аналітика гаманців</h1>", 1)
-    t = re.sub(r'<div class="subtabs".*?</div>', '<p class="small muted wallets-lead">Один бот у трьох гаманцях з різними монетами: порівняння, найвигідніша угода і чому, живий бот у браузері. <a href="simulation.html">← До симуляції</a></p>', t, count=1, flags=re.S)
-    t = t.replace('<div class="rep-bar" hidden>', '<div class="rep-bar">', 1)
-    path = os.path.join(ROOT, "wallets.html")
-    if not os.path.exists(path) or read(path) != t:
-        # зберігаємо вже підставлені шапку/підвал/скрипти: їх збірка оновить далі
-        write(path, t)
-
-
 def main():
     check = "--check" in sys.argv
-    if not check:
-        sync_wallets_page()
     stale, built = [], 0
     for name in sorted(os.listdir(ROOT)):
         if not name.endswith(".html"):

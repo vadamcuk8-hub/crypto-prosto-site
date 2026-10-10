@@ -41,7 +41,7 @@
         if (!st || !Array.isArray(st.curve)) return;
         let cv = cleanCurve(st.curve);
         if (rs !== null) cv = cv.filter(function (p) { return p.t >= rs - 60000; });
-        if (cv.length) w.strategies[r.id] = { curve: cv, trades: num(st.trades) ? st.trades : null, open: Array.isArray(st.open) ? st.open.length : null };
+        if (cv.length) w.strategies[r.id] = { curve: cv, trades: num(st.trades) ? st.trades : null, open: Array.isArray(st.open) ? st.open.length : null, openCoins: Array.isArray(st.open) ? st.open.filter(function (x) { return typeof x === "string"; }) : null, state: st.state && typeof st.state === "object" ? st.state : {} };
       });
       wallets[cap] = w;
     });
@@ -108,5 +108,73 @@
   function periodWindow(period, now) { const w = PERIODS[period]; return w === undefined || w === null ? null : [now - w, now]; }
   function logAllowed(vals) { return vals.length > 0 && vals.every(function (v) { return v > 0; }); }
 
-  root.WalletsData = { COLORS: COLORS, PERIODS: PERIODS, MIN_GAP: MIN_GAP, parseModel: parseModel, series: series, dailySeries: dailySeries, value: value, gapThreshold: gapThreshold, split: split, clip: clip, periodWindow: periodWindow, logAllowed: logAllowed, median: median };
+  // ---------- Показники карток і KPI (лише з наявних збережених точок) ----------
+  // Просідання: найбільше падіння від піку до дна за збереженими точками (між запусками агента рухи невідомі, тому це оцінка за дискретними точками)
+  function maxDrawdown(vals) {
+    if (!Array.isArray(vals) || vals.length < 2) return null;
+    let peak = -Infinity, mdd = 0;
+    vals.forEach(function (v) { if (v > peak) peak = v; if (peak > 0) mdd = Math.max(mdd, (peak - v) / peak * 100); });
+    return mdd;
+  }
+  function sumNums(arr) { return arr.every(function (x) { return x !== null && x !== undefined; }) ? arr.reduce(function (a, b) { return a + b; }, 0) : null; }
+
+  // Показники одного гаманця: «Вибраний бот» — один рахунок; «Середнє по ботах» — середня крива 16 ботів, а угоди й позиції — СУМА по ботах (не показники одного рахунку)
+  function walletStats(model, query, cap) {
+    const w = model.wallets[cap], src = series(model, query, cap), pts = src.points, last = pts.length ? pts[pts.length - 1] : null;
+    const ids = w ? Object.keys(w.strategies) : [];
+    let trades = null, open = null, openCoins = [];
+    if (w) {
+      if (query.mode === "avg") { trades = ids.length ? sumNums(ids.map(function (id) { return w.strategies[id].trades; })) : null; open = ids.length ? sumNums(ids.map(function (id) { return w.strategies[id].open; })) : null; }
+      else { const st = w.strategies[query.bot]; trades = st ? st.trades : null; open = st ? st.open : null; openCoins = st && st.openCoins ? st.openCoins.slice() : []; }
+    }
+    return { cap: cap, deposit: cap, coins: w ? w.coins : [], last: last, first: pts.length ? pts[0] : null, value: last ? cap * last.eq : null, resultUsd: last ? cap * (last.eq - 1) : null, resultPct: last ? (last.eq - 1) * 100 : null,
+      trades: trades, open: open, openCoins: openCoins, bots: query.mode === "avg" ? ids.length : 1, dd: maxDrawdown(pts.map(function (p) { return p.eq; })), points: pts, meta: src.meta, roundStart: w ? w.roundStart : null, roundEnd: w ? w.roundEnd : null, dailyDays: w ? Object.keys(w.daily).length : 0 };
+  }
+  // Сумарна крива трьох рахунків: лише часові мітки, де є ВСІ три гаманці (без округлення й нових міток); просадка рахується по цій кривій, а не з просадок гаманців
+  function aggregate(model, query) {
+    const caps = model.caps, per = caps.map(function (c) { const m = {}; series(model, query, c).points.forEach(function (p) { m[p.t] = p.eq; }); return m; });
+    const first = per[0] || {}, out = [];
+    Object.keys(first).map(Number).sort(function (a, b) { return a - b; }).forEach(function (t) { if (per.every(function (m) { return m[t] !== undefined; })) out.push({ t: t, usd: caps.reduce(function (a, c, i) { return a + c * per[i][t]; }, 0) }); });
+    return out;
+  }
+  function kpis(model, query) {
+    const stats = model.caps.map(function (c) { return walletStats(model, query, c); }), have = stats.filter(function (s) { return s.last; });
+    const deposits = model.caps.reduce(function (a, c) { return a + c; }, 0), agg = aggregate(model, query);
+    if (!have.length) return { stats: stats, empty: true, deposits: deposits };
+    const sum = have.reduce(function (a, s) { return a + s.value; }, 0), dep = have.reduce(function (a, s) { return a + s.deposit; }, 0), lasts = have.map(function (s) { return s.last.t; });
+    return { stats: stats, empty: false, complete: have.length === stats.length, deposits: dep, sum: sum, resultUsd: sum - dep, resultPct: (sum - dep) / dep * 100, open: sumNums(stats.map(function (s) { return s.open; })), trades: sumNums(stats.map(function (s) { return s.trades; })),
+      dd: agg.length >= 2 ? maxDrawdown(agg.map(function (p) { return p.usd; })) : null, aggPoints: agg.length, asOf: Math.min.apply(null, lasts), mixedTimes: Math.max.apply(null, lasts) !== Math.min.apply(null, lasts) };
+  }
+
+  // ---------- Жива оцінка (окремо від історії): та сама формула, що й liveMarks у «Симуляції» ----------
+  // state[монета] = [у позиції?, eq монети, hold, остання ціна закриття, вага]; для монет у позиції eq множиться на (жива ціна / ціна закриття)
+  function liveEq(state, prices) {
+    const syms = Object.keys(state || {});
+    let eq = 0, open = 0, priced = 0;
+    syms.forEach(function (sym) {
+      const s = state[sym];
+      if (!Array.isArray(s) || !num(s[1]) || !num(s[3]) || s[3] <= 0) return;
+      const w = s.length > 4 && num(s[4]) ? s[4] : 1 / syms.length, live = prices && num(prices[sym]) && prices[sym] > 0 ? prices[sym] : null;
+      if (s[0]) { open++; if (live !== null) priced++; }
+      eq += w * s[1] * (s[0] && live !== null ? live / s[3] : 1);
+    });
+    return { eq: eq, open: open, priced: priced, complete: priced === open };
+  }
+  function liveWallet(model, query, cap, prices) {
+    const w = model.wallets[cap]; if (!w) return null;
+    const ids = query.mode === "avg" ? Object.keys(w.strategies) : (w.strategies[query.bot] ? [query.bot] : []);
+    if (!ids.length) return null;
+    const rs = ids.map(function (id) { return liveEq(w.strategies[id].state, prices); });
+    return { eq: rs.reduce(function (a, r) { return a + r.eq; }, 0) / rs.length, open: rs.reduce(function (a, r) { return a + r.open; }, 0), priced: rs.reduce(function (a, r) { return a + r.priced; }, 0), complete: rs.every(function (r) { return r.complete; }) };
+  }
+  function liveSymbols(model, query) {
+    const set = {};
+    model.caps.forEach(function (cap) {
+      const w = model.wallets[cap]; if (!w) return;
+      (query.mode === "avg" ? Object.keys(w.strategies) : [query.bot]).forEach(function (id) { const st = w.strategies[id]; if (!st) return; Object.keys(st.state).forEach(function (sym) { if (st.state[sym] && st.state[sym][0]) set[sym] = 1; }); });
+    });
+    return Object.keys(set).sort();
+  }
+
+  root.WalletsData = { maxDrawdown: maxDrawdown, walletStats: walletStats, aggregate: aggregate, kpis: kpis, liveEq: liveEq, liveWallet: liveWallet, liveSymbols: liveSymbols, COLORS: COLORS, PERIODS: PERIODS, MIN_GAP: MIN_GAP, parseModel: parseModel, series: series, dailySeries: dailySeries, value: value, gapThreshold: gapThreshold, split: split, clip: clip, periodWindow: periodWindow, logAllowed: logAllowed, median: median };
 })(typeof window !== "undefined" ? window : this);

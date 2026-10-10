@@ -416,14 +416,14 @@
       Array.prototype.forEach.call(host.querySelectorAll(".sim-scope button"), function (b) { assert(b.getBoundingClientRect().height >= 43.5, "кнопка звуження ≥44 px"); });
     } finally { f && f.remove(); }
   });
-  test("Сторінка «Ринок»: постійної панелі подій немає, графік на місці; сторінка «Гаманці» без змін (стрічки там немає)", async function () {
+  test("Сторінка «Ринок»: постійної панелі подій немає, графік на місці; сторінка «Гаманці» зі стрічкою лише у висувній панелі", async function () {
     let f = await frame("market.html", 1300); try {
       const d = f.contentDocument; if (!d || !d.getElementById("mkChart")) throw new Skip("сторінка не завантажилась");
       eq(d.querySelectorAll(".lf, .lf-fab, #mkFeed").length, 0, "панелі подій на «Ринку» немає"); assert(d.querySelector("#mkChart .ct-svg"), "біржовий графік працює");
     } finally { f && f.remove(); }
     f = await frame("wallets.html", 1300); try {
       const d = f.contentDocument; if (!d || !d.body) throw new Skip("сторінка не завантажилась");
-      eq(d.querySelectorAll(".lf, .sim-layout").length, 0, "сторінка гаманців не змінювалась");
+      eq(d.querySelectorAll(".sim-layout").length, 0, "розкладка симуляції на сторінці гаманців не з'являється"); eq(d.querySelectorAll(".lf").length, 1, "на гаманцях стрічка лише одна й лише як висувна панель"); assert(/Торгові події/.test(d.querySelector(".lf-fab").textContent), "кнопка «Торгові події»");
     } finally { f && f.remove(); }
   });
   test("Очищення: знищення панелі прибирає кнопку, клас режиму й слухачів медіа-запиту; повторне монтування не дублює", async function () {

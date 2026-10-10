@@ -6,6 +6,7 @@
   stablecoins  Стейблкоїни: пропозиція, лідери, динаміка (DefiLlama)                           кожні 30 хв
   network      Мережа біткоїна: комісії, черга, потужність (mempool.space)                     кожні 3 хв
   trader       Тестова біржа: автоматично купує й продає на Binance Testnet (ненастоящі гроші) за правилом із «Симуляції»
+  feed         Жива стрічка: журнал підтверджених подій (симуляція й Testnet) для панелі на сайті  після «Тестової біржі»
   simulation   Симуляція: 7-денний паперовий рахунок на 100, 1000, 10000 $ і перевірка правил на історії цін (щоразу)
   report       Звіт: щоденний звіт по ринку з розділами, застереженнями й архівом (після «Картини»)
   outlook      Картина: зводить сигнали, новини, настрій і потоки грошей у фон по кожній монеті (без порад)  після решти
@@ -32,7 +33,7 @@ try:
 except Exception:
     pass
 
-from agents import agent_outlook, agent_report, agent_signals, agent_simulation, agent_trader, agent_analyst, agent_notify, ai_summary, agent_market, agent_network, agent_regulation, agent_sentiment, agent_stablecoins
+from agents import agent_outlook, agent_report, agent_signals, agent_simulation, agent_trader, agent_feed, agent_analyst, agent_notify, ai_summary, agent_market, agent_network, agent_regulation, agent_sentiment, agent_stablecoins
 from agents.common import DATA, log, now_iso, record_history, write_json
 import news_agent
 
@@ -57,7 +58,7 @@ class NewsAgent:
                 "positive_share": round(100 * s.get("positive", 0) / n)}
 
 
-AGENTS = [agent_market, agent_network, agent_sentiment, agent_stablecoins, agent_regulation, agent_signals, NewsAgent, agent_outlook, agent_report, agent_simulation, agent_trader, agent_analyst, agent_notify]
+AGENTS = [agent_market, agent_network, agent_sentiment, agent_stablecoins, agent_regulation, agent_signals, NewsAgent, agent_outlook, agent_report, agent_simulation, agent_trader, agent_feed, agent_analyst, agent_notify]
 lock = threading.Lock()
 
 

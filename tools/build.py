@@ -33,7 +33,7 @@ PAGE_SCRIPTS = {
     "wallets.html": ["core.js", "agent-ui.js", "chart-tool.js", "simulation.js"],
     "agents.html": ["core.js", "agent-ui.js", "charts.js", "chart-tool.js", "widget-defs.js", "widgets.js", "agents.js"],
     "learn.html": ["core.js", "learn.js"],
-    "market.html": ["core.js", "agent-ui.js", "chart-tool.js", "market-live.js", "market-charts.js", "market-calc.js",
+    "market.html": ["core.js", "agent-ui.js", "chart-tool.js", "market-live.js", "market-charts.js", "live-feed.js", "market-terminal.js", "market-calc.js",
                     "market-heatmap.js", "market-alerts.js", "market.js"],
     "news.html": ["core.js", "news.js", "agent-ui.js", "feed.js"],
     "analytics.html": ["core.js", "agent-ui.js", "charts.js", "chart-tool.js", "analytics.js", "signals.js", "outlook.js", "report.js"],
@@ -103,7 +103,7 @@ def render_header(page):
 
 
 # Залежності модулів: де підключено ключовий скрипт, його допоміжні файли ставляться безпосередньо перед ним
-SCRIPT_DEPS = {"chart-tool.js": ["chart-indicators.js", "chart-scale.js", "chart-layout.js", "chart-data.js"]}
+SCRIPT_DEPS = {"chart-tool.js": ["chart-indicators.js", "chart-scale.js", "chart-layout.js", "chart-data.js"], "live-feed.js": ["live-feed-core.js"]}
 
 
 def render_scripts(page):

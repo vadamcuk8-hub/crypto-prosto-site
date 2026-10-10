@@ -4,6 +4,8 @@
 //  • Маніпуляції: колесо миші — масштаб, перетягування — прокрутка, подвійний клік — скинути; індикатори MA(7/25/99) і об'єм;
 //    інструменти: курсор, горизонтальна лінія (маркер), лінія тренду, лінійка (різниця ціни, відсоток, час).
 //  • Лінії й маркери зберігаються в цьому браузері. Клавіатура: стрілки, + / −, Home, Enter, Esc.
+//  • Сенсорне керування (Pointer Events): один палець — прокрутка, два — масштаб, довге натискання — перехрестя з даними свічки, дотик — вибір і редагування малюнків.
+//  • Малюнки редагуються (інструмент «Курсор»): вибір кліком, перетягування, контрольні точки, панель властивостей (колір, товщина, стиль, замок, видалення), Delete, Ctrl+Z / Ctrl+Y.
 // Дані й WebSocket: chart-data.js (спільне з'єднання, кеш, добір пропущених свічок, підвантаження історії), індикатори: chart-indicators.js.
 // Цінова шкала (звичайна, логарифмічна, відсоткова, ручне вертикальне масштабування): chart-scale.js. Точність цін: правила біржі через ChartData.symbolInfo.
 // Індикатори (SMA, EMA, Bollinger, VWAP на графіку; RSI і MACD в підпанелях; об'єм): набір і збереження налаштувань — chart-layout.js, математика — chart-indicators.js.
@@ -29,7 +31,12 @@ const ChartTool = (function () {
     { id: "fib", icon: "Fib", label: "Рівні Фібоначчі", hint: "Рівні Фібоначчі: натисніть початок руху, потім його кінець. Графік покаже рівні відкату 23,6 / 38,2 / 50 / 61,8 / 78,6 %." },
     { id: "ruler", icon: "↔", label: "Лінійка", hint: "Лінійка: натисніть першу точку, потім другу, щоб побачити різницю ціни, відсоток і час. Esc очищує вимір." },
   ];
-  const MAX_LINES = 20;
+  const MAX_LINES = 20, MAX_UNDO = 50, HIT_LINE = 7, HIT_HANDLE = 10, HIT_LINE_T = 16, HIT_HANDLE_T = 26, LONG_PRESS_MS = 450, TOUCH_MOVE = 8, NARROW_PX = 600;
+  // Типові вигляди малюнків (збігаються з CSS): h — горизонтальна лінія, l — тренд, f — Фібоначчі
+  const DEF_LOOK = { h: { color: "#f0b90b", width: 1.2, style: "dashed" }, l: { color: "#4a9bf5", width: 1.8, style: "solid" }, f: { color: "#cc7ee8", width: 1, style: "solid" } };
+  const OBJ_NAME = { h: "Горизонтальна лінія", l: "Лінія тренду", f: "Рівні Фібоначчі" };
+  let idSeq = 0;
+  function newId() { return "o" + Date.now().toString(36) + (++idSeq).toString(36); }
 
   // Розмір полотна за шириною контейнера: 1 одиниця viewBox = 1 піксель; на вузькому екрані графік вищий (0,9 від ширини), на широкому ≈0,51
   function sizeFor(wpx) {
@@ -37,9 +44,19 @@ const ChartTool = (function () {
     return { w: w, h: w < 560 ? Math.round(w * 0.9) : Math.max(300, Math.round(w * 0.51)) };
   }
 
+  // Жести скасовуються, коли вкладка ховається (один спільний слухач документа на всі графіки)
+  const gestureHosts = new Set();
+  let visBound = false;
+  function bindVisibility() {
+    if (visBound) return; visBound = true;
+    document.addEventListener("visibilitychange", function () { if (document.hidden) gestureHosts.forEach(function (fn) { fn(); }); });
+  }
+
   // Один екземпляр графіка: або вікно (dialog), або вбудований на сторінку (embed). Стан кожного окремий.
   function create(embed) {
-  let dlg = null, S = null, ui = {}, raf = 0, drag = null, host = null, lastGood = null;
+  let dlg = null, S = null, ui = {}, raf = 0, drag = null, host = null, lastGood = null, hintT = 0, lpTimer = 0, tmode = null, pinch = null;
+  const tp = new Map();                                                  // активні дотики: pointerId → позиція
+  let coarse = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);   // сенсорне введення: більші області попадання
   const CLIP = "ctclip" + (++uid);
   let W = DEF_W, H = DEF_H, ro = null;                                   // розмір полотна в пікселях: оновлюється ResizeObserver, тож шрифти лишаються читабельними
   function isOpen() { return embed ? dlg.isConnected : dlg.open; }
@@ -86,11 +103,31 @@ const ChartTool = (function () {
 
   // ---------- Збереження ліній ----------
   function storeKey() { return "ct2:" + (S.spec.symbol || S.spec.id || S.spec.title); }
+  // Стара структура {h, l, f} збережена; додаткові необов'язкові поля малюнка: id, locked, color, width, style ("solid" | "dashed").
+  // Один пошкоджений запис пропускається, решта лишається; при нечитабельному записі повністю копія зберігається під ключем ct2bak:
+  function cleanProps(o) {
+    if (typeof o.locked !== "boolean") delete o.locked;
+    if (!(typeof o.color === "string" && /^#[0-9a-fA-F]{6}$/.test(o.color))) delete o.color;
+    if (!(typeof o.width === "number" && o.width >= 0.5 && o.width <= 6)) delete o.width;
+    if (o.style !== "solid" && o.style !== "dashed") delete o.style;
+    return o;
+  }
+  function okPt(q) { return q && typeof q === "object" && typeof q.price === "number" && isFinite(q.price); }
+  function normLines(d) {
+    const seen = {};
+    const fix = function (o) { cleanProps(o); if (typeof o.id !== "string" || !/^[A-Za-z0-9_-]{1,24}$/.test(o.id) || seen[o.id]) o.id = newId(); seen[o.id] = true; return o; };
+    const pairs = function (arr) { return (Array.isArray(arr) ? arr : []).filter(function (x) { return x && okPt(x.a) && okPt(x.b); }).map(fix); };
+    return { h: (Array.isArray(d.h) ? d.h : []).filter(okPt).map(fix), l: pairs(d.l), f: pairs(d.f) };
+  }
   function loadLines() {
+    let raw = null;
     try {
-      const d = JSON.parse(localStorage.getItem(storeKey()) || "{}");
-      return { h: (d.h || []).filter(function (m) { return typeof m.price === "number"; }), l: (d.l || []).filter(function (x) { return x.a && x.b; }), f: (d.f || []).filter(function (x) { return x.a && x.b; }) };
-    } catch (e) { return { h: [], l: [], f: [] }; }
+      raw = localStorage.getItem(storeKey());
+      return normLines(JSON.parse(raw || "{}") || {});
+    } catch (e) {
+      try { if (raw) localStorage.setItem("ct2bak:" + storeKey().slice(4), raw); } catch (e2) { /* не критично */ }
+      return { h: [], l: [], f: [] };
+    }
   }
   function saveLines() { try { localStorage.setItem(storeKey(), JSON.stringify({ h: S.h, l: S.l, f: S.f })); } catch (e) { /* сховище недоступне: лінії живуть до закриття вікна */ } }
 
@@ -132,6 +169,8 @@ const ChartTool = (function () {
     ui.svg = sv("svg", { viewBox: "0 0 " + W + " " + H, class: "ct-svg", role: "application", tabindex: "0",
       "data-help": "Колесо миші — масштаб, перетягування — прокрутка, подвійний клік — скинути. Клавіатура: стрілки, + / −, Enter", "aria-label": "Інтерактивний графік. Стрілки вліво й вправо переміщують курсор, плюс і мінус змінюють масштаб, Enter ставить лінію або точку лінійки." });
     body.appendChild(ui.svg);
+    ui.props = el("div", "ct-props"); ui.props.hidden = true; ui.props.setAttribute("role", "toolbar"); ui.props.setAttribute("aria-label", "Властивості вибраного малюнка");
+    body.appendChild(ui.props);
     dlg.appendChild(body);
 
     ui.hint = el("p", "ct-hint");
@@ -145,17 +184,50 @@ const ChartTool = (function () {
     function xv(e) { const r = svg.getBoundingClientRect(); return (e.clientX - r.left) * W / r.width; }
     svg.addEventListener("pointerdown", function (e) {
       if (!S) return;
+      coarse = e.pointerType === "touch";
+      if (coarse) {
+        tp.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (tp.size >= 2) { secondFinger(); return; }                                      // другий палець: масштаб (або ігнор, якщо йшло редагування)
+        tmode = null;
+      }
       if (S.all.length && (xv(e) >= W - MR || e.shiftKey)) {                               // вісь цін або Shift: вертикальне масштабування / зсув
         const g0 = geo(view().pts);
         drag = { axis: xv(e) >= W - MR, vpan: !(xv(e) >= W - MR), y: e.clientY, moved: false, rng: { lo: g0.loT, hi: g0.hiT }, priceH: g0.priceH, g: g0 };
         try { svg.setPointerCapture(e.pointerId); } catch (err) { /* не критично */ }
         return;
       }
-      drag = { x: e.clientX, off: S.off, moved: false };
+      let hit = null;
+      if (S.tool === "cursor" && S.all.length) {                                          // режим вибору/редагування: ловимо контрольні точки й лінії
+        const r0 = svg.getBoundingClientRect(), px = xv(e), py = (e.clientY - r0.top) * H / r0.height, vw0 = view(), g0 = geo(vw0.pts);
+        const hh = hitHandle(px, py, g0, vw0);
+        if (hh) { startEdit(e, hh.kind, hh.o, hh.k, g0); return; }
+        const ho = hitObject(px, py, g0, vw0);
+        if (ho) { select(ho.o.id); if (!ho.o.locked) { startEdit(e, ho.kind, ho.o, "move", g0); return; } hit = "locked"; }
+        else hit = "empty";
+      }
+      drag = { x: e.clientX, off: S.off, moved: false, hit: hit };
       try { svg.setPointerCapture(e.pointerId); } catch (err) { /* не критично */ }
+      if (coarse && hit !== "locked") {                                                    // довге натискання: перехрестя з даними свічки (рух понад поріг скасовує очікування)
+        const pid = e.pointerId;
+        clearTimeout(lpTimer);
+        lpTimer = setTimeout(function () {
+          lpTimer = 0;
+          const q = tp.get(pid);
+          if (!S || !q || !drag || drag.moved || drag.edit || drag.axis || drag.vpan || tmode) return;
+          drag.lp = true; S.lp = true; pointer({ clientX: q.x, clientY: q.y }); schedule();
+        }, LONG_PRESS_MS);
+      }
     });
     svg.addEventListener("pointermove", function (e) {
       if (!S) return;
+      coarse = e.pointerType === "touch";
+      if (coarse) {
+        if (tp.has(e.pointerId)) tp.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (tmode === "pinch") { doPinch(); return; }
+        if (tmode === "ignore") return;
+        if (drag && drag.lp) { pointer(e); return; }
+      }
+      if (drag && drag.edit) { applyEdit(e); return; }
       if (drag && (drag.axis || drag.vpan)) {
         const r = svg.getBoundingClientRect(), dy = e.clientY - drag.y;
         if (Math.abs(dy) > 3) drag.moved = true;
@@ -168,19 +240,41 @@ const ChartTool = (function () {
       if (drag) {
         const r = svg.getBoundingClientRect(), step = (W - ML - MR) / visibleCount() * r.width / W;
         const dx = e.clientX - drag.x;
-        if (Math.abs(dx) > 4) drag.moved = true;
+        if (Math.abs(dx) > (coarse ? TOUCH_MOVE : 4)) { drag.moved = true; clearTimeout(lpTimer); lpTimer = 0; }
         if (drag.moved) { setOff(drag.off + Math.round(dx / step)); return; }
       }
       pointer(e);
     });
     svg.addEventListener("pointerup", function (e) {
       if (!S) { drag = null; return; }
+      if (e.pointerType === "touch" && touchEnd(e, false)) return;
+      if (drag && drag.edit) { const d = drag; drag = null; try { svg.releasePointerCapture(e.pointerId); } catch (err) { /* не критично */ } if (d.moved) commitFrom(d.pre); schedule(); return; }
       const wasClick = drag && !drag.moved && !drag.axis && !drag.vpan;
+      const emptyClick = wasClick && drag.hit === "empty";
       drag = null;
       try { svg.releasePointerCapture(e.pointerId); } catch (err) { /* не критично */ }
-      if (wasClick) { pointer(e); act(); }
+      if (emptyClick) select(null);                                                      // клік по порожньому місцю знімає виділення
+      if (wasClick) { pointer(e); act(); if (e.pointerType === "touch") { S.hover = null; schedule(); } }
     });
-    svg.addEventListener("pointerleave", function () { if (S && !drag) { S.hover = null; schedule(); } });
+    svg.addEventListener("pointercancel", function (e) {                                // перерване перетягування повертає малюнок на місце
+      if (e.pointerType === "touch") { touchEnd(e, true); return; }
+      if (drag && drag.edit) { const d = drag; drag = null; restoreSnap(d.pre); changed(); }
+      else drag = null;
+      try { svg.releasePointerCapture(e.pointerId); } catch (err) { /* не критично */ }
+    });
+    svg.addEventListener("lostpointercapture", function (e) { if (e.pointerType === "touch" && S && tp.has(e.pointerId)) touchEnd(e, true); });
+    // Сенсорні жести: прокрутка сторінки лишається доступною; торкання, що починає редагування чи масштаб, забирає жест лише в межах графіка
+    svg.addEventListener("touchstart", function (ev) {
+      if (!S || !S.all.length) return;
+      if (ev.touches.length >= 2) { ev.preventDefault(); return; }
+      const t = ev.touches[0], r = svg.getBoundingClientRect(), x = (t.clientX - r.left) * W / r.width, y = (t.clientY - r.top) * H / r.height;
+      if (x >= W - MR) { ev.preventDefault(); return; }
+      if (S.tool !== "cursor") return;
+      coarse = true;
+      const vw = view(), g = geo(vw.pts), h = hitHandle(x, y, g, vw) || hitObject(x, y, g, vw);
+      if (h && !h.o.locked) ev.preventDefault();
+    }, { passive: false });
+    svg.addEventListener("contextmenu", function (ev) { if (S && (S.lp || lpTimer || tmode)) ev.preventDefault(); });     // довге натискання не відкриває меню браузера
     svg.addEventListener("wheel", function (e) {
       if (!S) return;
       e.preventDefault();
@@ -203,17 +297,82 @@ const ChartTool = (function () {
       else if (e.key === "Home") { e.preventDefault(); resetView(); }
       else if (e.key === "a" || e.key === "A") { e.preventDefault(); S.vman = null; schedule(); }
       else if (e.key === "Escape" && (S.mA || S.mB || S.pend)) { e.stopPropagation(); S.mA = S.mB = S.pend = null; schedule(); }
+      else if (e.key === "Escape" && S.sel) { e.preventDefault(); e.stopPropagation(); select(null); }
+    });
+    // Гарячі клавіші редагування: Ctrl+Z, Ctrl+Y / Ctrl+Shift+Z, Delete / Backspace; у полях введення не перехоплюються
+    dlg.addEventListener("keydown", function (e) {
+      if (!S) return;
+      const t = e.target, tag = t && t.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (t && t.isContentEditable)) return;
+      const mod = e.ctrlKey || e.metaKey, k = (e.key || "").toLowerCase(), z = k === "z" || e.code === "KeyZ", y = k === "y" || e.code === "KeyY";
+      if (mod && z && !e.shiftKey) { if (undo()) e.preventDefault(); }
+      else if (mod && (y || (z && e.shiftKey))) { if (redo()) e.preventDefault(); }
+      else if ((e.key === "Delete" || e.key === "Backspace") && S.sel) { e.preventDefault(); deleteSel(); }
     });
     if (!embed) dlg.addEventListener("close", teardown);
     (embed ? host : document.body).appendChild(dlg);
   }
 
+  // ---------- Сенсорні жести ----------
+  // Стани: null (один палець: прокрутка/вибір/редагування/довге натискання), "pinch" (два пальці — масштаб), "ignore" (доки не піднято всі пальці)
+  function cancelGestures() {
+    clearTimeout(lpTimer); lpTimer = 0;
+    if (S && drag && drag.edit && drag.moved) { restoreSnap(drag.pre); changed(); }       // частково змінені координати не лишаються
+    drag = null; pinch = null; tmode = null; tp.clear();
+    if (S && S.lp) { S.lp = false; S.hover = null; schedule(); }
+  }
+  function secondFinger() {
+    clearTimeout(lpTimer); lpTimer = 0;
+    if (S.lp) { S.lp = false; S.hover = null; }
+    if (tmode === "pinch" || tmode === "ignore") return;                                  // третій палець ігноруємо
+    if (drag && drag.edit) {                                                              // випадковий другий палець не пошкоджує малюнок: рух скасовано
+      if (drag.moved) { restoreSnap(drag.pre); changed(); }
+      drag = null; tmode = "ignore"; schedule(); return;
+    }
+    drag = null;
+    if (!S.all.length) { tmode = "ignore"; return; }
+    const ids = Array.from(tp.keys()).slice(0, 2), a = tp.get(ids[0]), b = tp.get(ids[1]), r = ui.svg.getBoundingClientRect(), vw = view(), n0 = visibleCount();
+    const mx = ((a.x + b.x) / 2 - r.left) * W / r.width, frac = clamp((mx - ML) / (W - ML - MR), 0, 1);
+    pinch = { ids: ids, d0: Math.max(10, Math.hypot(a.x - b.x, a.y - b.y)), n0: n0, anchor: vw.start + frac * n0 };
+    tmode = "pinch";
+  }
+  // Масштаб двома пальцями: центр між пальцями лишається над тією самою свічкою; кількість свічок обмежена, ціни й малюнки не чіпаються
+  function doPinch() {
+    const a = tp.get(pinch.ids[0]), b = tp.get(pinch.ids[1]), len = S.all.length;
+    if (!a || !b || !len) return;
+    const r = ui.svg.getBoundingClientRect(), d = Math.max(10, Math.hypot(a.x - b.x, a.y - b.y));
+    const newN = clamp(Math.round(pinch.n0 * pinch.d0 / d), Math.min(MIN_BARS, len), len);
+    const mx = ((a.x + b.x) / 2 - r.left) * W / r.width, frac = clamp((mx - ML) / (W - ML - MR), 0, 1);
+    const start = clamp(Math.round(pinch.anchor - frac * newN), 0, len - newN);
+    S.n = newN; S.off = len - (start + newN);
+    schedule();
+  }
+  // Кінець дотику; true — подію повністю оброблено тут
+  function touchEnd(e, cancelled) {
+    tp.delete(e.pointerId);
+    try { ui.svg.releasePointerCapture(e.pointerId); } catch (err) { /* не критично */ }
+    if (tmode === "pinch" || tmode === "ignore") {
+      if (tp.size === 0) { tmode = null; pinch = null; } else if (tmode === "pinch") { tmode = "ignore"; pinch = null; }       // після підняття одного пальця решта не тягне графік
+      schedule(); return true;
+    }
+    clearTimeout(lpTimer); lpTimer = 0;
+    if (cancelled) {
+      if (drag && drag.edit && drag.moved) { restoreSnap(drag.pre); changed(); }
+      drag = null; if (S.lp) { S.lp = false; S.hover = null; } schedule(); return true;
+    }
+    if (drag && drag.lp) { drag = null; S.lp = false; S.hover = null; schedule(); return true; }
+    return false;
+  }
+
   // Підлаштовуємо полотно під ширину контейнера (1 одиниця viewBox = 1 піксель): на телефоні шрифти не зменшуються в рази
   function applySize(wpx) {
     if (!wpx || wpx < 50 || !ui.svg) return;
+    const bw = ui.svg.parentNode ? ui.svg.parentNode.clientWidth : 0;                      // ширина контейнера (не залежить від режиму розкладки)
+    dlg.classList.toggle("ct-narrow", bw > 0 && bw < NARROW_PX);                           // вузький екран: інструменти зверху в рядок, панель властивостей під графіком
     const sz = sizeFor(wpx), nw = sz.w, nh = sz.h;
     if (nw === W && nh === H) return;
     W = nw; H = nh;
+    cancelGestures();                                                                     // зміна розміру чи орієнтації скасовує жест, що триває
     ui.svg.setAttribute("viewBox", "0 0 " + W + " " + H);
     if (S) schedule();
   }
@@ -268,8 +427,13 @@ const ChartTool = (function () {
       const b = btn(ui.tools, t.icon, { active: S.tool === t.id, pressed: S.tool === t.id, title: t.label, help: t.label + ". " + t.hint, aria: true, onClick: function () { S.tool = t.id; S.mA = S.mB = S.pend = null; renderBar(); schedule(); } });
       b.classList.add("ct-tool");
     });
+    const un = btn(ui.tools, "↶", { title: "Скасувати (Ctrl+Z)", aria: true, onClick: function () { undo(); } });
+    const rd = btn(ui.tools, "↷", { title: "Повторити (Ctrl+Y)", aria: true, onClick: function () { redo(); } });
+    un.classList.add("ct-hist"); rd.classList.add("ct-hist"); ui.undoB = un; ui.redoB = rd;
+    syncHist();
     ui.hint.hidden = true;
   }
+  function syncHist() { if (ui.undoB) { ui.undoB.disabled = !S || !S.undo.length; ui.redoB.disabled = !S || !S.redo.length; } }
 
   // Режим шкали: змінюється лише спосіб показу цін, самі свічки й малюнки (час + ціна) не чіпаємо
   function setScale(m) { S.scale = m; S.vman = null; saveScaleMode(m); schedule(); }
@@ -354,7 +518,7 @@ const ChartTool = (function () {
     else return;                                                           // стара свічка: ігноруємо
     S.ver++;
   }
-  function shiftIdx(d) { [S.mA, S.mB, S.pend].forEach(function (p) { if (p && typeof p.gi === "number") p.gi += d; }); }
+  function shiftIdx(d) { [S.mA, S.mB, S.pend].forEach(function (p) { if (p && typeof p.gi === "number") p.gi += d; }); if (drag && drag.items) drag.items.forEach(function (it) { it.gi0 += d; }); }
 
   // Підвантаження старішої історії, коли вікно доходить до лівого краю даних. Вікно перегляду не зсувається:
   // S.off відраховується від правого краю, а нові свічки додаються лише ліворуч
@@ -375,7 +539,7 @@ const ChartTool = (function () {
     });
   }
 
-  function teardown() { if (S) { S.token++; unsubLive(); S = null; } stopRO(); drag = null; }
+  function teardown() { if (S) { S.token++; unsubLive(); S = null; } stopRO(); gestureHosts.delete(cancelGestures); drag = null; pinch = null; tmode = null; tp.clear(); clearTimeout(lpTimer); lpTimer = 0; clearTimeout(hintT); if (ui.props) { ui.props.hidden = true; ui.props.replaceChildren(); } }
 
   // ---------- Вікно перегляду (масштаб і прокрутка) ----------
   function visibleCount() { return clamp(S.n, Math.min(MIN_BARS, S.all.length), Math.max(S.all.length, 1)); }
@@ -450,7 +614,7 @@ const ChartTool = (function () {
     let price = clamp(g.val(Math.min(y, MT + g.priceH)), g.lo, g.hi);
     if (S.prec && S.prec.tick) price = ChartData.roundToTick(price, S.prec.tick);        // ціна для ліній і лінійки кратна кроку ціни біржі
     S.hover = { i: g.idx(x), price: price };
-    ui.svg.style.cursor = x >= W - MR ? "ns-resize" : "";
+    ui.svg.style.cursor = x >= W - MR ? "ns-resize" : S.tool === "cursor" ? cursorAt(x, y, g, v) : "";
     schedule();
   }
 
@@ -472,29 +636,153 @@ const ChartTool = (function () {
   // Клік або Enter: інструмент діє залежно від режиму
   function act() {
     if (!S || !S.hover) return;
-    const vw = view(), pt = mkPoint(vw);
+    const vw = view(), pt = mkPoint(vw), P = function (q) { return { t: q.t, gi: q.gi, price: q.price }; };
     if (S.tool === "hline") {
-      if (S.h.length >= MAX_LINES) S.h.shift();
-      S.h.push({ t: pt.t, price: pt.price });
-      saveLines(); renderLines();
+      mutate(function () { if (S.h.length >= MAX_LINES) S.h.shift(); const o = { id: newId(), t: pt.t, price: pt.price }; S.h.push(o); S.sel = o.id; });
     } else if (S.tool === "trend") {
       if (!S.pend) S.pend = pt;
       else {
-        if (S.l.length >= MAX_LINES) S.l.shift();
-        S.l.push({ a: { t: S.pend.t, gi: S.pend.gi, price: S.pend.price }, b: { t: pt.t, gi: pt.gi, price: pt.price } });
-        S.pend = null; saveLines(); renderLines();
+        const a = S.pend; S.pend = null;
+        mutate(function () { if (S.l.length >= MAX_LINES) S.l.shift(); const o = { id: newId(), a: P(a), b: P(pt) }; S.l.push(o); S.sel = o.id; });
       }
     } else if (S.tool === "fib") {
       if (!S.pend) S.pend = pt;
       else {
-        if (S.f.length >= MAX_LINES) S.f.shift();
-        S.f.push({ a: { t: S.pend.t, gi: S.pend.gi, price: S.pend.price }, b: { t: pt.t, gi: pt.gi, price: pt.price } });
-        S.pend = null; saveLines(); renderLines();
+        const a = S.pend; S.pend = null;
+        mutate(function () { if (S.f.length >= MAX_LINES) S.f.shift(); const o = { id: newId(), a: P(a), b: P(pt) }; S.f.push(o); S.sel = o.id; });
       }
     } else if (S.tool === "ruler") {
       if (!S.mA || S.mB) { S.mA = pt; S.mB = null; } else { S.mB = pt; }
     }
     schedule();
+  }
+
+  // ---------- Редагування малюнків: вибір, перетягування, історія ----------
+  // Службові рівні й маркери B/S (spec.levels, spec.markers) тут не беруть участі: редагуються лише власні малюнки користувача (S.h, S.l, S.f).
+  function eff(kind, o) { const d = DEF_LOOK[kind]; return { color: o.color || d.color, width: o.width || d.width, style: o.style || d.style }; }
+  function lookStyle(kind, o, fill) {                                           // inline-стиль лише для змінених користувачем властивостей
+    let st = "";
+    if (o.color) st += (fill ? "fill:" : "stroke:") + o.color + ";";
+    if (!fill) { if (o.width) st += "stroke-width:" + o.width + ";"; if (o.style) st += "stroke-dasharray:" + (o.style === "dashed" ? "6 4" : "none") + ";"; }
+    return st;
+  }
+  function eachObj(fn) { ["h", "f", "l"].forEach(function (k) { S[k].forEach(function (o) { fn(k, o); }); }); }    // порядок = порядок малювання (знизу вгору)
+  function findSel() { let r = null; if (S.sel) eachObj(function (k, o) { if (o.id === S.sel) r = { kind: k, o: o }; }); return r; }
+  function snap() { return JSON.stringify({ h: S.h, l: S.l, f: S.f }); }
+  function restoreSnap(str) { const d = normLines(JSON.parse(str)); S.h = d.h; S.l = d.l; S.f = d.f; if (S.sel && !findSel()) S.sel = null; }
+  function changed() { S.lv++; saveLines(); renderLines(); renderProps(); syncHist(); schedule(); }
+  function commitFrom(pre) {                                                    // одна дія = один запис історії; нова дія очищає Redo
+    if (snap() === pre) return false;
+    S.undo.push(pre); if (S.undo.length > MAX_UNDO) S.undo.shift(); S.redo = [];
+    changed(); return true;
+  }
+  function mutate(fn) { const pre = snap(); fn(); commitFrom(pre); }
+  function undo() { if (!S || !S.undo.length) return false; S.redo.push(snap()); restoreSnap(S.undo.pop()); changed(); return true; }
+  function redo() { if (!S || !S.redo.length) return false; S.undo.push(snap()); restoreSnap(S.redo.pop()); changed(); return true; }
+  function select(id) { if (S.sel === id) return; S.sel = id; renderProps(); schedule(); }
+  function say(msg) { ui.hint.textContent = msg; ui.hint.hidden = false; clearTimeout(hintT); hintT = setTimeout(function () { ui.hint.hidden = true; }, 2600); }
+  function deleteSel() {
+    const f = findSel(); if (!f) return;
+    if (f.o.locked) { say("Малюнок заблоковано: спершу розблокуйте його, щоб видалити."); return; }
+    mutate(function () { S[f.kind] = S[f.kind].filter(function (x) { return x !== f.o; }); S.sel = null; });
+  }
+
+  // Відстань (у пікселях полотна) від точки до відрізка
+  function segDist(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1, L = dx * dx + dy * dy;
+    let t = L ? ((px - x1) * dx + (py - y1) * dy) / L : 0; t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+  }
+  function ptXY(q, g, vw) { return { x: g.x(idxOf(q) - vw.start), y: g.y(q.price) }; }
+  function objDist(kind, o, x, y, g, vw) {
+    if (x < ML || x > W - MR || y < MT || y > MT + g.priceH) return Infinity;
+    if (kind === "h") return g.inside(o.price) ? Math.abs(y - g.y(o.price)) : Infinity;
+    const a = ptXY(o.a, g, vw), b = ptXY(o.b, g, vw);
+    if (kind === "l") return segDist(x, y, a.x, a.y, b.x, b.y);
+    let d = segDist(x, y, a.x, a.y, b.x, b.y);
+    const x0 = Math.min(a.x, b.x), dP = o.b.price - o.a.price;
+    FIB.forEach(function (lv) { const pr = o.b.price - dP * lv; if (g.inside(pr)) d = Math.min(d, segDist(x, y, x0, g.y(pr), W - MR, g.y(pr))); });
+    return d;
+  }
+  // Найближчий малюнок у межах HIT_LINE; при однаковій відстані — верхній за порядком малювання
+  function hitObject(x, y, g, vw) {
+    let best = null, bd = coarse ? HIT_LINE_T : HIT_LINE;
+    eachObj(function (k, o) { const d = objDist(k, o, x, y, g, vw); if (d <= bd) { bd = d; best = { kind: k, o: o, d: d }; } });
+    return best;
+  }
+  function hitHandle(x, y, g, vw) {
+    const f = S.tool === "cursor" ? findSel() : null;
+    if (!f || f.o.locked || f.kind === "h") return null;
+    let best = null, bd = coarse ? HIT_HANDLE_T : HIT_HANDLE;
+    ["a", "b"].forEach(function (k) { const q = ptXY(f.o[k], g, vw), d = Math.hypot(x - q.x, y - q.y); if (d <= bd) { bd = d; best = { kind: f.kind, o: f.o, k: k }; } });
+    return best;
+  }
+  function cursorAt(x, y, g, vw) {
+    if (hitHandle(x, y, g, vw)) return "grab";
+    const h = hitObject(x, y, g, vw);
+    if (!h) return "";
+    return h.o.locked ? "default" : h.o.id === S.sel ? "move" : "pointer";
+  }
+
+  // Перетягування: зсув рахується від точки натискання в пікселях і переводиться у (час, ціну) поточними функціями шкали — стрибка немає на жодному режимі
+  function startEdit(e, kind, o, what, g) {
+    const names = kind === "h" ? [] : what === "move" ? ["a", "b"] : [what];
+    const items = kind === "h" ? [{ p: o, gi0: 0, y0: g.y(o.price), price0: o.price }] : names.map(function (k) { return { p: o[k], gi0: idxOf(o[k]), y0: g.y(o[k].price), t0: o[k].t, g0: o[k].gi, price0: o[k].price }; });
+    drag = { edit: { kind: kind, o: o }, x0: e.clientX, y0: e.clientY, g: g, items: items, moved: false, pre: snap() };
+    try { ui.svg.setPointerCapture(e.pointerId); } catch (err) { /* не критично */ }
+  }
+  function applyEdit(e) {
+    const d = drag, r = ui.svg.getBoundingClientRect();
+    let dx = (e.clientX - d.x0) * W / r.width, dy = (e.clientY - d.y0) * H / r.height;
+    if (!d.moved) { if (Math.hypot(dx, dy) < (coarse ? 6 : 3)) return; d.moved = true; }
+    const isH = d.edit.kind === "h", n = S.all.length;
+    let di = isH ? 0 : Math.round(dx / d.g.step);
+    if (!isH) { const mn = Math.min.apply(null, d.items.map(function (i) { return i.gi0; })), mx = Math.max.apply(null, d.items.map(function (i) { return i.gi0; })); di = clamp(di, -mn, n - 1 - mx); }
+    const ys = d.items.map(function (i) { return i.y0; });
+    dy = clamp(dy, MT - Math.min.apply(null, ys), MT + d.g.priceH - Math.max.apply(null, ys));         // вся фігура лишається в межах цінової області (геометрія зберігається)
+    d.items.forEach(function (it) {
+      let price = d.g.val(it.y0 + dy);
+      if (S.prec && S.prec.tick) price = ChartData.roundToTick(price, S.prec.tick);
+      if (!(price > 0) || !isFinite(price)) return;
+      it.p.price = price;
+      if (!isH) {
+        if (di === 0) { it.p.t = it.t0; it.p.gi = it.g0; }
+        else { const gi = it.gi0 + di; it.p.t = S.all[gi].t; it.p.gi = gi; }
+      }
+    });
+    schedule();
+  }
+
+  // Плаваюча панель властивостей вибраного малюнка
+  function renderProps() {
+    const box = ui.props; box.replaceChildren();
+    const f = S ? findSel() : null;
+    if (!f) { box.hidden = true; return; }
+    box.hidden = false;
+    const o = f.o, d = eff(f.kind, o), lock = !!o.locked;
+    box.appendChild(el("b", "ct-pname", OBJ_NAME[f.kind] + (lock ? " 🔒" : "")));
+    const col = document.createElement("input"); col.type = "color"; col.value = d.color; col.disabled = lock; col.title = "Колір"; col.setAttribute("aria-label", "Колір малюнка");
+    let pre = null;
+    col.addEventListener("input", function () { if (pre === null) pre = snap(); o.color = col.value; schedule(); });
+    col.addEventListener("change", function () { if (pre !== null) { const p0 = pre; pre = null; o.color = col.value; if (!commitFrom(p0)) changed(); } });
+    box.appendChild(col);
+    const w = document.createElement("select"); w.disabled = lock; w.title = "Товщина"; w.setAttribute("aria-label", "Товщина лінії");
+    [1, 1.5, 2, 3, 4].forEach(function (x) { const op = el("option", "", x + " px"); op.value = String(x); w.appendChild(op); });
+    w.value = String([1, 1.5, 2, 3, 4].reduce(function (b, x) { return Math.abs(x - d.width) < Math.abs(b - d.width) ? x : b; }, 1));
+    w.addEventListener("change", function () { mutate(function () { o.width = parseFloat(w.value); }); });
+    box.appendChild(w);
+    const st = document.createElement("select"); st.disabled = lock; st.title = "Стиль лінії"; st.setAttribute("aria-label", "Стиль лінії");
+    [["solid", "Суцільна"], ["dashed", "Пунктир"]].forEach(function (x) { const op = el("option", "", x[1]); op.value = x[0]; st.appendChild(op); });
+    st.value = d.style;
+    st.addEventListener("change", function () { mutate(function () { o.style = st.value; }); });
+    box.appendChild(st);
+    const lk = el("button", "ct-btn ct-plock", lock ? "Розблокувати" : "Заблокувати"); lk.type = "button"; lk.setAttribute("aria-pressed", lock ? "true" : "false");
+    lk.setAttribute("data-help", lock ? "Дозволити переміщення й видалення" : "Захистити від випадкового переміщення й видалення");
+    lk.addEventListener("click", function () { mutate(function () { if (o.locked) delete o.locked; else o.locked = true; }); });
+    box.appendChild(lk);
+    const rm = el("button", "ct-btn ct-pdel", "Видалити"); rm.type = "button"; rm.disabled = lock; rm.setAttribute("aria-label", "Видалити вибраний малюнок"); rm.title = lock ? "Спершу розблокуйте" : "Видалити (Delete)";
+    rm.addEventListener("click", deleteSel);
+    box.appendChild(rm);
   }
 
   // ---------- Малювання ----------
@@ -569,30 +857,41 @@ const ChartTool = (function () {
     // індикатори на основному графіку (SMA, EMA, Bollinger, VWAP): ряди рахуються по всій історії й кешуються, показуємо видиму частину
     drawOverlays(g, vw, sv("g", { "clip-path": "url(#" + CLIP + "p)" }, body));
     // горизонтальні лінії (маркери)
+    const glow = function (kind, o, x1, y1, x2, y2) {                          // підсвічування вибраного малюнка
+      if (S.sel !== o.id) return;
+      sv("line", { x1: x1, y1: y1, x2: x2, y2: y2, class: "ct-sel-glow" + (o.locked ? " locked" : ""), "data-oid": o.id, style: "stroke:" + eff(kind, o).color + ";stroke-width:" + (eff(kind, o).width + 7) }, body);
+    };
     S.h.forEach(function (m) {
       if (!g.inside(m.price)) return;
       const y = g.y(m.price);
-      sv("line", { x1: ML, x2: W - MR, y1: y, y2: y, class: "ct-hline" }, body);
-      sv("rect", { x: W - MR + 1, y: y - 9, width: MR - 2, height: 18, rx: 3, class: "ct-hline-tag" }, svg);
+      glow("h", m, ML, y, W - MR, y);
+      sv("line", { x1: ML, x2: W - MR, y1: y, y2: y, class: "ct-hline", style: lookStyle("h", m), "data-oid": m.id }, body);
+      sv("rect", { x: W - MR + 1, y: y - 9, width: MR - 2, height: 18, rx: 3, class: "ct-hline-tag", style: lookStyle("h", m, true) }, svg);
       sv("text", { x: W - MR + 6, y: y + 4, class: "ct-hline-text" }, svg).textContent = FS(m.price);
     });
     // рівні Фібоначчі
     S.f.forEach(function (fb) {
       const a = idxOf(fb.a) - vw.start, b = idxOf(fb.b) - vw.start, x0 = Math.min(g.x(a), g.x(b)), dP = fb.b.price - fb.a.price;
+      glow("f", fb, g.x(a), g.y(fb.a.price), g.x(b), g.y(fb.b.price));
       FIB.forEach(function (lv) {
         const price = fb.b.price - dP * lv, y = g.y(price);
         if (!g.inside(price)) return;
-        sv("line", { x1: x0, x2: W - MR, y1: y, y2: y, class: "ct-fib" + (lv === 0 || lv === 1 ? " ct-fib-edge" : "") }, body);
-        sv("text", { x: x0 + 4, y: y - 3, class: "ct-fib-t" }, body).textContent = (lv * 100).toLocaleString("uk-UA", { maximumFractionDigits: 1 }) + "% · " + FP(price);
+        sv("line", { x1: x0, x2: W - MR, y1: y, y2: y, class: "ct-fib" + (lv === 0 || lv === 1 ? " ct-fib-edge" : ""), style: lookStyle("f", fb), "data-oid": fb.id }, body);
+        sv("text", { x: x0 + 4, y: y - 3, class: "ct-fib-t", style: lookStyle("f", fb, true) }, body).textContent = (lv * 100).toLocaleString("uk-UA", { maximumFractionDigits: 1 }) + "% · " + FP(price);
       });
-      sv("line", { x1: g.x(a), y1: g.y(fb.a.price), x2: g.x(b), y2: g.y(fb.b.price), class: "ct-trend ct-dash" }, body);
+      sv("line", { x1: g.x(a), y1: g.y(fb.a.price), x2: g.x(b), y2: g.y(fb.b.price), class: "ct-trend ct-dash", style: fb.color ? "stroke:" + fb.color : "" }, body);
     });
     // лінії тренду
     S.l.forEach(function (ln) {
       const a = idxOf(ln.a) - vw.start, b = idxOf(ln.b) - vw.start;
-      sv("line", { x1: g.x(a), y1: g.y(ln.a.price), x2: g.x(b), y2: g.y(ln.b.price), class: "ct-trend" }, body);
-      sv("circle", { cx: g.x(a), cy: g.y(ln.a.price), r: 3.5, class: "ct-trend-dot" }, body);
-      sv("circle", { cx: g.x(b), cy: g.y(ln.b.price), r: 3.5, class: "ct-trend-dot" }, body);
+      glow("l", ln, g.x(a), g.y(ln.a.price), g.x(b), g.y(ln.b.price));
+      sv("line", { x1: g.x(a), y1: g.y(ln.a.price), x2: g.x(b), y2: g.y(ln.b.price), class: "ct-trend", style: lookStyle("l", ln), "data-oid": ln.id }, body);
+      sv("circle", { cx: g.x(a), cy: g.y(ln.a.price), r: 3.5, class: "ct-trend-dot", style: lookStyle("l", ln, true) }, body);
+      sv("circle", { cx: g.x(b), cy: g.y(ln.b.price), r: 3.5, class: "ct-trend-dot", style: lookStyle("l", ln, true) }, body);
+    });
+    const selO = S.tool === "cursor" ? findSel() : null;                     // контрольні точки — лише для вибраного незаблокованого тренду чи Фібоначчі
+    if (selO && selO.kind !== "h" && !selO.o.locked) ["a", "b"].forEach(function (k) {
+      sv("circle", { cx: g.x(idxOf(selO.o[k]) - vw.start), cy: g.y(selO.o[k].price), r: coarse ? 11 : 6, class: "ct-handle", "data-h": k, style: "stroke:" + eff(selO.kind, selO.o).color }, body);
     });
     if (S.pend) {
       const a = S.pend.gi - vw.start;
@@ -647,6 +946,7 @@ const ChartTool = (function () {
       sv("text", { x: tx + 6, y: H - MB + 15, class: "ct-crosstext" }, svg).textContent = tt;
       readHtml = p;
     }
+    if (S.lp && S.hover) drawLpCard(g, vw, readHtml, vw.start + S.hover.i);
     legend(readHtml || last, readHtml ? vw.start + S.hover.i : S.all.length - 1, readHtml);
 
     // шапка
@@ -788,6 +1088,25 @@ const ChartTool = (function () {
     if (d2) sv("path", { d: d2, class: "ct-macd-line", style: "stroke:" + (it.color2 || "#ff9800") + ";stroke-width:" + it.width }, cg);
   }
 
+  // Картка даних свічки під час довгого натискання: дата й час, OHLC, обсяг, значення активних індикаторів (картка з боку, протилежного до пальця)
+  function drawLpCard(g, vw, p, gi) {
+    if (!p) return;
+    const lines = [fmtDate(p.t, S.intraday || isLive())];
+    if (p.o !== undefined) { lines.push("Відкр. " + FP(p.o) + "  Макс " + FP(p.h)); lines.push("Мін " + FP(p.l) + "  Закр. " + FP(p.c)); } else lines.push("Значення " + FP(p.c));
+    if (p.v !== undefined) lines.push("Об'єм " + fmtV(p.v));
+    let n = 0;
+    S.layout.items.forEach(function (it) {
+      if (!it.visible || it.type === "vol" || n >= 6) return;
+      const v = indValue(it, gi, true); if (!v) return;
+      lines.push(ChartLayout.label(it) + " " + v); n++;
+    });
+    const w = Math.min(g.plotW - 12, Math.max.apply(null, lines.map(function (t) { return t.length; })) * 6.6 + 16), h = lines.length * 15 + 8;
+    const x = g.x(S.hover.i), left = x > ML + g.plotW / 2;
+    const bx = left ? ML + 6 : W - MR - w - 6, by = MT + 6;
+    sv("rect", { x: bx, y: by, width: w, height: h, rx: 6, class: "ct-lp-bg" }, ui.svg);
+    lines.forEach(function (t, i) { sv("text", { x: bx + 8, y: by + 17 + i * 15, class: "ct-lp-t" }, ui.svg).textContent = t; });
+  }
+
   // ---------- Панель керування індикаторами ----------
   function renderIndChips() {
     ui.inds.replaceChildren();
@@ -913,7 +1232,7 @@ const ChartTool = (function () {
 
   // ---------- Список ліній ----------
   function renderLines(quiet) {
-    const sig = S.h.length + "/" + S.l.length + "/" + S.f.length;
+    const sig = S.h.length + "/" + S.l.length + "/" + S.f.length + "/" + S.lv + "/" + (S.sel || "");
     if (quiet && ui.list.dataset.n === sig && S.all.length) {
       const last = S.all[S.all.length - 1].c;
       ui.list.querySelectorAll("[data-price]").forEach(function (n) {
@@ -930,39 +1249,41 @@ const ChartTool = (function () {
     const ul = el("ul", "ct-mlist");
     S.h.forEach(function (m, idx) {
       const li = el("li");
-      li.appendChild(el("b", "", "Горизонтальна " + FP(m.price)));
+      li.appendChild(el("b", "", (m.locked ? "🔒 " : "") + "Горизонтальна " + FP(m.price)));
       if (m.t) li.appendChild(el("span", "ct-lk", " · " + fmtDate(m.t, true)));
       const ch = el("span"); ch.dataset.price = String(m.price);
       li.appendChild(document.createTextNode(" ")); li.appendChild(ch);
-      li.appendChild(del("горизонтальну лінію " + FP(m.price), function () { S.h.splice(idx, 1); saveLines(); renderLines(); schedule(); }));
+      li.appendChild(del("горизонтальну лінію " + FP(m.price), function () { removeObj("h", m); }, m.locked));
       ul.appendChild(li);
     });
     S.l.forEach(function (ln, idx) {
       const li = el("li");
       const d = ln.b.price - ln.a.price;
-      li.appendChild(el("b", "", "Тренд " + FP(ln.a.price) + " → " + FP(ln.b.price)));
+      li.appendChild(el("b", "", (ln.locked ? "🔒 " : "") + "Тренд " + FP(ln.a.price) + " → " + FP(ln.b.price)));
       li.appendChild(el("span", ln.b.price >= ln.a.price ? "ct-pl ct-upc" : "ct-pl ct-downc", " " + fmtPct(100 * d / ln.a.price)));
-      li.appendChild(del("лінію тренду", function () { S.l.splice(idx, 1); saveLines(); renderLines(); schedule(); }));
+      li.appendChild(del("лінію тренду", function () { removeObj("l", ln); }, ln.locked));
       ul.appendChild(li);
     });
     S.f.forEach(function (fb, idx) {
       const li = el("li");
-      li.appendChild(el("b", "", "Фібоначчі " + FP(fb.a.price) + " → " + FP(fb.b.price)));
-      li.appendChild(del("рівні Фібоначчі", function () { S.f.splice(idx, 1); saveLines(); renderLines(); schedule(); }));
+      li.appendChild(el("b", "", (fb.locked ? "🔒 " : "") + "Фібоначчі " + FP(fb.a.price) + " → " + FP(fb.b.price)));
+      li.appendChild(del("рівні Фібоначчі", function () { removeObj("f", fb); }, fb.locked));
       ul.appendChild(li);
     });
     ui.list.appendChild(ul);
     const clear = el("button", "ct-btn", "Очистити всі");
     clear.type = "button";
-    clear.setAttribute("data-help", "Видалити всі горизонтальні лінії й лінії тренду для цієї монети");
-    clear.addEventListener("click", function () { S.h = []; S.l = []; S.f = []; saveLines(); renderLines(); schedule(); });
+    clear.setAttribute("data-help", "Видалити всі малюнки цієї монети, крім заблокованих (їх спершу розблокуйте). Дію можна скасувати Ctrl+Z");
+    clear.addEventListener("click", function () { mutate(function () { ["h", "l", "f"].forEach(function (k) { S[k] = S[k].filter(function (o) { return o.locked; }); }); if (S.sel && !findSel()) S.sel = null; }); });
     ui.list.appendChild(clear);
     if (S.all.length) renderLines(true);
   }
 
-  function del(what, fn) {
+  function removeObj(kind, o) { mutate(function () { S[kind] = S[kind].filter(function (x) { return x !== o; }); if (S.sel === o.id) S.sel = null; }); }
+  function del(what, fn, locked) {
     const b = el("button", "ct-del", "Видалити");
     b.type = "button";
+    if (locked) { b.disabled = true; b.title = "Малюнок заблоковано: спершу розблокуйте"; }
     b.setAttribute("aria-label", "Видалити " + what);
     b.setAttribute("data-help", "Видалити " + what + " з графіка");
     b.addEventListener("click", fn);
@@ -989,13 +1310,15 @@ const ChartTool = (function () {
     teardown();
     const fi = spec.interval ? FRAMES.findIndex(function (f) { return f.id === spec.interval; }) : -1;
     const LAY = openLayout(spec);
-    S = { spec: spec, all: [], n: DEFAULT_BARS, off: 0, type: "candles", frame: fi >= 0 ? fi : DEFAULT_FRAME, tool: "cursor", h: [], l: [], f: [],
+    S = { spec: spec, all: [], n: DEFAULT_BARS, off: 0, type: "candles", frame: fi >= 0 ? fi : DEFAULT_FRAME, tool: "cursor", h: [], l: [], f: [], sel: null, undo: [], redo: [], lv: 0,
           layout: LAY.layout, layoutKey: LAY.key, hover: null, mA: null, mB: null, pend: null, token: 0, ws: null,
           error: null, intraday: true, exchangeTime: 0, fallbackMode: false, scale: loadScaleMode(), vman: null, prec: null, ver: 0, cache: ChartIndicators.cache(), pager: null, noMore: false, loadingOlder: false, unsub: null, link: "idle" };
     const saved = loadLines(); S.h = saved.h; S.l = saved.l; S.f = saved.f;
     ui.title.textContent = spec.symbol ? spec.symbol + "/USDT" : spec.title;
     ui.sub.textContent = spec.symbol ? spec.name : (spec.subtitle || "");
     ui.list.dataset.n = "";
+    renderProps();
+    gestureHosts.add(cancelGestures); bindVisibility();
     if (spec.symbol) { renderBar(); loadLive(); }
     else {
       S.type = "line"; S.intraday = false;

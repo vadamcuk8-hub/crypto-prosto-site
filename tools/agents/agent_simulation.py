@@ -197,18 +197,21 @@ def explain(rule, side, ind, score, why=None):
            ("Оцінка сигналу піднялась до %d, вище −%d: обернене правило виходить (%s)." % (score, rule["exit"], parts))
 
 
-def make_event(rule, sym, side, c, k, scores, tstamp, ctx, now, eq, initial=False, w=None, why_info=None):
+def make_event(rule, sym, side, c, k, scores, tstamp, ctx, now, eq, initial=False, w=None, why_info=None, exit_type=None):
     ind = indicators(c[:k + 1])
     sc = scores[k] if scores[k] is not None else 0
     why = explain(rule, side, ind, sc, why_info)
     if initial:
         why = "Початкова позиція на старті раунду. " + why
-    return {"at": now.isoformat(timespec="minutes"), "candle": tstamp[k], "coin": sym, "side": side, "price": c[k], "rule": rule["id"], "tf": rule["tf"],
-            "w": w,
-            "eq": round(eq, 5),                      # скільки було на рахунку цієї монети (1.0 = стартова частка): звідси кількість і прибуток угоди
-            "reason": why, "ind": {"price": ind["price"], "sma50": ind["sma50"], "sma200": ind["sma200"], "rsi": round(ind["rsi"], 1),
-                                   "macd": round(ind["macd"], 6), "mom30": round(ind["mom30"], 2), "score": sc},
-            "ctx": ctx.get(sym)}
+    ev = {"at": now.isoformat(timespec="minutes"), "candle": tstamp[k], "coin": sym, "side": side, "price": c[k], "rule": rule["id"], "tf": rule["tf"],
+          "w": w,
+          "eq": round(eq, 5),                      # скільки було на рахунку цієї монети (1.0 = стартова частка): звідси кількість і прибуток угоди
+          "reason": why, "ind": {"price": ind["price"], "sma50": ind["sma50"], "sma200": ind["sma200"], "rsi": round(ind["rsi"], 1),
+                                 "macd": round(ind["macd"], 6), "mom30": round(ind["mom30"], 2), "score": sc},
+          "ctx": ctx.get(sym)}
+    if side == "SELL":                             # достовірна причина виходу, відома коду рушія (stop, take, trail, trend, signal); інакше unknown. Лише дописується в журнал, рішень не змінює
+        ev["exit"] = exit_type or "unknown"
+    return ev
 
 
 def outlook_context():
@@ -380,7 +383,7 @@ def setup_step(rule, sd, ptf, cost, ctx, events, now):
                         co["eq"] *= 1 - cs
                         co.update(pos=False, entry=None, peak=None, cool=now_ms + rule.get("cooldown_min", 30) * 60000)
                         sd["trades"] += 1
-                        evs = make_event(rule, sym, "SELL", c, k, scores, t, ctx, now, co["eq"], w=round(w, 4), why_info=("setup", ex[0]))
+                        evs = make_event(rule, sym, "SELL", c, k, scores, t, ctx, now, co["eq"], w=round(w, 4), why_info=("setup", ex[0]), exit_type=ex[1])
                         evs["cost"] = round(cs, 5)
                         events.setdefault(rule["id"], []).append(evs)
             # 2) жива ціна зараз: оцінюємо рахунок і, якщо умови зійшлись, діємо одразу
@@ -397,7 +400,7 @@ def setup_step(rule, sd, ptf, cost, ctx, events, now):
                     co["eq"] *= 1 - cs
                     co.update(pos=False, entry=None, peak=None, cool=now_ms + rule.get("cooldown_min", 30) * 60000)
                     sd["trades"] += 1
-                    evs = make_event(rule, sym, "SELL", c, len(c) - 1, scores, t, ctx, now, co["eq"], w=round(w, 4), why_info=("setup", ex[0]))
+                    evs = make_event(rule, sym, "SELL", c, len(c) - 1, scores, t, ctx, now, co["eq"], w=round(w, 4), why_info=("setup", ex[0]), exit_type=ex[1])
                     evs["cost"] = round(cs, 5)
                     events.setdefault(rule["id"], []).append(evs)
             elif now_ms >= co.get("cool", 0):
@@ -523,7 +526,8 @@ def paper_update(ptf, kb, now, tag=""):
                         if not want:
                             co["cool"] = rule.get("cooldown", 0)
                         sd["trades"] += 1
-                        evn = make_event(rule, sym, "BUY" if want else "SELL", c, k, scores, t, ctx, now, eq_before if want else co["eq"], w=round(w, 4), why_info=info)
+                        evn = make_event(rule, sym, "BUY" if want else "SELL", c, k, scores, t, ctx, now, eq_before if want else co["eq"], w=round(w, 4), why_info=info,
+                                         exit_type=None if want else (info[0] if info else "signal"))
                         evn["cost"] = round(cc, 5)
                         events.setdefault(rule["id"], []).append(evn)
                     co["t"] = t[k]

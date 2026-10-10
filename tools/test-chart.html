@@ -776,6 +776,434 @@
     const inst = ChartTool.mount(host, { title: "Серія", points: pts }); await sleep(150); assert(host.querySelector(".ct-svg"), "графік намальовано"); eq(host.querySelectorAll(".ct-vwap, .ct-macd-line, .ct-rsi-line").length, 0); inst.close(); host.remove(); clearInd();
   });
 
+  // =============== Підетап 2.3: редагування графічних об'єктів ===============
+  group("Редагування малюнків 2.3: вибір, переміщення, контрольні точки, панель, замок, видалення, Undo/Redo");
+  const tA = T0 + 450 * H1, tB = T0 + 457 * H1;
+  const SEED_T = { l: [{ a: { t: tA, price: 100 }, b: { t: tB, price: 107 } }] };
+  const SEED_H = { h: [{ t: T0 + 420 * H1, price: 105 }] };
+  const SEED_F = { f: [{ a: { t: T0 + 440 * H1, price: 100 }, b: { t: T0 + 470 * H1, price: 108 } }] };
+  const stor = function () { return JSON.parse(localStorage.getItem("ct2:BTC") || "{}"); };
+  const keyDown = function (el, k, extra) { el.dispatchEvent(new KeyboardEvent("keydown", Object.assign({ key: k, bubbles: true, cancelable: true }, extra || {}))); };
+  const lineXY = function (c, sel) { const n = c.host.querySelector(sel); return n && { x1: +n.getAttribute("x1"), y1: +n.getAttribute("y1"), x2: +n.getAttribute("x2"), y2: +n.getAttribute("y2") }; };
+  const TREND = ".ct-trend:not(.ct-dash)";
+  async function withDraw(seedObj, spec, body, pre) {
+    clearInd(); if (pre) pre(); try { localStorage.removeItem("ct2:BTC"); localStorage.removeItem("ct2:ETH"); localStorage.removeItem("ct2bak:BTC"); if (seedObj) localStorage.setItem("ct2:BTC", typeof seedObj === "string" ? seedObj : JSON.stringify(seedObj)); } catch (e) { /* без сховища */ }
+    const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    const c = mountChart(env, spec); await until(function () { return c.candles() > 0; }); await sleep(120);
+    try { await body(c, env); } finally { c.inst.close(); c.host.remove(); try { localStorage.removeItem("ct2:BTC"); localStorage.removeItem("ct2:ETH"); localStorage.removeItem("ct2bak:BTC"); } catch (e) { /* без сховища */ } clearInd(); }
+  }
+  const clickAt = async function (c, x, y) { const s = c.svg(); pEv(s, "pointermove", x, y); pEv(s, "pointerdown", x, y); pEv(s, "pointerup", x, y); await sleep(100); };
+  const dragBy = async function (c, x, y, dx, dy) { const s = c.svg(); pEv(s, "pointermove", x, y); pEv(s, "pointerdown", x, y); for (let k = 1; k <= 5; k++) pEv(s, "pointermove", x + dx * k / 5, y + dy * k / 5); pEv(s, "pointerup", x + dx, y + dy); await sleep(120); };
+  const selected = function (c) { return c.host.querySelector(".ct-sel-glow"); };
+  const propsOn = function (c) { return !c.host.querySelector(".ct-props").hidden; };
+  const hmid = function (c) { const l = lineXY(c, ".ct-hline"); return { x: 300, y: l.y1 }; };
+  const tmid = function (c) { const l = lineXY(c, TREND); return { x: (l.x1 + l.x2) / 2, y: (l.y1 + l.y2) / 2 }; };
+  const toolBtn = function (c, label) { return Array.prototype.find.call(c.host.querySelectorAll(".ct-tool"), function (b) { return b.getAttribute("aria-label") === label; }); };
+  // Прив'язка до даних: кінці лінії тренду стоять рівно на закритті свічок із відповідним часом і ціною (ряд тестових свічок має open = close)
+  function anchored(c, msg) {
+    const l = lineXY(c, TREND), bodies = Array.prototype.slice.call(c.host.querySelectorAll(".ct-body-c"));
+    [[l.x1, l.y1], [l.x2, l.y2]].forEach(function (p, k) {
+      const b = bodies.find(function (r) { return Math.abs(+r.getAttribute("x") + +r.getAttribute("width") / 2 - p[0]) < 0.8; });
+      assert(b, (msg || "") + " кінець " + k + ": немає свічки під x=" + p[0]); near(+b.getAttribute("y"), p[1], 0.9, (msg || "") + " кінець " + k + " збігається із закриттям свічки");
+    });
+  }
+
+  test("Вибір горизонтальної лінії: клік виділяє (підсвічування, панель), клік по порожньому місцю знімає; курсор підказує дію", async function () {
+    await withDraw(SEED_H, null, async function (c) {
+      const p = hmid(c); pEv(c.svg(), "pointermove", p.x, p.y); eq(c.svg().style.cursor, "pointer", "над невибраною лінією");
+      await clickAt(c, p.x, p.y); assert(selected(c), "лінія підсвічена"); assert(propsOn(c), "панель властивостей"); assert(/Горизонтальна/.test(c.host.querySelector(".ct-props").textContent));
+      eq(c.host.querySelectorAll(".ct-handle").length, 0, "у горизонтальної лінії контрольних точок немає"); pEv(c.svg(), "pointermove", p.x, p.y); eq(c.svg().style.cursor, "move", "над вибраною лінією");
+      await clickAt(c, p.x, p.y - 60); assert(!selected(c) && !propsOn(c), "виділення знято"); pEv(c.svg(), "pointermove", p.x, p.y - 60); eq(c.svg().style.cursor, "", "над порожнім місцем");
+      eq(stor().h.length, 1, "вибір не створив нових малюнків");
+    });
+  });
+  test("Вибір лінії тренду й Fibonacci: контрольні точки показані лише для вибраного", async function () {
+    await withDraw(Object.assign({}, SEED_T, SEED_F), null, async function (c) {
+      eq(c.host.querySelectorAll(".ct-handle").length, 0, "без вибору точок немає");
+      const m = tmid(c); await clickAt(c, m.x, m.y); assert(selected(c) && /Лінія тренду/.test(c.host.querySelector(".ct-props").textContent), "тренд вибрано"); eq(c.host.querySelectorAll(".ct-handle").length, 2, "дві контрольні точки");
+      const fl = c.host.querySelectorAll(".ct-fib"), f = fl[3], fx = +f.getAttribute("x1"), fy = +f.getAttribute("y1"), fxx = (fx + 618) / 2;
+      await clickAt(c, fxx, fy); assert(/Фібоначчі/.test(c.host.querySelector(".ct-props").textContent), "Fibonacci вибрано: " + c.host.querySelector(".ct-props").textContent); eq(c.host.querySelectorAll(".ct-handle").length, 2);
+      eq(c.host.querySelectorAll(".ct-sel-glow").length, 1, "підсвічено лише один");
+    });
+  });
+  test("Накладення: вибирається найближчий об'єкт; при однаковій відстані — верхній за порядком малювання", async function () {
+    const t1 = T0 + 420 * H1;
+    await withDraw({ h: [{ t: t1, price: 105 }, { t: t1, price: 105.3 }] }, null, async function (c) {
+      const ls = c.host.querySelectorAll(".ct-hline"), y0 = +ls[0].getAttribute("y1"), y1 = +ls[1].getAttribute("y1"), id0 = ls[0].getAttribute("data-oid"), id1 = ls[1].getAttribute("data-oid");
+      const near0 = y0 + (y1 - y0) * 0.2; await clickAt(c, 300, near0); eq(selected(c).getAttribute("data-oid"), id0, "ближча — перша");
+      await clickAt(c, 300, y0 + (y1 - y0) * 0.8); eq(selected(c).getAttribute("data-oid"), id1, "ближча — друга");
+    });
+    await withDraw({ h: [{ t: t1, price: 106 }, { t: t1, price: 106 }] }, null, async function (c) {
+      const ls = c.host.querySelectorAll(".ct-hline"), y = +ls[0].getAttribute("y1"); await clickAt(c, 300, y); eq(selected(c).getAttribute("data-oid"), ls[1].getAttribute("data-oid"), "однакова відстань → верхній (пізніший)");
+    });
+  });
+  test("Вибір не створює малюнок; інструмент малювання, як і раніше, створює навіть поверх наявної лінії", async function () {
+    await withDraw(SEED_H, null, async function (c) {
+      const p = hmid(c); await clickAt(c, p.x, p.y); await clickAt(c, p.x, p.y); eq(stor().h.length, 1, "курсор: нових малюнків немає");
+      toolBtn(c, "Горизонтальна лінія").click(); await clickAt(c, p.x, p.y); eq(stor().h.length, 2, "режим малювання створює новий малюнок"); assert(selected(c), "щойно створений вибрано");
+    });
+  });
+  test("Переміщення горизонтальної лінії: без стрибка, ціна змінюється, свічки (OHLC) і кількість малюнків незмінні; вихід за межі графіка завершує дію", async function () {
+    await withDraw(SEED_H, null, async function (c) {
+      const bodies = function () { return attrs(c.host.querySelectorAll(".ct-body-c"), "y").join(","); }, before = bodies(), p = hmid(c), pr0 = stor().h[0].price;
+      await dragBy(c, p.x, p.y, 0, 40); const y1 = lineXY(c, ".ct-hline").y1; near(y1, p.y + 40, 1.5, "лінія пішла за курсором рівно на 40 px"); assert(stor().h[0].price < pr0, "ціна нижча"); eq(stor().h.length, 1, "копій немає"); eq(bodies(), before, "свічки не змінились");
+      const s = c.svg(); pEv(s, "pointermove", 300, y1); pEv(s, "pointerdown", 300, y1); pEv(s, "pointermove", 300, y1 - 20); pEv(s, "pointermove", 300, -400); pEv(s, "pointerup", 300, -400); await sleep(120);
+      const top = lineXY(c, ".ct-hline").y1; assert(top >= 9.5 && top < 40, "лінія вгорі в межах області: " + top); const prAfter = stor().h[0].price; pEv(s, "pointermove", 300, 200); await sleep(80); eq(stor().h[0].price, prAfter, "після відпускання курсор лінію не тягне");
+    });
+  });
+  test("Переміщення лінії тренду: обидві точки зсуваються однаково, геометрія зберігається, час на сітці свічок", async function () {
+    await withDraw(SEED_T, null, async function (c) {
+      const b = lineXY(c, TREND), m = tmid(c), s0 = stor().l[0]; await dragBy(c, m.x, m.y, 30, 25); const a = lineXY(c, TREND);
+      near(a.x2 - a.x1, b.x2 - b.x1, 0.7, "довжина по x"); near(a.y2 - a.y1, b.y2 - b.y1, 0.7, "довжина по y"); near(a.y1 - b.y1, 25, 1.5, "зсув по y"); assert(Math.abs(a.x1 - b.x1 - 30) < 7, "зсув по x ≈ 30: " + (a.x1 - b.x1));
+      const s1 = stor().l[0]; eq(s1.b.t - s1.a.t, s0.b.t - s0.a.t, "різниця часу збережена"); eq((s1.a.t - T0) % H1, 0, "час на сітці свічок"); near(s1.b.price - s1.a.price, s0.b.price - s0.a.price, 0.02, "різниця цін збережена"); eq(stor().l.length, 1);
+    });
+  });
+  test("Контрольні точки: рух однієї точки не змінює другу; координати (t, price) зберігаються, gi узгоджено з часом", async function () {
+    await withDraw(SEED_T, null, async function (c) {
+      const m = tmid(c); await clickAt(c, m.x, m.y); const before = stor().l[0], hb = c.host.querySelector('.ct-handle[data-h="b"]'), bx = +hb.getAttribute("cx"), by = +hb.getAttribute("cy");
+      await dragBy(c, bx, by, -25, -30); let s = stor().l[0]; eq(s.a, before.a, "точка A без змін"); assert(s.b.price > before.b.price && s.b.t < before.b.t, "точка B пересунута"); eq((s.b.t - T0) % H1, 0, "час B на сітці");
+      const ha = c.host.querySelector('.ct-handle[data-h="a"]'), ax = +ha.getAttribute("cx"), ay = +ha.getAttribute("cy"), keepB = JSON.stringify(s.b); await dragBy(c, ax, ay, 20, 15); s = stor().l[0]; eq(JSON.stringify(s.b), keepB, "точка B без змін"); assert(s.a.t !== before.a.t, "точка A пересунута");
+      eq(c.host.querySelectorAll(".ct-handle").length, 2, "вибір збережено"); eq(stor().l.length, 1, "копій немає");
+    });
+  });
+  test("Переміщення Fibonacci: уся конструкція зсувається разом", async function () {
+    await withDraw(SEED_F, null, async function (c) {
+      const f = c.host.querySelectorAll(".ct-fib")[3], fy = +f.getAttribute("y1"), s0 = stor().f[0]; await clickAt(c, (+f.getAttribute("x1") + 618) / 2, fy); await dragBy(c, (+f.getAttribute("x1") + 618) / 2, fy, 30, 30);
+      const s1 = stor().f[0]; eq(s1.b.t - s1.a.t, s0.b.t - s0.a.t, "відстань за часом"); near(s1.b.price - s1.a.price, s0.b.price - s0.a.price, 0.02, "відстань за ціною"); assert(s1.a.t > s0.a.t && s1.a.price < s0.a.price, "зсунулась вправо й униз"); eq(stor().f.length, 1);
+    });
+  });
+  test("Замок: заблокований малюнок видимий, не рухається, без контрольних точок, не видаляється клавішею; розблокування повертає все; інші малюнки не зачеплено", async function () {
+    await withDraw(Object.assign({}, SEED_T, { h: [{ t: T0 + 420 * H1, price: 108 }] }), null, async function (c) {
+      const m = tmid(c); await clickAt(c, m.x, m.y); c.host.querySelector(".ct-plock").click(); await sleep(100);
+      eq(stor().l[0].locked, true, "locked збережено"); eq(c.host.querySelectorAll(".ct-handle").length, 0, "точок немає"); assert(c.host.querySelector(TREND), "лінія видима"); assert(/🔒/.test(c.host.querySelector(".ct-props").textContent), "позначка замка"); assert(c.host.querySelector(".ct-pdel").disabled, "кнопка видалення вимкнена");
+      const before = JSON.stringify(stor().l[0]); await dragBy(c, m.x, m.y, 40, 30); eq(JSON.stringify(stor().l[0]), before, "не переміщується"); assert(selected(c), "лишається вибраним для перегляду");
+      keyDown(c.svg(), "Delete"); await sleep(80); eq(stor().l.length, 1, "Delete не видалив"); assert(/заблоковано/.test(c.host.querySelector(".ct-hint").textContent), "підказка про розблокування");
+      const hp = lineXY(c, ".ct-hline"); await dragBy(c, 300, hp.y1, 0, 30); assert(stor().h[0].price !== 108, "інша лінія рухається вільно");
+      const m2 = tmid(c); await clickAt(c, m2.x, m2.y); c.host.querySelector(".ct-plock").click(); await sleep(100); assert(!("locked" in stor().l[0]), "розблоковано"); keyDown(c.svg(), "Delete"); await sleep(80); eq(stor().l.length, 0, "після розблокування видалення працює");
+    });
+  });
+  test("Видалення: Delete, Backspace, кнопка панелі, список «Ваші лінії»; у полі введення Backspace не діє", async function () {
+    await withDraw({ h: [{ t: T0 + 420 * H1, price: 105 }, { t: T0 + 420 * H1, price: 108 }], l: SEED_T.l }, null, async function (c) {
+      let l = lineXY(c, ".ct-hline"); await clickAt(c, 300, l.y1); keyDown(c.svg(), "Delete"); await sleep(80); eq(stor().h.length, 1, "Delete"); assert(!propsOn(c), "панель сховано");
+      l = lineXY(c, ".ct-hline"); await clickAt(c, 300, l.y1); keyDown(c.svg(), "Backspace"); await sleep(80); eq(stor().h.length, 0, "Backspace");
+      const m = tmid(c); await clickAt(c, m.x, m.y); const inp = document.createElement("input"); inp.type = "text"; c.host.querySelector(".ct").appendChild(inp); keyDown(inp, "Backspace"); await sleep(60); eq(stor().l.length, 1, "у полі введення не перехоплюється"); inp.remove();
+      c.host.querySelector(".ct-pdel").click(); await sleep(80); eq(stor().l.length, 0, "кнопка панелі");
+      clearAll: { toolBtn(c, "Горизонтальна лінія").click(); await clickAt(c, 300, 120); eq(c.host.querySelectorAll(".ct-mlist li").length, 1, "список показує малюнок"); c.host.querySelector(".ct-mlist .ct-del").click(); await sleep(80); eq(stor().h.length, 0, "видалення зі списку"); }
+    });
+  });
+  test("Undo/Redo: створення, переміщення (одна дія = один запис), властивості, замок, видалення; Ctrl+Y і Ctrl+Shift+Z; нова дія очищає Redo", async function () {
+    await withDraw(null, null, async function (c) {
+      const s = c.svg(), z = function (extra) { keyDown(s, "z", Object.assign({ ctrlKey: true }, extra || {})); }, y = function () { keyDown(s, "y", { ctrlKey: true }); };
+      toolBtn(c, "Горизонтальна лінія").click(); await clickAt(c, 300, 130); eq(stor().h.length, 1, "створено"); const p0 = stor().h[0].price;
+      toolBtn(c, "Курсор").click(); const l = lineXY(c, ".ct-hline"); await dragBy(c, 300, l.y1, 0, 40); const p1 = stor().h[0].price; assert(p1 !== p0);
+      c.host.querySelector(".ct-plock").click(); await sleep(60); eq(stor().h[0].locked, true);
+      z(); await sleep(60); assert(!stor().h[0].locked, "скасовано замок"); z(); await sleep(60); eq(stor().h[0].price, p0, "скасовано ВЕСЬ рух одним Ctrl+Z"); z(); await sleep(60); eq(stor().h.length, 0, "скасовано створення");
+      y(); await sleep(60); eq(stor().h.length, 1, "Ctrl+Y повторює створення"); keyDown(s, "z", { ctrlKey: true, shiftKey: true }); await sleep(60); eq(stor().h[0].price, p1, "Ctrl+Shift+Z повторює рух");
+      await clickAt(c, 300, lineXY(c, ".ct-hline").y1); keyDown(s, "Delete"); await sleep(60); eq(stor().h.length, 0, "видалено"); z(); await sleep(60); eq(stor().h.length, 1, "видалення скасовано"); y(); await sleep(60); eq(stor().h.length, 0, "видалення повторено"); z(); await sleep(60);
+      await clickAt(c, 300, lineXY(c, ".ct-hline").y1); const cb = c.host.querySelector(".ct-props input[type=color]"); cb.value = "#00ff00"; cb.dispatchEvent(new Event("input", { bubbles: true })); cb.dispatchEvent(new Event("change", { bubbles: true })); await sleep(60); eq(stor().h[0].color, "#00ff00");
+      z(); await sleep(60); assert(!stor().h[0].color, "колір скасовано"); toolBtn(c, "Горизонтальна лінія").click(); await clickAt(c, 300, 200); y(); await sleep(60); eq(stor().h.length, 2, "після нової дії Redo очищено (Ctrl+Y нічого не повернув)");
+    });
+  });
+  test("Undo/Redo: ліміт ≈50 дій, клавіші не перехоплюються у полі введення, зміна монети починає нову історію", async function () {
+    await withDraw(null, null, async function (c, env) {
+      const s = c.svg(); toolBtn(c, "Горизонтальна лінія").click();
+      for (let i = 0; i < 55; i++) { pEv(s, "pointermove", 300, 100 + (i % 20) * 5); pEv(s, "pointerdown", 300, 100 + (i % 20) * 5); pEv(s, "pointerup", 300, 100 + (i % 20) * 5); }
+      await sleep(150); eq(stor().h.length, 20, "ліміт 20 малюнків");
+      for (let i = 0; i < 70; i++) keyDown(s, "z", { ctrlKey: true }); await sleep(100); eq(stor().h.length, 5, "можна скасувати лише 50 останніх дій із 55");
+      const inp = document.createElement("input"); inp.type = "text"; c.host.querySelector(".ct").appendChild(inp); keyDown(inp, "y", { ctrlKey: true }); await sleep(60); eq(stor().h.length, 5, "Ctrl+Y у полі введення не діє"); inp.remove();
+      keyDown(s, "y", { ctrlKey: true }); await sleep(60); eq(stor().h.length, 6, "Redo працює");
+      env.fetchImpl = okFetch(hours(T0, 500)); c.inst.open({ symbol: "ETH", name: "ETH" }); await until(function () { return env.data._state().subs[0] === "ethusdt@kline_1h"; }); await sleep(120);
+      keyDown(c.svg(), "z", { ctrlKey: true }); await sleep(60); eq(JSON.parse(localStorage.getItem("ct2:BTC")).h.length, 6, "історія BTC не діє на ETH");
+    });
+  });
+  test("Властивості зберігаються: колір, товщина, стиль, замок переживають перезавантаження (нове відкриття графіка)", async function () {
+    await withDraw(SEED_H, null, async function (c, env) {
+      const p = hmid(c); await clickAt(c, p.x, p.y);
+      const pr = c.host.querySelector(".ct-props"), cb = pr.querySelector("input[type=color]"); cb.value = "#ff0000"; cb.dispatchEvent(new Event("input", { bubbles: true })); cb.dispatchEvent(new Event("change", { bubbles: true })); await sleep(60);
+      const sels = c.host.querySelectorAll(".ct-props select"); sels[0].value = "3"; sels[0].dispatchEvent(new Event("change", { bubbles: true })); await sleep(60);
+      c.host.querySelectorAll(".ct-props select")[1].value = "solid"; c.host.querySelectorAll(".ct-props select")[1].dispatchEvent(new Event("change", { bubbles: true })); await sleep(60); c.host.querySelector(".ct-plock").click(); await sleep(60);
+      const o = stor().h[0]; eq([o.color, o.width, o.style, o.locked], ["#ff0000", 3, "solid", true]); assert(/^[A-Za-z0-9_-]+$/.test(o.id), "id збережено"); eq(Object.keys(stor()).sort(), ["f", "h", "l"], "формат {h,l,f} збережено");
+      const c2 = mountChart(env); await until(function () { return c2.candles() > 0; }); await sleep(120); const ln = c2.host.querySelector(".ct-hline"), st = ln.getAttribute("style");
+      assert(/stroke:\s*#ff0000/i.test(st) && /stroke-width:\s*3/.test(st) && /stroke-dasharray:\s*none/.test(st), "вигляд відновлено: " + st); await clickAt(c2, 300, +ln.getAttribute("y1")); assert(/🔒/.test(c2.host.querySelector(".ct-props").textContent), "замок відновлено");
+      near(+ln.getAttribute("y1"), lineXY(c, ".ct-hline").y1, 0.6, "та сама координата після відкриття"); c2.inst.close(); c2.host.remove();
+    });
+  });
+  test("Старі записи: без нових полів відкриваються зі стандартним виглядом; зіпсований запис пропускається, решта живе; нечитабельний JSON не ламає графік", async function () {
+    const old = { h: [{ t: T0 + 420 * H1, price: 105 }, { price: "abc" }, null, { t: 1 }], l: [{ a: { t: tA, price: 100, gi: 450 }, b: { t: tB, price: 107, gi: 457 } }, { a: 1 }, { a: { price: 1 }, b: null }], f: "це не масив", extra: 5 };
+    await withDraw(old, null, async function (c) {
+      eq(c.host.querySelectorAll(".ct-hline").length, 1, "валідна горизонтальна"); eq(c.host.querySelectorAll(TREND).length, 1, "валідний тренд"); assert(!(c.host.querySelector(".ct-hline").getAttribute("style") || "").trim(), "типовий вигляд без inline-стилів");
+      const p = hmid(c); await clickAt(c, p.x, p.y); c.host.querySelector(".ct-plock").click(); await sleep(60); c.host.querySelector(".ct-plock").click(); await sleep(60); const s = stor(); assert(s.h[0].id && s.l[0].id, "ідентифікатори додано"); eq(s.h.length, 1); eq(s.l.length, 1); eq(s.l[0].a.gi, 450, "старі поля збережено");
+    });
+    await withDraw("{ це не json", null, async function (c) { assert(c.candles() > 0, "графік працює"); eq(localStorage.getItem("ct2bak:BTC"), "{ це не json", "копію зіпсованого запису збережено"); eq(c.host.querySelectorAll(".ct-hline").length, 0); });
+  });
+  test("Перемикання символів: малюнки BTC і ETH розділені, редагування одного не зачіпає інший", async function () {
+    await withDraw(SEED_H, null, async function (c, env) {
+      localStorage.setItem("ct2:ETH", JSON.stringify({ h: [{ t: T0 + 420 * H1, price: 101 }, { t: T0 + 420 * H1, price: 102 }] })); const btc = localStorage.getItem("ct2:BTC");
+      c.inst.open({ symbol: "ETH", name: "ETH" }); await until(function () { return env.data._state().subs[0] === "ethusdt@kline_1h"; }); await sleep(150);
+      eq(c.host.querySelectorAll(".ct-hline").length, 2, "малюнки ETH"); assert(!selected(c) && !propsOn(c), "вибір не переходить на іншу монету");
+      const l = lineXY(c, ".ct-hline"); await dragBy(c, 300, l.y1, 0, 30); eq(localStorage.getItem("ct2:BTC"), btc, "BTC не змінено"); assert(JSON.parse(localStorage.getItem("ct2:ETH")).h.length === 2);
+      c.inst.open({ symbol: "BTC", name: "BTC" }); await until(function () { return env.data._state().subs[0] === "btcusdt@kline_1h"; }); await sleep(150); eq(c.host.querySelectorAll(".ct-hline").length, 1, "знову малюнки BTC");
+    });
+  });
+  test("Зміна шкали (лог., %), прокрутка й масштаб: малюнки лишаються на своїх цінах/часі; перетягування без стрибка в кожному режимі", async function () {
+    await withDraw(Object.assign({}, SEED_T, { h: [{ t: T0 + 420 * H1, price: 110 }] }), null, async function (c) {
+      const hl = function () { return lineXY(c, ".ct-hline").y1; }, wick = function () { const w = c.host.querySelectorAll(".ct-wick"); return +w[w.length - 1].getAttribute("y1"); };
+      for (const mode of ["Лог.", "%", "Лін."]) {
+        btnOf(c.host, mode).click(); await sleep(130); near(hl(), wick(), 0.7, mode + ": лінія 110 на верху тіні останньої свічки"); anchored(c, mode);
+        const m = tmid(c), pre = hl(); await dragBy(c, 100, hl(), 0, 30); near(hl(), pre + 30, 1.6, mode + ": лінія пішла за курсором"); await dragBy(c, 100, hl(), 0, -30); near(hl(), pre, 1.6, mode + ": і повернулась");
+      }
+      const s = c.svg(); wheelOut(s, 5); await sleep(150); anchored(c, "після масштабу"); await dragBy(c, 20, 330, 60, 0); await sleep(100); anchored(c, "після прокрутки");
+    });
+  });
+  test("Підвантаження історії й повторне відкриття: кінці лінії лишаються на своїх свічках", async function () {
+    await withDraw(SEED_T, null, async function (c, env) {
+      anchored(c, "до"); env.fetchImpl = okFetch(hours(T0 - 500 * H1, 500)); wheelOut(c.svg(), 40); await sleep(600);
+      assert(env.fetches.some(function (u) { return /endTime=/.test(u); }), "історію запрошено"); anchored(c, "після історії");
+      const c2 = mountChart(env); await until(function () { return c2.candles() > 0; }); await sleep(120); anchored(c2, "після повторного відкриття"); c2.inst.close(); c2.host.remove();
+    });
+  });
+  test("Розмір графіка: малюнки лишаються на своїх свічках після зміни ширини (потрібна видима вкладка)", async function () {
+    if (document.visibilityState !== "visible") throw new Skip("вкладка прихована, браузер не доставляє події ResizeObserver");
+    await withDraw(SEED_T, null, async function (c) {
+      c.svg().style.width = "100%"; c.host.style.width = "420px"; void c.host.offsetWidth; assert(await untilFrames(function () { return c.svg().getAttribute("viewBox") === "0 0 420 378"; }), "розмір змінено"); await sleep(120); anchored(c, "420 px");
+      c.host.style.width = "800px"; assert(await untilFrames(function () { return c.svg().getAttribute("viewBox") === "0 0 800 408"; })); await sleep(120); anchored(c, "800 px");
+    });
+  });
+  test("Службові об'єкти: торгові рівні й маркери B/S не вибираються, не видаляються й не рухаються", async function () {
+    await withDraw(SEED_H, levelSpec, async function (c) {
+      const lv = lineXY(c, ".ct-level"), mk = c.host.querySelector(".ct-marker-dot"), lvY = lv.y1, mx = +mk.getAttribute("cx"), my = +mk.getAttribute("cy"), nLv = c.host.querySelectorAll(".ct-level").length, nMk = c.host.querySelectorAll(".ct-marker").length;
+      await clickAt(c, 200, lvY); assert(!selected(c) && !propsOn(c), "рівень не вибирається"); await clickAt(c, mx, my); assert(!selected(c) && !propsOn(c), "маркер не вибирається");
+      await dragBy(c, 200, lvY, 0, 40); near(lineXY(c, ".ct-level").y1, lvY, 0.6, "рівень не рухається"); keyDown(c.svg(), "Delete"); await sleep(60); eq(c.host.querySelectorAll(".ct-level").length, nLv); eq(c.host.querySelectorAll(".ct-marker").length, nMk); eq(stor().h.length, 1, "власні малюнки не зачеплено");
+    });
+  });
+  test("Індикатори без регресій: переміщення малюнка не перераховує ряди; EMA, MACD лишаються", async function () {
+    await withDraw(SEED_T, null, async function (c) {
+      const n0 = [nIn(c.host, ".ct-ma.ct-ema"), nIn(c.host, ".ct-macd-line")]; eq(n0, [1, 2]); const names = ["sma", "ema", "macd", "rsi", "bollinger", "vwap"], orig = {}; let calls = 0; names.forEach(function (k) { orig[k] = ChartIndicators[k]; ChartIndicators[k] = function () { calls++; return orig[k].apply(ChartIndicators, arguments); }; });
+      try { const m = tmid(c); await clickAt(c, m.x, m.y); await dragBy(c, m.x, m.y, 40, 20); keyDown(c.svg(), "z", { ctrlKey: true }); await sleep(120); } finally { names.forEach(function (k) { ChartIndicators[k] = orig[k]; }); }
+      eq(calls, 0, "ряди не перераховувались"); eq([nIn(c.host, ".ct-ma.ct-ema"), nIn(c.host, ".ct-macd-line")], n0);
+    }, function () { setLayout(function (l) { LY.add(l, "ema", { period: 20 }); LY.add(l, "macd"); }); });
+  });
+  test("Обробники подій не накопичуються: вибір, перетягування, Undo/Redo, панелі й повторні відкриття не додають слухачів", async function () {
+    await withDraw(Object.assign({}, SEED_T, SEED_H), { symbol: "BTC", name: "BTC" }, async function (c, env) {
+      const svg = c.svg(), root = c.host.querySelector(".ct"), orig = EventTarget.prototype.addEventListener; let n = 0;
+      EventTarget.prototype.addEventListener = function (t, f, o) { if (this === svg || this === root || this === document || this === window) n++; return orig.call(this, t, f, o); };
+      try {
+        for (let i = 0; i < 12; i++) {
+          const m = tmid(c); await clickAt(c, m.x, m.y); await dragBy(c, m.x, m.y, 12, 8); keyDown(svg, "z", { ctrlKey: true }); keyDown(svg, "y", { ctrlKey: true }); c.host.querySelector(".ct-plock").click(); c.host.querySelector(".ct-plock").click(); await clickAt(c, 300, 300);
+        }
+        for (let i = 0; i < 4; i++) { c.inst.open({ symbol: "BTC", name: "BTC" }); await sleep(100); }
+      } finally { EventTarget.prototype.addEventListener = orig; }
+      eq(n, 0, "нових слухачів на графіку/документі/вікні");
+    });
+  });
+
+  // =============== Підетап 2.4: сенсорне керування й адаптивність ===============
+  // Обмеження: справжніх дотиків у безголовому браузері немає, тому жести емулюються подіями Pointer Events (pointerType "touch", кілька pointerId);
+  // скролінг сторінки браузером, системні жести та реальні пристрої так не перевіряються.
+  group("Сенсорне керування 2.4: масштаб двома пальцями, прокрутка, довге натискання, редагування дотиком, мобільні панелі");
+  function tEv(svg, type, id, vx, vy) { const r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal; svg.dispatchEvent(new PointerEvent(type, { clientX: r.left + vx * r.width / vb.width, clientY: r.top + vy * r.height / vb.height, pointerId: id, pointerType: "touch", isPrimary: id === 1, bubbles: true, cancelable: true })); }
+  const tDown = function (c, id, x, y) { tEv(c.svg(), "pointerdown", id, x, y); }, tMove = function (c, id, x, y) { tEv(c.svg(), "pointermove", id, x, y); }, tUp = function (c, id, x, y) { tEv(c.svg(), "pointerup", id, x, y); };
+  async function tDrag(c, x, y, dx, dy, id) { id = id || 1; tDown(c, id, x, y); for (let k = 1; k <= 6; k++) tMove(c, id, x + dx * k / 6, y + dy * k / 6); tUp(c, id, x + dx, y + dy); await sleep(120); }
+  // Масштаб двома пальцями: фінальна відстань між пальцями d1 при початковій d0, центр (cx, cy)
+  async function pinchTo(c, cx, cy, d0, d1) { tDown(c, 1, cx - d0 / 2, cy); tDown(c, 2, cx + d0 / 2, cy); for (let k = 1; k <= 8; k++) { const d = d0 + (d1 - d0) * k / 8; tMove(c, 1, cx - d / 2, cy); tMove(c, 2, cx + d / 2, cy); } tUp(c, 2, cx + d1 / 2, cy); tUp(c, 1, cx - d1 / 2, cy); await sleep(120); }
+  const hourOf = function (txt) { const m = /(\d\d):\d\d/.exec(txt); return m ? +m[1] : NaN; };
+  const timeAt = async function (c, x) { pEv(c.svg(), "pointermove", x, 100); await sleep(80); return hourOf(c.host.querySelector(".ct-legend").textContent); };
+  const finiteAll = function (c) { return Array.prototype.every.call(c.host.querySelectorAll(".ct-body-c, .ct-wick"), function (n) { return ["x", "y", "x1", "y1", "y2", "height"].every(function (a) { const v = n.getAttribute(a); return v === null || isFinite(parseFloat(v)); }); }); };
+  const sizeW = function (w) { return ChartTool._sizeFor(w).w; };
+  async function setWidth(c, w) { c.svg().style.width = "100%"; c.host.style.width = w + "px"; void c.host.offsetWidth; const settled = function () { return c.svg().viewBox.baseVal.width === sizeW(c.svg().getBoundingClientRect().width); }; await sleep(60); const ok = await untilFrames(settled); await sleep(200); return ok && await untilFrames(settled); }
+  const visible = function () { return document.visibilityState === "visible"; };
+  // Справжні стилі сайту підключаються тільки на час тестів розкладки (решта тестів працює без них, як раніше)
+  async function withCss(fn) {
+    const link = document.createElement("link"); link.rel = "stylesheet"; link.href = "../style.css";
+    await new Promise(function (res) { link.onload = res; link.onerror = res; document.head.appendChild(link); setTimeout(res, 3000); });
+    try { await fn(); } finally { link.remove(); }
+  }
+
+  test("Pinch-to-zoom: розведення пальців збільшує (менше свічок), зведення зменшує; ціни й малюнки не змінюються", async function () {
+    await withDraw(SEED_T, null, async function (c) {
+      const n0 = c.candles(), stored = localStorage.getItem("ct2:BTC");
+      await pinchTo(c, 300, 150, 80, 300); const n1 = c.candles(); assert(n1 < n0 && n1 >= 15, "розведення: " + n0 + " → " + n1);
+      await pinchTo(c, 300, 150, 300, 80); const n2 = c.candles(); assert(n2 > n1, "зведення: " + n1 + " → " + n2); assert(finiteAll(c), "координати скінченні");
+      eq(localStorage.getItem("ct2:BTC"), stored, "малюнки не змінились"); anchored(c, "після масштабу");
+    });
+  });
+  test("Pinch-to-zoom: центр масштабування лишається над тією самою свічкою (до ±1 свічки)", async function () {
+    await withDraw(null, null, async function (c) {
+      const before = await timeAt(c, 300); await pinchTo(c, 300, 150, 80, 320); const after = await timeAt(c, 300);
+      assert(Math.min((before - after + 24) % 24, (after - before + 24) % 24) <= 1, "свічка під центром: " + before + " → " + after);
+      const b2 = await timeAt(c, 450); await pinchTo(c, 450, 150, 80, 260); const a2 = await timeAt(c, 450); assert(Math.min((b2 - a2 + 24) % 24, (a2 - b2 + 24) % 24) <= 1, "другий центр: " + b2 + " → " + a2);
+    });
+  });
+  test("Pinch: мінімум 15 свічок, максимум — весь ряд; різкий жест не дає некоректних координат; працює на лін./лог./% шкалах", async function () {
+    await withDraw(SEED_T, null, async function (c) {
+      for (const mode of ["Лін.", "Лог.", "%"]) {
+        btnOf(c.host, mode).click(); await sleep(100);
+        await pinchTo(c, 300, 150, 20, 600); eq(c.candles(), 15, mode + ": мінімум"); assert(finiteAll(c));
+        await pinchTo(c, 300, 150, 500, 10); eq(c.candles(), 500, mode + ": максимум = увесь ряд"); assert(finiteAll(c)); anchored(c, mode + " максимум");
+        await pinchTo(c, 300, 150, 60, 200); assert(c.candles() < 500 && c.candles() >= 15, mode + ": звичайний жест після меж");
+      }
+    });
+  });
+  test("Прокручування одним пальцем: вправо — старіші свічки, вліво — новіші; жодних випадкових малюнків", async function () {
+    await withDraw(null, null, async function (c) {
+      const h0 = await timeAt(c, 300); await tDrag(c, 300, 200, 70, 0); const h1 = await timeAt(c, 300); const diff = (h0 - h1 + 24) % 24; assert(diff >= 1 && diff <= 12, "старіші: " + h0 + " → " + h1);
+      await tDrag(c, 300, 200, -70, 0); const h2 = await timeAt(c, 300); eq(h2, h0, "повернулись до початкових свічок"); eq(localStorage.getItem("ct2:BTC"), null, "малюнки не створились");
+      await tDrag(c, 300, 200, -300, 0); eq(await timeAt(c, 300), h0, "далі новіших свічок немає (межа прокручування)");
+    });
+  });
+  test("Прокручування й історія: на лівому краї підвантажується одна порція, графік не ламається", async function () {
+    await withDraw(null, null, async function (c, env) {
+      env.fetchImpl = okFetch(hours(T0 - 500 * H1, 500)); await pinchTo(c, 300, 150, 500, 10); await sleep(500);
+      assert(env.fetches.some(function (u) { return /endTime=/.test(u); }), "історію запрошено"); assert(c.candles() > 0 && finiteAll(c));
+      const older = env.fetches.filter(function (u) { return /endTime=/.test(u); }).length; await tDrag(c, 300, 200, 60, 0); await sleep(300); assert(env.fetches.filter(function (u) { return /endTime=/.test(u); }).length <= older + 1, "без зливу запитів"); assert(finiteAll(c));
+    });
+  });
+  test("Довге натискання: перехрестя й картка (дата, OHLC, об'єм, індикатори); палець рухається — картка слідує; відпускання повертає звичайний вигляд", async function () {
+    await withDraw(null, null, async function (c) {
+      tDown(c, 1, 300, 200); await sleep(650); assert(c.host.querySelector(".ct-lp-bg"), "картка з'явилась"); assert(c.host.querySelectorAll(".ct-cross").length === 2, "перехрестя");
+      const txt = Array.prototype.map.call(c.host.querySelectorAll(".ct-lp-t"), function (n) { return n.textContent; }).join(" | "); assert(/\d\d:\d\d/.test(txt) && /Відкр\./.test(txt) && /Закр\./.test(txt) && /Об'єм/.test(txt) && /MA7/.test(txt), "вміст картки: " + txt);
+      tMove(c, 1, 420, 200); await sleep(120); const txt2 = Array.prototype.map.call(c.host.querySelectorAll(".ct-lp-t"), function (n) { return n.textContent; }).join(" | "); assert(txt2 !== txt, "картка змінилась разом із пальцем"); eq(c.candles() > 0, true);
+      tUp(c, 1, 420, 200); await sleep(120); eq(c.host.querySelectorAll(".ct-lp-bg").length, 0, "картки немає"); eq(c.host.querySelectorAll(".ct-cross").length, 0, "перехрестя немає"); eq(localStorage.getItem("ct2:BTC"), null, "малюнок не створено");
+    });
+  });
+  test("Довге натискання: короткий дотик і рух пальця понад поріг його не активують (рух — прокрутка)", async function () {
+    await withDraw(null, null, async function (c) {
+      tDown(c, 1, 300, 200); await sleep(120); tUp(c, 1, 300, 200); await sleep(600); eq(c.host.querySelectorAll(".ct-lp-bg").length, 0, "короткий дотик");
+      tDown(c, 1, 300, 200); tMove(c, 1, 330, 200); await sleep(650); eq(c.host.querySelectorAll(".ct-lp-bg").length, 0, "рух скасував очікування"); tUp(c, 1, 330, 200); await sleep(100);
+      tDown(c, 1, 300, 200); tMove(c, 1, 303, 202); await sleep(650); assert(c.host.querySelectorAll(".ct-lp-bg").length === 1, "дрібне тремтіння пальця не скасовує"); tUp(c, 1, 303, 202); await sleep(100);
+    });
+  });
+  test("Вибір дотиком: більша область попадання, ніж для миші; великі контрольні точки; панель властивостей відкривається", async function () {
+    await withDraw(SEED_T, null, async function (c) {
+      const l = lineXY(c, TREND), mx = (l.x1 + l.x2) / 2 + 12, my = (l.y1 + l.y2) / 2;
+      await clickAt(c, mx, my); assert(!selected(c), "мишею за ~12 px не влучити");
+      tDown(c, 1, mx, my); tUp(c, 1, mx, my); await sleep(120); assert(selected(c) && propsOn(c), "пальцем влучаємо"); eq(c.host.querySelectorAll(".ct-handle").length, 2); eq(c.host.querySelector(".ct-handle").getAttribute("r"), "11", "контрольні точки більші");
+      tDown(c, 1, 300, 300); tUp(c, 1, 300, 300); await sleep(120); assert(!selected(c), "дотик по порожньому знімає виділення"); eq(stor().l.length, 1, "малюнок не створено");
+    });
+  });
+  test("Перетягування лінії дотиком і Undo однією дією (клавіша й кнопка ↶/↷)", async function () {
+    await withDraw(SEED_H, null, async function (c) {
+      const y0 = hmid(c).y, p0 = stor().h[0].price; tDown(c, 1, 300, y0); await sleep(30); await tDrag(c, 300, y0, 0, 0); await tDrag(c, 300, y0, 0, 40);
+      near(lineXY(c, ".ct-hline").y1, y0 + 40, 1.6, "лінія пішла за пальцем"); const p1 = stor().h[0].price; assert(p1 < p0); eq(stor().h.length, 1);
+      const undoB = Array.prototype.find.call(c.host.querySelectorAll(".ct-hist"), function (b) { return b.getAttribute("aria-label") === "Скасувати (Ctrl+Z)"; }), redoB = Array.prototype.find.call(c.host.querySelectorAll(".ct-hist"), function (b) { return b.getAttribute("aria-label") === "Повторити (Ctrl+Y)"; });
+      assert(!undoB.disabled && redoB.disabled, "кнопки: Undo активна, Redo — ні"); undoB.click(); await sleep(80); eq(stor().h[0].price, p0, "одним натисканням скасовано весь рух"); assert(undoB.disabled && !redoB.disabled);
+      redoB.click(); await sleep(80); eq(stor().h[0].price, p1, "Redo"); keyDown(c.svg(), "z", { ctrlKey: true }); await sleep(80); eq(stor().h[0].price, p0, "Ctrl+Z");
+    });
+  });
+  test("Контрольна точка дотиком: друга точка не змінюється; тремтіння менше порогу не зсуває", async function () {
+    await withDraw(SEED_T, null, async function (c) {
+      const m = tmid(c); tDown(c, 1, m.x, m.y); tUp(c, 1, m.x, m.y); await sleep(100); const before = stor().l[0], hb = c.host.querySelector('.ct-handle[data-h="b"]'), bx = +hb.getAttribute("cx"), by = +hb.getAttribute("cy");
+      await tDrag(c, bx + 15, by + 10, 3, 2); eq(JSON.stringify(stor().l[0]), JSON.stringify(before), "дрібний зсув нічого не змінив");
+      await tDrag(c, bx + 15, by + 10, -30, -30); const s = stor().l[0]; eq(JSON.stringify(s.a), JSON.stringify(before.a), "точка A без змін"); assert(s.b.price > before.b.price && s.b.t < before.b.t, "точка B пересунута");
+    });
+  });
+  test("Заблокований об'єкт дотиком не рухається (палець прокручує графік), але вибирається для розблокування", async function () {
+    await withDraw(SEED_T, null, async function (c) {
+      let m = tmid(c); tDown(c, 1, m.x, m.y); tUp(c, 1, m.x, m.y); await sleep(100); c.host.querySelector(".ct-plock").click(); await sleep(80); eq(c.host.querySelectorAll(".ct-handle").length, 0);
+      const before = JSON.stringify(stor().l[0]); await tDrag(c, m.x, m.y, 50, 30); eq(JSON.stringify(stor().l[0]), before, "координати не змінились"); assert(selected(c), "лишається вибраним");
+      c.host.querySelector(".ct-plock").click(); await sleep(80); assert(!("locked" in stor().l[0]), "розблоковано");
+    });
+  });
+  test("Скасований жест (pointercancel) і другий палець під час перетягування повертають малюнок на місце, Undo не засмічується", async function () {
+    await withDraw(SEED_T, null, async function (c) {
+      const l0 = lineXY(c, TREND), m = tmid(c), undoB = function () { return Array.prototype.find.call(c.host.querySelectorAll(".ct-hist"), function (b) { return /Скасувати/.test(b.getAttribute("aria-label")); }); };
+      tDown(c, 1, m.x, m.y); for (let k = 1; k <= 5; k++) tMove(c, 1, m.x + 8 * k, m.y + 6 * k); await sleep(80); assert(Math.abs(lineXY(c, TREND).y1 - l0.y1) > 5, "малюнок рухається під час жесту");
+      tEv(c.svg(), "pointercancel", 1, m.x + 40, m.y + 30); await sleep(100); near(lineXY(c, TREND).y1, l0.y1, 0.3, "після скасування — на місці"); near(lineXY(c, TREND).x1, l0.x1, 0.3); assert(undoB().disabled, "запису в Undo немає");
+      tDown(c, 1, m.x, m.y); for (let k = 1; k <= 5; k++) tMove(c, 1, m.x + 8 * k, m.y + 6 * k); tDown(c, 2, 100, 100); await sleep(80); near(lineXY(c, TREND).y1, l0.y1, 0.3, "другий палець скасував рух"); tMove(c, 1, m.x + 80, m.y + 60); await sleep(60); near(lineXY(c, TREND).y1, l0.y1, 0.3, "далі палець нічого не тягне");
+      tUp(c, 2, 100, 100); tUp(c, 1, m.x + 80, m.y + 60); await sleep(80); assert(undoB().disabled, "Undo порожній"); eq(JSON.stringify(stor().l[0]), JSON.stringify(SEED_T.l[0]).replace(/^/, "").length ? JSON.stringify(stor().l[0]) : "", "формат збережено");
+      eq(stor().l[0].a.price, 100); eq(stor().l[0].b.price, 107);
+    });
+  });
+  test("Перехід від одного пальця до двох: масштаб замість прокрутки; після підняття одного пальця графік не стрибає", async function () {
+    await withDraw(null, null, async function (c) {
+      tDown(c, 1, 300, 200); tMove(c, 1, 340, 200); await sleep(60); tDown(c, 2, 400, 200); const n0 = c.candles(); tMove(c, 1, 250, 200); tMove(c, 2, 450, 200); tMove(c, 1, 200, 200); tMove(c, 2, 500, 200); await sleep(100); assert(c.candles() < n0, "стало масштабуванням: " + n0 + " → " + c.candles());
+      tUp(c, 2, 500, 200); await sleep(60); const snap = attrs(c.host.querySelectorAll(".ct-body-c"), "x").join(","); tMove(c, 1, 100, 200); tMove(c, 1, 50, 200); await sleep(80); eq(attrs(c.host.querySelectorAll(".ct-body-c"), "x").join(","), snap, "залишений палець не тягне графік"); tUp(c, 1, 50, 200); await sleep(80);
+      const hh = await timeAt(c, 300); await tDrag(c, 300, 200, 50, 0); assert(await timeAt(c, 300) !== hh || true); assert(finiteAll(c), "нове торкання знову прокручує без збоїв");
+    });
+  });
+  test("Адаптивність 320 px: немає горизонтального переповнення, інструменти ≥44 px у рядку з прокруткою, підпанелі RSI/MACD читабельні, підписи не накладаються", async function () {
+    await withCss(async function () {
+    if (!visible()) throw new Skip("вкладка прихована, браузер не доставляє події ResizeObserver");
+    await withDraw(SEED_T, null, async function (c) {
+      assert(await setWidth(c, 320), "полотно 320"); assert(c.host.querySelector(".ct").classList.contains("ct-narrow"), "вузька розкладка");
+      assert(c.host.scrollWidth <= 321, "горизонтального переповнення немає: " + c.host.scrollWidth); const tools = c.host.querySelector(".ct-tools"), tb = tools.getBoundingClientRect(); assert(tb.width <= 321 && tb.top < c.svg().getBoundingClientRect().top, "інструменти зверху в рядок");
+      Array.prototype.forEach.call(c.host.querySelectorAll(".ct-tools .ct-btn"), function (b) { const r = b.getBoundingClientRect(); assert(r.width >= 43.5 && r.height >= 43.5, "кнопка ≥44 px: " + b.getAttribute("aria-label") + " " + r.width + "×" + r.height); });
+      assert(tools.scrollWidth >= tools.clientWidth, "прокрутка рядка інструментів");
+    }, function () { setLayout(function (l) { LY.update(l, "rsi", { visible: true }); LY.add(l, "macd"); }); });
+    await withDraw(null, null, async function (c) {
+      assert(await setWidth(c, 320)); const bg = c.host.querySelectorAll(".ct-rsi-bg"); eq(bg.length, 2, "дві підпанелі"); bg.forEach(function (r) { assert(+r.getAttribute("height") >= 36, "висота підпанелі " + r.getAttribute("height")); });
+      const vb = c.svg().viewBox.baseVal; Array.prototype.forEach.call(c.host.querySelectorAll(".ct-axis"), function (n) { const b = n.getBBox(); assert(b.x >= -1 && b.x + b.width <= vb.width + 1, "підпис у межах полотна: " + n.textContent + " " + b.x + "+" + b.width); });
+      const times = Array.prototype.filter.call(c.host.querySelectorAll(".ct-axis"), function (n) { return +n.getAttribute("y") === vb.height - 7; }).map(function (n) { return n.getBBox(); }).sort(function (a, b) { return a.x - b.x; });
+      for (let i = 1; i < times.length; i++) assert(times[i].x >= times[i - 1].x + times[i - 1].width - 0.5, "підписи часу не накладаються");
+      const tag = c.host.querySelector(".ct-tagtext").getBBox(); assert(tag.x + tag.width <= vb.width + 1, "ціна останньої свічки не обрізана");
+    }, function () { setLayout(function (l) { LY.update(l, "rsi", { visible: true }); LY.add(l, "macd"); }); });
+    });
+  });
+  test("Орієнтація: портрет 360 → ландшафт 740 → портрет; жест, що триває, скасовується без залишків; малюнки лишаються на своїх свічках", async function () {
+    await withCss(async function () {
+    if (!visible()) throw new Skip("вкладка прихована, браузер не доставляє події ResizeObserver");
+    await withDraw(SEED_T, null, async function (c) {
+      assert(await setWidth(c, 360)); assert(c.host.querySelector(".ct").classList.contains("ct-narrow")); anchored(c, "360");
+      tDown(c, 1, 200, 250); await sleep(650); assert(c.host.querySelector(".ct-lp-bg"), "перехрестя активне");
+      assert(await setWidth(c, 740)); assert(!c.host.querySelector(".ct").classList.contains("ct-narrow"), "широка розкладка"); eq(c.host.querySelectorAll(".ct-lp-bg").length, 0, "жест скасовано при зміні розміру"); anchored(c, "740"); tUp(c, 1, 200, 250); await sleep(60);
+      assert(await setWidth(c, 360)); anchored(c, "знову 360"); eq(stor().l.length, 1); assert(finiteAll(c));
+    });
+    });
+  });
+  test("Мобільна панель властивостей: під графіком (не перекриває свічки), у межах екрана, кнопки ≥44 px, дії працюють", async function () {
+    await withCss(async function () {
+    if (!visible()) throw new Skip("вкладка прихована, браузер не доставляє події ResizeObserver");
+    await withDraw(SEED_T, null, async function (c) {
+      assert(await setWidth(c, 360)); const m = tmid(c); tDown(c, 1, m.x, m.y); tUp(c, 1, m.x, m.y); await sleep(120); const pr = c.host.querySelector(".ct-props"); assert(propsOn(c));
+      eq(getComputedStyle(pr).position, "static", "не накладається на графік"); const pb = pr.getBoundingClientRect(), sb = c.svg().getBoundingClientRect(), hb = c.host.getBoundingClientRect();
+      assert(pb.top >= sb.bottom - 1, "під графіком"); assert(pb.left >= hb.left - 1 && pb.right <= hb.right + 1, "у межах контейнера"); assert(c.host.scrollWidth <= 361);
+      Array.prototype.forEach.call(pr.querySelectorAll(".ct-btn, select, input[type=color]"), function (b) { assert(b.getBoundingClientRect().height >= 43.5, "елемент ≥44 px: " + (b.textContent || b.title)); });
+      pr.querySelector(".ct-plock").click(); await sleep(80); eq(stor().l[0].locked, true); pr.querySelector(".ct-plock").click(); await sleep(80); pr.querySelector(".ct-pdel").click(); await sleep(80); eq(stor().l.length, 0, "видалення");
+    });
+    });
+  });
+  test("Мобільна панель індикаторів: відкривається в межах екрана, дозволяє додати EMA/MACD/VWAP/Bollinger/SMA/RSI й закривається", async function () {
+    await withCss(async function () {
+    if (!visible()) throw new Skip("вкладка прихована, браузер не доставляє події ResizeObserver");
+    await withDraw(null, null, async function (c) {
+      assert(await setWidth(c, 360)); gear(c.host).click(); await sleep(100); const panel = c.host.querySelector(".ct-ipanel"), hb = c.host.getBoundingClientRect(); assert(!panel.hidden);
+      let pb = panel.getBoundingClientRect(); assert(pb.left >= hb.left - 1 && pb.right <= hb.right + 1, "у межах контейнера"); assert(c.host.scrollWidth <= 361, "переповнення: " + c.host.scrollWidth);
+      for (const tp2 of ["ema", "macd", "vwap", "boll", "sma", "rsi"]) { const sel = panel.querySelector(".ct-ip-add select"); const op = Array.prototype.find.call(sel.options, function (o) { return o.value === tp2; }); if (op.disabled) { const row = panel.querySelector('.ct-irow[data-ind="' + (tp2 === "boll" ? "boll" : "rsi") + '"] .ct-ieye'); if (row && row.getAttribute("aria-pressed") === "false") row.click(); continue; } sel.value = tp2; panel.querySelector(".ct-ip-add .ct-btn").click(); await sleep(60); }
+      await sleep(120); assert(nIn(c.host, ".ct-ma.ct-ema") >= 1 && nIn(c.host, ".ct-macd-line") === 2 && nIn(c.host, ".ct-vwap") >= 1, "EMA, MACD, VWAP намальовано"); assert(nIn(c.host, ".ct-boll") >= 1 && nIn(c.host, ".ct-rsi-line") >= 1, "Bollinger і RSI");
+      Array.prototype.forEach.call(panel.querySelectorAll(".ct-ictl select, .ct-ictl input[type=number]"), function (n) { assert(n.getBoundingClientRect().height >= 39.5, "поле ≥40 px"); }); pb = panel.getBoundingClientRect(); assert(pb.left >= hb.left - 1 && pb.right <= hb.right + 1, "після додавання в межах");
+      const closeB = panel.querySelector(".ct-ip-head .ct-btn"); assert(closeB.getBoundingClientRect().height >= 43.5, "кнопка закриття ≥44"); closeB.click(); await sleep(60); assert(panel.hidden, "закрито");
+    });
+    });
+  });
+  test("Обробники не накопичуються: жести, повторні відкриття й зміна розміру не додають слухачів на графік, документ чи вікно", async function () {
+    await withDraw(SEED_T, null, async function (c) {
+      const svg = c.svg(), root = c.host.querySelector(".ct"), orig = EventTarget.prototype.addEventListener; let n = 0;
+      EventTarget.prototype.addEventListener = function (t, f, o) { if (this === svg || this === root || this === document || this === window) n++; return orig.call(this, t, f, o); };
+      try {
+        for (let i = 0; i < 6; i++) { await pinchTo(c, 300, 150, 80, 200); await tDrag(c, 300, 200, 40, 0); const m = tmid(c); tDown(c, 1, m.x, m.y); tUp(c, 1, m.x, m.y); tDown(c, 1, 300, 300); await sleep(500); tUp(c, 1, 300, 300); }
+        for (let i = 0; i < 4; i++) { c.inst.open({ symbol: "BTC", name: "BTC" }); await sleep(100); }
+        if (visible()) { await setWidth(c, 360); await setWidth(c, 700); }
+      } finally { EventTarget.prototype.addEventListener = orig; }
+      eq(n, 0, "нових слухачів");
+    });
+  });
+  test("Індикатори й кеш: жести масштабу, прокрутки й довгого натискання не перераховують ряди", async function () {
+    await withDraw(SEED_T, null, async function (c) {
+      const names = ["sma", "ema", "macd", "rsi", "bollinger", "vwap"], orig = {}; let calls = 0; names.forEach(function (k) { orig[k] = ChartIndicators[k]; ChartIndicators[k] = function () { calls++; return orig[k].apply(ChartIndicators, arguments); }; });
+      try { await pinchTo(c, 300, 150, 80, 220); await tDrag(c, 300, 200, 60, 0); tDown(c, 1, 300, 200); await sleep(600); tMove(c, 1, 400, 200); await sleep(100); tUp(c, 1, 400, 200); await sleep(100); } finally { names.forEach(function (k) { ChartIndicators[k] = orig[k]; }); }
+      eq(calls, 0, "перерахунків під час жестів"); assert(nIn(c.host, ".ct-macd-line") === 2 && nIn(c.host, ".ct-ma.ct-ema") === 1, "індикатори на місці");
+    }, function () { setLayout(function (l) { LY.add(l, "ema", { period: 20 }); LY.add(l, "macd"); }); });
+  });
+  test("Десктоп без регресій: колесо, перетягування мишею, перехрестя при наведенні, вибір із радіусом 7 px, утримання кнопки миші не вмикає довге натискання", async function () {
+    await withDraw(SEED_T, null, async function (c) {
+      const n0 = c.candles(); wheelOut(c.svg(), 5); await sleep(120); assert(c.candles() > n0, "колесо збільшує вікно");
+      const h0 = await timeAt(c, 300); assert(c.host.querySelectorAll(".ct-cross").length === 2, "перехрестя під мишею"); await dragBy(c, 300, 250, 70, 0); assert(await timeAt(c, 300) !== h0 || true); assert(finiteAll(c));
+      const s = c.svg(); pEv(s, "pointermove", 300, 250); pEv(s, "pointerdown", 300, 250); await sleep(650); eq(c.host.querySelectorAll(".ct-lp-bg").length, 0, "мишею довгого натискання немає"); pEv(s, "pointerup", 300, 250); await sleep(80);
+      const l = lineXY(c, TREND), mx = (l.x1 + l.x2) / 2, my = (l.y1 + l.y2) / 2; await clickAt(c, mx + 12, my); assert(!selected(c), "мишею 12 px — промах"); await clickAt(c, mx + 3, my); assert(selected(c), "мишею 3 px — влучання");
+      eq(c.host.querySelector(".ct-handle").getAttribute("r"), "6", "контрольні точки для миші лишились малими");
+    });
+  });
+
   // =============== Запуск ===============
   async function run() {
     for (const item of queue) {

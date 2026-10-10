@@ -33,6 +33,7 @@ CHECKS = {
     "outlook": {"outlook": ["coins", "market", "insights"]},
     "report": {"report": ["headline", "sections", "archive", "insights"]},
     "trader": {"trader": ["insights"]},
+    "feed": {"feed": ["insights"]},
     "analyst": {"analyst": ["insights"]},
     "notify": {"notify": ["insights"]},
     "simulation": {"simulation": ["paper", "strategies", "insights"], "simulation_history": ["coins"]},

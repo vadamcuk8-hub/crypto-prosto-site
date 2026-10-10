@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>Тести живої стрічки</title>
+<style>
+  body { font: 15px/1.5 system-ui, "Segoe UI", sans-serif; margin: 20px; background: #0b0e11; color: #eaecef; }
+  h1 { font-size: 20px; } h2 { font-size: 16px; margin: 18px 0 6px; color: #f0b90b; }
+  .ok { color: #2ebd85; } .fail { color: #f6465d; font-weight: 700; } .note { color: #9aa4b2; }
+  #sum { font-size: 18px; font-weight: 700; margin: 10px 0; } li { margin: 2px 0; }
+</style>
+</head>
+<body>
+<h1>Тести живої стрічки подій (live-feed-core.js, live-feed.js)</h1>
+<p class="note">Відкрийте через локальний сервер: /tools/test-feed.html. Мережа не потрібна: fetch, WebSocket, таймери, сховище й звук підмінені. Запуск без Node.js: <code>python tools/run_chart_tests.py test-feed.html</code>.</p>
+<div id="sum">Виконується…</div>
+<div id="out"></div>
+<script src="../agent-ui.js"></script>
+<script src="../live-feed-core.js"></script>
+<script src="../live-feed.js"></script>
+<script>
+(function () {
+  const out = document.getElementById("out"), queue = [];
+  let section = null, pass = 0, fail = 0, skipped = 0;
+  function group(n) { queue.push({ group: n }); }
+  function test(n, fn) { queue.push({ name: n, fn: fn }); }
+  function Skip(m) { this.message = m; }
+  function assert(c, m) { if (!c) throw new Error(m || "перевірка не пройшла"); }
+  function eq(a, b, m) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error((m || "значення різні") + ": очікували " + JSON.stringify(b) + ", отримали " + JSON.stringify(a)); }
+  function near(a, b, e, m) { if (a === null || b === null || Math.abs(a - b) > (e || 1e-9)) throw new Error((m || "значення різні") + ": очікували ≈" + b + ", отримали " + a); }
+  const sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  const flush = async function () { for (let i = 0; i < 4; i++) await sleep(0); };
+  const C = LiveFeedCore, NOW = Date.now();
+
+  // ---------- Підміна середовища ----------
+  function fakeEnv(opts) {
+    opts = opts || {};
+    const env = { now: function () { return env._now; }, _now: NOW, timers: [], seq: 0, sockets: [], fetches: [], delays: [], journalUrl: "data/live_feed.json", random: function () { return 0.5; }, beeps: [], journalBody: opts.journal || null, restBody: null, restFail: false, journalFail: false };
+    const mem = {};
+    env.mem = mem;
+    env.storage = { getItem: function (k) { return k in mem ? mem[k] : null; }, setItem: function (k, v) { if (opts.storageFail) throw new Error("quota"); mem[k] = String(v); } };
+    env.setTimeout = function (fn, ms) { const id = ++env.seq; env.timers.push({ id: id, at: env._now + ms, fn: fn }); env.delays.push(ms); return id; };
+    env.clearTimeout = function (id) { env.timers = env.timers.filter(function (t) { return t.id !== id; }); };
+    env.advance = function (ms) {
+      const end = env._now + ms;
+      for (;;) { const due = env.timers.filter(function (t) { return t.at <= end; }).sort(function (a, b) { return a.at - b.at; })[0]; if (!due) break; env.timers = env.timers.filter(function (t) { return t !== due; }); env._now = due.at; due.fn(); }
+      env._now = end;
+    };
+    env.fetch = function (u) {
+      env.fetches.push(u);
+      if (/live_feed/.test(u)) {
+        if (env.journalFail) return Promise.reject(new Error("мережа"));
+        const b = env.journalBody;
+        return Promise.resolve({ ok: b !== null, status: b === null ? 404 : 200, json: function () { return typeof b === "string" ? Promise.reject(new Error("не JSON")) : Promise.resolve(JSON.parse(JSON.stringify(b))); } });
+      }
+      if (/ticker\/price/.test(u)) {
+        if (env.restFail) return Promise.reject(new Error("мережа"));
+        return Promise.resolve({ ok: true, json: function () { return Promise.resolve(env.restBody || []); } });
+      }
+      return Promise.reject(new Error("невідомий запит " + u));
+    };
+    function WS(url) { this.url = url; this.readyState = 0; env.sockets.push(this); }
+    WS.prototype.close = function () { this.readyState = 3; this.closedByClient = true; };
+    WS.prototype.open = function () { this.readyState = 1; if (this.onopen) this.onopen(); };
+    WS.prototype.price = function (sym, p) { if (this.onmessage) this.onmessage({ data: JSON.stringify({ data: { s: sym + "USDT", c: String(p) } }) }); };
+    WS.prototype.drop = function () { this.readyState = 3; if (this.onclose) this.onclose(); };
+    env.WebSocket = opts.noWS ? undefined : WS;
+    env.AudioContext = function () { this.currentTime = 0; this.destination = {}; this.createOscillator = function () { const o = { frequency: { value: 0 }, connect: function () {}, start: function () { env.beeps.push(o.frequency.value); }, stop: function () {} }; return o; }; this.createGain = function () { return { gain: { value: 0 }, connect: function () {} }; }; this.resume = function () {}; };
+    return env;
+  }
+  function tEvent(o) { return Object.assign({ id: "sim-" + Math.random().toString(36).slice(2), t: NOW - 60000, source: "sim", confirmed: "engine", type: "close", coin: "BNB", pair: "BNB/USDT", wallet: 1000, bot: "trend_1h", bot_title: "Trend Pro", direction: "LONG", price: 751.48, entry_price: 748.02, pnl_pct: 0.46, pnl_usd: 3.42, result: "profit", exit: "take", reason: "тест" }, o || {}); }
+  function journal(events, open, extra) { return Object.assign({ v: 1, updated: new Date(NOW).toISOString(), policy: "Журнал, а не повна історія: старіші записи видаляються.", max_events: 1000, dropped: 0, fee: 0.0015, events: events || [], open: open || [] }, extra || {}); }
+  function position(o) { return Object.assign({ pos: "p1", wallet: 1000, bot: "trend_1h", bot_title: "Trend Pro", coin: "BNB", pair: "BNB/USDT", direction: "LONG", entry: 100, entry_cost: 0.0015, entry_t: NOW - 1000 }, o || {}); }
+  const CFG = { fee: 0.0015, near: 0.2, hyst: 0.05 };
+  async function started(env) { const ctl = C.createController(env); ctl.start(); await flush(); return ctl; }
+
+  // =============== Модель, категорії, фільтри ===============
+  group("Модель подій, категорії й фільтри");
+  test("Подія журналу перевіряється: сміття, невідомі типи й нечислові ціни відкидаються; Testnet і симуляція розрізняються", function () {
+    assert(C.normTrade(tEvent()) && C.normTrade(tEvent({ source: "testnet", wallet: "testnet", confirmed: "exchange", order_id: "11" })), "добрі події");
+    [null, 5, "x", {}, tEvent({ id: "" }), tEvent({ t: "вчора" }), tEvent({ source: "real" }), tEvent({ type: "buy" }), tEvent({ price: NaN }), tEvent({ wallet: "abc" })].forEach(function (b, i) { eq(C.normTrade(b), null, "сміття #" + i); });
+    const a = C.normTrade(tEvent({ exit: "signal" })), b = C.normTrade(tEvent({ source: "testnet", wallet: "testnet", confirmed: "exchange", exit: "signal" }));
+    assert(C.sourceLabel(a) === "Віртуальна угода" && C.sourceLabel(b) === "Binance Testnet" && C.sourceLabel({ source: "price" }) === "Цінова подія", "різні назви");
+    assert(/не біржов/.test(C.sourceNote(a)) && /тестов/.test(C.sourceNote(b)) && /Оцінка за поточною ціною/.test(C.sourceNote({ source: "price" })), "різні пояснення");
+    assert(C.title(b) !== C.title(a), "заголовки Testnet і симуляції різні");
+  });
+  test("Стартові позиції раунду не показуються в стрічці й не рахуються в лічильниках", async function () {
+    const env = fakeEnv({ journal: journal([tEvent({ id: "i1", type: "open", initial: true, result: undefined, exit: undefined }), tEvent({ id: "c1" })]) }), ctl = await started(env);
+    eq(ctl.state().items.map(function (x) { return x.id; }), ["c1"]); ctl.stop();
+  });
+  test("Результат Testnet не подається як точний чистий PnL (позначка в картці й пояснення в подробицях); результат симулятора позначено як модельний", async function () {
+    const env = fakeEnv({ journal: journal([tEvent({ id: "tn", source: "testnet", wallet: "testnet", confirmed: "exchange", pnl_basis: "quote_diff", fees: { BNB: 0.001 } }), tEvent({ id: "sm", t: NOW - 5000, pnl_basis: "model" })]) }), u = await mountUI(env, { period: "all" });
+    const cards = qa(u, ".lf-card"); assert(/без повного обліку комісій/.test(cards[1].textContent) && !/Реалізований результат/.test(cards[1].textContent), "Testnet: " + cards[1].textContent); assert(/Реалізований результат/.test(cards[0].textContent), "симулятор");
+    cards[1].click(); assert(/не точний чистий PnL/.test(q(u, ".lf-detail").textContent), "пояснення в подробицях"); assert(C.normTrade(tEvent({ source: "testnet", wallet: "testnet", pnl_basis: "model" })).pnlExact === false, "навіть із полем model Testnet не вважається точним"); u.done();
+  });
+  test("Причина виходу: SL/TP лише за явним exit; unknown не стає Stop Loss; закриття без результату нейтральне", function () {
+    const stop = C.normTrade(tEvent({ exit: "stop", result: "loss" })), unk = C.normTrade(tEvent({ exit: "unknown", result: "loss" })), noexit = C.normTrade(tEvent({ exit: undefined, result: "loss" }));
+    eq(C.cats(stop), ["loss", "sltp"]); eq(C.cats(unk), ["loss"], "unknown — не SL/TP"); eq(C.cats(noexit), ["loss"], "немає поля — unknown"); assert(/Stop Loss/.test(C.title(stop)) && !/Stop Loss/.test(C.title(unk)));
+    eq(C.cats(C.normTrade(tEvent({ result: "unknown", exit: "signal", pnl_usd: undefined }))), []); eq(C.cats(C.normTrade(tEvent({ type: "open", result: undefined, exit: undefined }))), []);
+  });
+  test("Цінові події: категорії беззбитковості, плюсу й мінусу; підпис «Оцінка»", function () {
+    const mk = function (type) { return C.normInfo({ id: "px-" + type, t: NOW, type: type, coin: "BNB", price: 1, wallet: 1000, bot: "b" }); };
+    eq(C.cats(mk("near_be")), ["be"]); eq(C.cats(mk("reached_be")), ["be"]); eq(C.cats(mk("to_plus")), ["profit"]); eq(C.cats(mk("to_minus")), ["loss"]);
+    assert(mk("near_be").source === "price" && mk("near_be").confirmed === "estimate"); eq(C.normInfo({ id: "x", t: NOW, type: "sold", coin: "A", price: 1 }), null, "невідомий тип цінової події");
+  });
+  test("mergeItems: дедуплікація за ID, найновіші першими, стабільний порядок при однаковому часі", function () {
+    const a = C.normTrade(tEvent({ id: "a", t: 5 })), b = C.normTrade(tEvent({ id: "b", t: 9 })), a2 = C.normTrade(tEvent({ id: "a", t: 5, price: 1 })), c = C.normTrade(tEvent({ id: "c", t: 9 }));
+    const m = C.mergeItems([[a, b], [a2, c]]);
+    eq(m.map(function (x) { return x.id; }), ["c", "b", "a"]); eq(m[2].price, a.price, "перший запис не перезаписується");
+  });
+  test("Фільтри комбінуються (пара + бот + гаманець + період + категорія); лічильники відповідають фактичним подіям", function () {
+    const L = [
+      tEvent({ id: "1", t: NOW - 600000 }), tEvent({ id: "2", t: NOW - 7200000, coin: "ETH", pair: "ETH/USDT", result: "loss", exit: "stop", pnl_usd: -1 }), tEvent({ id: "3", t: NOW - 90000000, wallet: 100, bot: "dca", result: "profit", exit: "signal" }),
+      tEvent({ id: "4", t: NOW - 100, wallet: "testnet", source: "testnet", confirmed: "exchange", bot: "trend_1h", result: "loss", exit: "unknown", pnl_usd: -2 }),
+    ].map(C.normTrade);
+    const px = [C.normInfo({ id: "p1", t: NOW - 50, type: "near_be", coin: "BNB", price: 1, wallet: 1000, bot: "trend_1h" }), C.normInfo({ id: "p2", t: NOW - 40, type: "to_plus", coin: "BNB", price: 1, wallet: 1000, bot: "trend_1h" })];
+    const all = C.mergeItems([L, px]);
+    eq(C.counts(all, { period: "all" }, NOW), { all: 6, profit: 3, loss: 2, be: 1, sltp: 2 }, "усе");
+    eq(C.counts(all, { period: "24h" }, NOW), { all: 5, profit: 2, loss: 2, be: 1, sltp: 2 }, "за 24 год немає події №3 (≈25 год)");
+    eq(C.counts(all, { period: "1h" }, NOW).all, 4, "за годину: №1, №4 і дві цінові — без №2");
+    eq(C.applyFilter(all, { period: "all", coin: "ETH" }, NOW).map(function (x) { return x.id; }), ["2"]);
+    eq(C.applyFilter(all, { period: "all", wallet: 100 }, NOW).map(function (x) { return x.id; }), ["3"]);
+    eq(C.applyFilter(all, { period: "all", wallet: "testnet" }, NOW).map(function (x) { return x.id; }), ["4"]);
+    eq(C.applyFilter(all, { period: "all", bot: "trend_1h", cat: "loss" }, NOW).map(function (x) { return x.id; }).sort(), ["2", "4"]);
+    eq(C.applyFilter(all, { period: "24h", bot: "trend_1h", wallet: 1000, coin: "BNB", cat: "be" }, NOW).map(function (x) { return x.id; }), ["p1"], "комбінація п'яти умов");
+    eq(C.counts(all, { period: "all", coin: "BNB", cat: "loss" }, NOW).all, 5, "лічильники не залежать від вибраної категорії, лише від решти фільтрів");
+  });
+
+  // =============== Беззбитковість і цінові події ===============
+  group("Беззбитковість і цінові сповіщення (LONG / SHORT, комісії, гістерезис)");
+  test("Беззбитковість із чинної моделі витрат: LONG = ціна / ((1−вхід)(1−вихід)); збігається зі сторінкою «Симуляція» при однакових витратах; SHORT дзеркально", function () {
+    near(C.beOf({ entry: 100, entry_cost: 0.0015, direction: "LONG" }, CFG), 100 / (0.9985 * 0.9985), 1e-9);
+    near(C.beOf({ entry: 100, entry_cost: 0.0015, direction: "LONG" }, CFG), 100 / Math.pow(1 - 0.0015, 2), 1e-9, "як exitTargets: entry / (1−fee)²");
+    near(C.beOf({ entry: 100, entry_cost: 0.0007, direction: "LONG" }, CFG), 100 / (0.9993 * 0.9985), 1e-9, "фактичні витрати входу з події");
+    near(C.beOf({ entry: 100, direction: "LONG" }, CFG), 100 / Math.pow(1 - 0.0015, 2), 1e-9, "немає витрат входу — модель");
+    near(C.beOf({ entry: 100, entry_cost: 0.0015, direction: "SHORT" }, CFG), 100 * 0.9985 * 0.9985, 1e-9);
+    near(C.pnlPct({ entry: 100, direction: "SHORT" }, 90), 10, 1e-9); near(C.pnlPct({ entry: 100, direction: "LONG" }, 90), -10, 1e-9);
+    assert(C.distBe({ direction: "LONG" }, 100.3, 100) > 0 && C.distBe({ direction: "LONG" }, 100.3, 101) < 0 && C.distBe({ direction: "SHORT" }, 99.7, 100) > 0 && C.distBe({ direction: "SHORT" }, 99.7, 99) < 0, "знак відстані");
+  });
+  test("Перший розрахунок запам'ятовує стан і не створює подій (нічого заднім числом), навіть якщо ціна вже за беззбитковістю чи в мінусі", function () {
+    const p = position(), be = C.beOf(p, CFG);
+    [be + 5, be - 0.01, 90, 100].forEach(function (price) { const r = C.evalPosition(p, price, undefined, CFG, NOW); eq(r.events, [], "baseline " + price); assert(r.st, "стан збережено"); });
+  });
+  test("Наближення до беззбитковості: одна подія при вході в зону 0,2 %; без повторів у зоні; повторно лише після виходу за 0,3 %", function () {
+    const p = position(), be = C.beOf(p, CFG);
+    let r = C.evalPosition(p, be * 0.99, undefined, CFG, NOW), st = r.st, ev = [];
+    const bes = function () { return ev.filter(function (e) { return /_be$/.test(e.type); }); };
+    const step = function (price) { r = C.evalPosition(p, price, st, CFG, NOW); st = r.st; ev = ev.concat(r.events); };
+    step(be * 0.9975); eq(bes().length, 0, "ще поза зоною (0,25 %)");
+    step(be * 0.9985); eq(bes().map(function (e) { return e.type; }), ["near_be"], "у зоні"); near(bes()[0].dist, 0.15, 0.02);
+    for (let i = 0; i < 20; i++) step(be * (0.9984 + (i % 3) * 0.0003)); eq(bes().length, 1, "тремтіння в зоні не створює повторів");
+    step(be * 0.9972); eq(bes().length, 1, "вихід із зони, але ще не за 0,3 %"); step(be * 0.9985); eq(bes().length, 1, "повернення в зону без виходу за 0,3 % — тиша");
+    step(be * 0.996); step(be * 0.9985); eq(bes().map(function (e) { return e.type; }), ["near_be", "near_be"], "після виходу за 0,3 % — нова подія"); assert(bes()[0].id !== bes()[1].id, "різні ID");
+  });
+  test("Досягнення беззбитковості: перетин створює одну подію; гойдання навколо рівня не дублює; після відходу на 0,1 % вниз — нова", function () {
+    const p = position(), be = C.beOf(p, CFG);
+    let st = C.evalPosition(p, be * 0.99, undefined, CFG, NOW).st, ev = [];
+    const step = function (price) { const r = C.evalPosition(p, price, st, CFG, NOW); st = r.st; ev = ev.concat(r.events); };
+    const bes = function () { return ev.filter(function (e) { return /_be$/.test(e.type); }); };
+    step(be * 1.0005); eq(bes().map(function (e) { return e.type; }), ["reached_be"], "перетин (з далекої зони одразу «досягнуто», без «наближення»)");
+    for (let i = 0; i < 30; i++) step(be * (i % 2 ? 1.0004 : 0.9996)); eq(bes().length, 1, "гойдання ±0,04 % не дублює");
+    step(be * 0.9985); step(be * 1.001); eq(ev.filter(function (e) { return e.type === "reached_be"; }).length, 2, "відхід нижче на >0,1 % і новий перетин");
+    assert(new Set(ev.map(function (e) { return e.id; })).size === ev.length, "ID унікальні");
+  });
+  test("Перехід PnL через нуль: гістерезис ±0,05 %; подія лише при реальній зміні знака (мінус→плюс, плюс→мінус)", function () {
+    const p = position();
+    let st = C.evalPosition(p, 99.5, undefined, CFG, NOW).st, ev = [];
+    const step = function (price) { const r = C.evalPosition(p, price, st, CFG, NOW); st = r.st; ev = ev.concat(r.events); };
+    const pls = function () { return ev.filter(function (e) { return /^to_/.test(e.type); }); };
+    step(100.02); step(99.98); step(100.03); eq(pls().length, 0, "дрібні коливання в смузі ±0,05 % мовчать");
+    step(100.2); eq(pls().map(function (e) { return e.type; }), ["to_plus"]); near(pls()[0].pnlPct, 0.2, 1e-6);
+    step(100.4); step(100.1); eq(pls().length, 1, "залишаємось у плюсі");
+    step(99.8); eq(pls().map(function (e) { return e.type; }), ["to_plus", "to_minus"]); step(99.6); step(99.7); eq(pls().length, 2);
+  });
+  test("SHORT: падіння ціни — плюс, зростання — мінус; беззбитковість нижче входу", function () {
+    const p = position({ direction: "SHORT" }), be = C.beOf(p, CFG);
+    assert(be < p.entry, "BE нижче входу");
+    let st = C.evalPosition(p, 101, undefined, CFG, NOW).st, ev = [];
+    const step = function (price) { const r = C.evalPosition(p, price, st, CFG, NOW); st = r.st; ev = ev.concat(r.events); };
+    step(99.5); eq(ev.filter(function (e) { return /^to_/.test(e.type); }).map(function (e) { return e.type; }), ["to_plus"], "SHORT у плюс при падінні");
+    step(be * 1.0015); step(be * 0.999); assert(ev.some(function (e) { return e.type === "reached_be"; }), "досягнуто беззбитковості вниз"); step(100.5); assert(ev[ev.length - 1].type === "to_minus", "ріст — мінус");
+  });
+  test("Після «перезавантаження» (стан збережено й завантажено) старі сповіщення не повторюються; номери подій продовжуються", function () {
+    const p = position(), be = C.beOf(p, CFG);
+    let st = C.evalPosition(p, be * 0.99, undefined, CFG, NOW).st;
+    let r = C.evalPosition(p, be * 1.001, st, CFG, NOW); st = JSON.parse(JSON.stringify(r.st)); eq(r.events.map(function (e) { return e.type; }), ["to_plus", "reached_be"]);
+    r = C.evalPosition(p, be * 1.001, st, CFG, NOW); eq(r.events, [], "та сама ціна після перезавантаження — тиша");
+    r = C.evalPosition(p, be * 0.9985, st, CFG, NOW); st = r.st; r = C.evalPosition(p, be * 1.002, st, CFG, NOW); assert(r.events.length === 1 && /reached_be-2$/.test(r.events[0].id), "лічильник продовжено: " + JSON.stringify(r.events.map(function (e) { return e.id; })));
+  });
+
+  // =============== Контролер: журнал, ціни, події ===============
+  group("Контролер: журнал, дублікати, перезавантаження, живі ціни, звук");
+  test("Завантаження журналу: події з'являються, порожній журнал не помилка, відсутність файлу — зрозумілий стан", async function () {
+    let env = fakeEnv({ journal: journal([]) }), ctl = await started(env);
+    let s = ctl.state(); assert(s.journal.ok && s.journal.loaded && s.items.length === 0, "порожня історія"); ctl.stop();
+    env = fakeEnv({ journal: null }); ctl = await started(env); s = ctl.state(); assert(!s.journal.ok && !s.journal.loaded && /404/.test(s.journal.error), "404: " + s.journal.error); ctl.stop();
+    env = fakeEnv({ journal: journal([tEvent({ id: "a" }), tEvent({ id: "b" })]) }); ctl = await started(env); eq(ctl.state().items.length, 2); ctl.stop();
+  });
+  test("Пошкоджений журнал (не JSON, чужа версія, не масив): помилка в стані, попередні дані лишаються, відновлення наступним запитом", async function () {
+    const env = fakeEnv({ journal: journal([tEvent({ id: "a" })]) }), ctl = await started(env);
+    eq(ctl.state().items.length, 1);
+    env.journalBody = "{не json"; await ctl.refresh(); let s = ctl.state(); assert(!s.journal.ok && s.items.length === 1, "дані збережено при помилці"); assert(s.journal.loaded, "позначка, що раніше вантажилось");
+    env.journalBody = { v: 7, events: [] }; await ctl.refresh(); assert(!ctl.state().journal.ok && ctl.state().items.length === 1);
+    env.journalBody = { v: 1, events: "x" }; await ctl.refresh(); assert(!ctl.state().journal.ok);
+    env.journalFail = true; await ctl.refresh(); assert(!ctl.state().journal.ok && /мереж/.test(ctl.state().journal.error), "збій мережі");
+    env.journalFail = false; env.journalBody = journal([tEvent({ id: "a" }), tEvent({ id: "b" })]); await ctl.refresh(); assert(ctl.state().journal.ok && ctl.state().items.length === 2, "відновилось"); ctl.stop();
+  });
+  test("Дублікати: повторна доставка того самого журналу не дублює; нова подія з'являється один раз, onNew спрацьовує лише для неї; перше завантаження не «нове»", async function () {
+    const env = fakeEnv({ journal: journal([tEvent({ id: "a" }), tEvent({ id: "a" }), tEvent({ id: "b" })]) }), ctl = await started(env), news = [];
+    ctl.onNew(function (l) { news.push(l.map(function (x) { return x.id; })); });
+    eq(ctl.state().items.length, 2, "дубль усередині журналу"); eq(news, [], "перше завантаження не оголошується");
+    await ctl.refresh(); await ctl.refresh(); eq(ctl.state().items.length, 2); eq(news, []);
+    env.journalBody = journal([tEvent({ id: "a" }), tEvent({ id: "b" }), tEvent({ id: "c", t: NOW })]); await ctl.refresh(); await ctl.refresh();
+    eq(news, [["c"]], "нова подія рівно один раз"); eq(ctl.state().items.length, 3); ctl.stop();
+  });
+  test("Одночасні події різних ботів, та сама монета в різних гаманцях: усі окремо, ID не збігаються", async function () {
+    const L = [tEvent({ id: "w1", wallet: 100, bot: "a" }), tEvent({ id: "w2", wallet: 1000, bot: "a" }), tEvent({ id: "w3", wallet: 1000, bot: "b" }), tEvent({ id: "w4", wallet: 10000, bot: "a", t: NOW - 60000 })];
+    const env = fakeEnv({ journal: journal(L) }), ctl = await started(env), s = ctl.state();
+    eq(s.items.length, 4); eq(s.wallets, [100, 1000, 10000]); eq(C.applyFilter(s.items, { period: "all", wallet: 1000, bot: "a" }, NOW).map(function (x) { return x.id; }), ["w2"]); ctl.stop();
+  });
+  test("Цінові події з живих цін: реальні позиції з журналу, один сокет на кілька позицій, події зберігаються й не повторюються після перезавантаження", async function () {
+    const p1 = position({ pos: "p1", wallet: 1000, bot: "a" }), p2 = position({ pos: "p2", wallet: 100, bot: "b" }), p3 = position({ pos: "p3", coin: "ETH", pair: "ETH/USDT", entry: 2000 });
+    const env = fakeEnv({ journal: journal([], [p1, p2, p3]) }); let ctl = await started(env);
+    eq(env.sockets.length, 1, "одне з'єднання на всі позиції"); assert(/bnbusdt@miniTicker/.test(env.sockets[0].url) && /ethusdt@miniTicker/.test(env.sockets[0].url) && env.sockets[0].url.split("/").length >= 2);
+    const ws = env.sockets[0]; ws.open(); const be = C.beOf(p1, CFG);
+    ws.price("BNB", be * 0.99); ws.price("ETH", 2001); eq(ctl.state().items.length, 0, "перша ціна — лише стан");
+    ws.price("BNB", be * 1.001); let s = ctl.state();
+    eq(s.items.filter(function (x) { return x.type === "reached_be"; }).length, 2, "дві позиції однієї монети в різних гаманцях — дві окремі події"); eq(new Set(s.items.map(function (x) { return x.wallet; })).size, 2);
+    ctl.stop(); const stored = env.mem["lf:info:v1"]; assert(stored, "збережено");
+    ctl = await started(env); env.sockets[env.sockets.length - 1].open(); env.sockets[env.sockets.length - 1].price("BNB", be * 1.001); s = ctl.state();
+    eq(s.items.filter(function (x) { return x.type === "reached_be"; }).length, 2, "після перезавантаження без нових дублів"); ctl.stop();
+  });
+  test("Пошкоджене або недоступне сховище браузера не ламає стрічку", async function () {
+    let env = fakeEnv({ journal: journal([tEvent({ id: "a" })]) }); env.mem["lf:info:v1"] = "{зламано"; env.mem["lf:prefs:v1"] = "сміття";
+    let ctl = await started(env); eq(ctl.state().items.length, 1); eq(ctl.state().prefs.sound, false, "звук за замовчуванням вимкнено"); ctl.stop();
+    env = fakeEnv({ journal: journal([tEvent({ id: "a" })]), storageFail: true }); ctl = await started(env); ctl.setPref("sound", true); eq(ctl.state().items.length, 1); ctl.stop();
+  });
+  test("Живі ціни: WebSocket → онлайн; розрив → перепідключення з наростаючою затримкою; після двох невдач резервні REST-запити; відновлення зупиняє REST", async function () {
+    const env = fakeEnv({ journal: journal([], [position()]) }); env.restBody = [{ symbol: "BNBUSDT", price: "101.5" }];
+    const ctl = await started(env), seen = []; ctl.subscribe(function (s) { if (seen[seen.length - 1] !== s.price) seen.push(s.price); });
+    eq(ctl.state().price, "connecting"); env.sockets[0].open(); eq(ctl.state().price, "live");
+    env.sockets[0].drop(); eq(ctl.state().price, "reconnecting"); env.advance(1000); eq(env.sockets.length, 2, "перше перепідключення через ~1 с");
+    env.sockets[1].drop(); env.advance(30000); await flush(); assert(env.fetches.some(function (u) { return /ticker\/price/.test(u); }), "резервний REST після двох невдач"); eq(ctl.state().price, "rest");
+    assert(ctl.state().journal.ok, "журнал працює незалежно"); const lastWs = env.sockets[env.sockets.length - 1]; lastWs.open(); eq(ctl.state().price, "live", "WebSocket повернувся");
+    const restBefore = env.fetches.filter(function (u) { return /ticker\/price/.test(u); }).length; env.advance(60000); await flush(); eq(env.fetches.filter(function (u) { return /ticker\/price/.test(u); }).length, restBefore, "після відновлення WebSocket REST-запити припинились");
+    assert(seen.indexOf("reconnecting") >= 0 && seen.indexOf("rest") >= 0 && seen.indexOf("live") >= 0, "статуси: " + seen.join(",")); ctl.stop();
+  });
+  test("Немає WebSocket у браузері: ціни йдуть через REST раз на 20 с, статус «rest»; збій REST — «offline»; сокети не створюються", async function () {
+    const env = fakeEnv({ journal: journal([], [position()]), noWS: true }); env.restBody = [{ symbol: "BNBUSDT", price: "100" }, { symbol: "BNBUSDT", price: "100.5" }];
+    const ctl = await started(env); env.advance(0); await flush(); eq(ctl.state().price, "rest"); eq(env.sockets.length, 0);
+    const c0 = env.fetches.filter(function (u) { return /ticker\/price/.test(u); }).length; env.advance(20000); await flush(); assert(env.fetches.filter(function (u) { return /ticker\/price/.test(u); }).length > c0, "наступний запит через 20 с");
+    env.restFail = true; env.advance(20000); await flush(); eq(ctl.state().price, "offline", "збій REST"); ctl.stop();
+  });
+  test("Розрив і мовчання сокета: WebSocket без повідомлень 45+ с примусово перепідключається", async function () {
+    const env = fakeEnv({ journal: journal([], [position()]) }), ctl = await started(env); env.sockets[0].open(); env.advance(16000); eq(env.sockets.length, 1);
+    env.advance(50000); assert(env.sockets[0].closedByClient, "старий сокет закрито"); env.advance(5000); assert(env.sockets.length >= 2, "створено новий"); ctl.stop();
+  });
+  test("Зміна набору відкритих позицій перепідключає рівно один сокет; без позицій — сокета немає; stop закриває все", async function () {
+    const env = fakeEnv({ journal: journal([], [position()]) }), ctl = await started(env);
+    eq(env.sockets.length, 1); env.sockets[0].open(); env.journalBody = journal([], [position(), position({ pos: "p9", coin: "SOL", pair: "SOL/USDT" })]); await ctl.refresh();
+    eq(env.sockets.length, 2); assert(env.sockets[0].closedByClient && /solusdt/.test(env.sockets[1].url)); env.journalBody = journal([], []); await ctl.refresh(); assert(env.sockets[1].closedByClient, "позицій немає — сокет закрито"); eq(ctl.state().price, "idle"); ctl.stop();
+  });
+  test("Звук: вимкнений за замовчуванням; прибуткове/збиткове закриття й досягнення беззбитковості — по одному сигналу, різні за тоном; дублікати, відкриття й часткові закриття мовчать", async function () {
+    const env = fakeEnv({ journal: journal([], [position()]) }), ctl = await started(env); ctl.setPref("sound", true); env.beeps.length = 0;
+    const add = async function (evs) { env.journalBody = journal(evs, [position()]); await ctl.refresh(); await ctl.refresh(); };
+    const base = [];
+    base.push(tEvent({ id: "p1", t: NOW, result: "profit" })); await add(base); const afterProfit = env.beeps.length; assert(afterProfit >= 1, "сигнал прибутку");
+    base.push(tEvent({ id: "l1", t: NOW, result: "loss", exit: "stop", pnl_usd: -1 })); await add(base); const afterLoss = env.beeps.length; assert(afterLoss > afterProfit, "сигнал збитку");
+    assert(env.beeps.slice(0, afterProfit)[0] > env.beeps.slice(afterProfit)[0], "прибуток і збиток звучать по-різному");
+    base.push(tEvent({ id: "o1", t: NOW, type: "open", result: undefined, exit: undefined })); base.push(tEvent({ id: "pp", t: NOW, partial: true, result: "unknown", pnl_usd: undefined })); await add(base); eq(env.beeps.length, afterLoss, "відкриття й часткове — без звуку");
+    await add(base); await add(base); eq(env.beeps.length, afterLoss, "повторна доставка — без нового звуку");
+    const be = C.beOf(position(), CFG); env.sockets[0].open(); env.sockets[0].price("BNB", be * 0.99); env.sockets[0].price("BNB", be * 1.001); assert(env.beeps.length > afterLoss, "досягнення беззбитковості"); const n = env.beeps.length;
+    env.sockets[0].price("BNB", be * 1.0012); eq(env.beeps.length, n, "без повтору"); ctl.stop();
+  });
+  test("Лічильник непрочитаних: події новіші за «прочитано»; markRead обнуляє; нова подія збільшує", async function () {
+    const env = fakeEnv({ journal: journal([tEvent({ id: "a", t: NOW - 5000 }), tEvent({ id: "b", t: NOW - 4000 })]) }), ctl = await started(env);
+    eq(ctl.state().unread, 2); ctl.markRead(); eq(ctl.state().unread, 0);
+    env.journalBody = journal([tEvent({ id: "a", t: NOW - 5000 }), tEvent({ id: "b", t: NOW - 4000 }), tEvent({ id: "c", t: NOW + 5000 })]); await ctl.refresh(); eq(ctl.state().unread, 1); ctl.stop();
+  });
+
+  // =============== Інтерфейс ===============
+  group("Інтерфейс стрічки: картки, фільтри, подробиці, згортання, безпека, мобільне вікно");
+  const mounted = [];
+  function cleanupUI() { while (mounted.length) { const x = mounted.pop(); try { x.inst.destroy(); } catch (e) { /* уже знищено */ } x.root.remove(); } document.querySelectorAll(".lf-fab").forEach(function (n) { n.remove(); }); }
+  async function mountUI(env, opts) {
+    const root = document.createElement("div"), host = document.createElement("div"); host.style.cssText = "position:relative;width:420px;height:560px"; root.appendChild(host); document.body.appendChild(root);
+    const inst = LiveFeed.mount(host, Object.assign({ env: env, layoutRoot: root }, opts || {})); await flush(); await sleep(30);
+    const rec = { inst: inst, host: host, root: root, done: function () { const i = mounted.indexOf(rec); if (i >= 0) mounted.splice(i, 1); inst.destroy(); root.remove(); } };
+    mounted.push(rec);
+    return rec;
+  }
+  const q = function (u, s) { return u.host.querySelector(s); }, qa = function (u, s) { return u.host.querySelectorAll(s); };
+  test("Картка містить пару, тип, час із секундами, гаманець, бота, LONG, джерело, вхід/вихід і результат; без даних нічого не вигадується", async function () {
+    const env = fakeEnv({ journal: journal([tEvent({ id: "a", t: NOW - 3000 }), tEvent({ id: "u", t: NOW - 6000, result: "unknown", pnl_usd: undefined, pnl_pct: undefined, entry_price: undefined, exit: undefined }), tEvent({ id: "tn", t: NOW - 9000, source: "testnet", wallet: "testnet", confirmed: "exchange", order_id: "77", status: "FILLED", bot: "trend_1h" })]) });
+    const u = await mountUI(env, { period: "all" }); const cards = qa(u, ".lf-card"); eq(cards.length, 3);
+    assert(/Результат за виконаннями \(без повного обліку комісій\)/.test(cards[2].textContent) || cards[2].textContent.indexOf("USDT") < 0, "Testnet: результат з позначкою неповного обліку комісій: " + cards[2].textContent);
+    const t = cards[0].textContent; assert(/BNB\/USDT/.test(t) && /Take Profit виконано/.test(t) && /\d\d:\d\d:\d\d/.test(t) && /1\s?000 \$/.test(t) && /Trend Pro/.test(t) && /LONG/.test(t) && /Віртуальна угода/.test(t) && /Вихід: 751,48/.test(t) && /Вхід: 748,02/.test(t) && /\+3,42 USDT/.test(t) && /\+0,46%/.test(t), "повна картка: " + t);
+    assert(/Результат невідомий/.test(cards[1].textContent) && !/USDT \(/.test(cards[1].textContent) && !/Вхід:/.test(cards[1].textContent), "без даних — без вигаданих чисел: " + cards[1].textContent);
+    assert(/Binance Testnet/.test(cards[2].textContent) && /Testnet/.test(cards[2].textContent) && !/Віртуальна угода/.test(cards[2].textContent), "Testnet відрізняється");
+    assert(cards[0].className.indexOf("tone-up") > 0, "кольорова смуга за типом"); u.done();
+  });
+  test("Цінова подія на картці підписана як оцінка за поточною ціною, а не підтверджена угода", async function () {
+    const p = position(), env = fakeEnv({ journal: journal([], [p]) }), u = await mountUI(env, { period: "all" }), be = C.beOf(p, CFG);
+    env.sockets[0].open(); env.sockets[0].price("BNB", be * 0.99); env.sockets[0].price("BNB", be * 0.9985); await sleep(30);
+    const card = q(u, '.lf-card[data-type="near_be"]'); assert(card, "картка з'явилась"); assert(/Наближення до беззбитковості/.test(card.textContent) && /Цінова подія/.test(card.textContent) && /Відстань до беззбитковості/.test(card.textContent), card.textContent);
+    card.click(); assert(/Оцінка за поточною ціною/.test(q(u, ".lf-detail").textContent) && /не підтверджена угода/.test(q(u, ".lf-detail").textContent), "пояснення в подробицях"); u.done();
+  });
+  test("Фільтри в інтерфейсі: вкладки з лічильниками, пара, бот, гаманець, період комбінуються; початковий фільтр за гаманцем і ботом", async function () {
+    const L = [tEvent({ id: "1" }), tEvent({ id: "2", coin: "ETH", pair: "ETH/USDT", result: "loss", exit: "stop", pnl_usd: -3 }), tEvent({ id: "3", wallet: 100, bot: "dca", bot_title: "DCA" }), tEvent({ id: "4", t: NOW - 3 * 86400000 })];
+    const env = fakeEnv({ journal: journal(L) }), u = await mountUI(env);
+    const tab = function (c) { return q(u, '.lf-tab[data-cat="' + c + '"]'); };
+    eq(tab("all").textContent, "Усі (3)", "за 24 год — три з чотирьох"); eq(tab("loss").textContent, "Збиток (1)"); eq(tab("sltp").textContent, "SL/TP (3)", "усі три події мають exit take/stop");
+    tab("loss").click(); eq(qa(u, ".lf-card").length, 1); eq(tab("all").textContent, "Усі (3)", "лічильники лишаються фактичними");
+    const per = q(u, ".lf-select[aria-label='Період']"); per.value = "all"; per.dispatchEvent(new Event("change")); eq(tab("all").textContent, "Усі (4)");
+    tab("all").click(); const w = q(u, ".lf-select[aria-label='Гаманець']"); w.value = "100"; w.dispatchEvent(new Event("change")); eq(qa(u, ".lf-card").length, 1, "гаманець 100 $");
+    u.inst.setFilter({ wallet: "", bot: "trend_1h", coin: "ETH" }); eq(qa(u, ".lf-card").length, 1, "бот + пара"); u.done();
+    const u2 = await mountUI(fakeEnv({ journal: journal(L) }), { wallet: 100, period: "all" }); eq(qa(u2, ".lf-card").length, 1, "початковий фільтр за гаманцем"); eq(u2.inst.getFilter().wallet, 100); u2.done();
+  });
+  test("Порожні стани: порожній журнал, немає збігів із фільтрами, журнал недоступний — зрозумілі повідомлення", async function () {
+    let u = await mountUI(fakeEnv({ journal: journal([]) })); assert(/Подій ще немає/.test(q(u, ".lf-list").textContent)); u.done();
+    u = await mountUI(fakeEnv({ journal: journal([tEvent({ t: NOW - 3 * 86400000 })]) })); assert(/За вибраними фільтрами подій немає/.test(q(u, ".lf-list").textContent)); u.done();
+    u = await mountUI(fakeEnv({ journal: null })); assert(/недоступний/.test(q(u, ".lf-list").textContent) && /недоступний/.test(q(u, ".lf-pill").textContent), "помилка журналу видна"); u.done();
+  });
+  test("Підпис підключення відповідає реальному стану: Онлайн, перепідключення, резервні ціни, немає живих цін", async function () {
+    const env = fakeEnv({ journal: journal([], [position()]) }), u = await mountUI(env); const pill = function () { return q(u, ".lf-pill").textContent; };
+    assert(/Підключення/.test(pill()), pill()); env.sockets[0].open(); await sleep(10); assert(/^Онлайн$/.test(pill()) && q(u, ".lf-pill").classList.contains("ok"), pill());
+    env.sockets[0].drop(); await sleep(10); assert(/Перепідключення/.test(pill()), pill()); env.sockets[1] && 0; env.advance(1000); env.sockets[1].drop(); env.advance(30000); await flush(); await sleep(10); assert(/раз на 20 с/.test(pill()), pill());
+    env.restFail = true; env.advance(20000); await flush(); await sleep(10); assert(/Немає живих цін/.test(pill()) && q(u, ".lf-pill").classList.contains("bad"), pill()); u.done();
+  });
+  test("Подробиці: відкриваються по кліку й Enter, містять джерело, підтвердження, ордер Testnet, причину виходу; Esc закриває", async function () {
+    const env = fakeEnv({ journal: journal([tEvent({ id: "tn", source: "testnet", wallet: "testnet", confirmed: "exchange", order_id: "ORD-7", status: "FILLED", exit: "unknown", result: "profit", fees: { BNB: 0.001 } })]) });
+    const u = await mountUI(env, { period: "all" }), card = q(u, ".lf-card"); card.click(); const d = q(u, ".lf-detail"); assert(!d.hidden, "відкрито");
+    const t = d.textContent; assert(/Binance Testnet/.test(t) && /ORD-7/.test(t) && /FILLED/.test(t) && /Причина не вказана рушієм/.test(t) && /0.001 BNB/.test(t) && /ненастоящі гроші/.test(t), t);
+    q(u, ".lf-detail").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); assert(d.hidden, "Esc закриває"); card.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); assert(!d.hidden, "Enter відкриває"); u.done();
+  });
+  test("Безпека: HTML у назвах, причинах і ID не створює елементів (лише textContent)", async function () {
+    const evil = '<img src=x onerror="window.__pwn=1"><b id="pwn">x</b>';
+    const env = fakeEnv({ journal: journal([tEvent({ id: "e1", bot_title: evil, reason: evil, pair: evil, bot: "a" })]) }), u = await mountUI(env, { period: "all" });
+    q(u, ".lf-card").click(); await sleep(30); assert(!document.getElementById("pwn") && !u.host.querySelector("img") && !window.__pwn, "HTML не виконано"); assert(u.host.textContent.indexOf("<img") >= 0, "показано як текст"); u.done();
+  });
+  test("Згортання: панель ховається, графік займає місце (клас на контейнері), кнопка повернення й лічильник працюють, стан зберігається", async function () {
+    const env = fakeEnv({ journal: journal([tEvent({ id: "a", t: NOW })]) }); let flag = null;
+    let u = await mountUI(env, { period: "all", onCollapse: function (v) { flag = v; } });
+    q(u, ".lf-collapse").click(); assert(u.host.classList.contains("lf-collapsed") && u.root.classList.contains("lf-root-collapsed") && flag === true, "згорнуто"); assert(JSON.parse(env.mem["lf:prefs:v1"]).collapsed === true, "стан збережено");
+    q({ host: u.root }, ".lf-reopen").click(); assert(!u.host.classList.contains("lf-collapsed") && !u.root.classList.contains("lf-root-collapsed") && flag === false, "повернуто"); u.done();
+  });
+  test("Кнопка звуку: за замовчуванням вимкнено, перемикає стан і підпис, зберігає вибір", async function () {
+    const env = fakeEnv({ journal: journal([]) }), u = await mountUI(env), b = q(u, ".lf-sound");
+    eq(b.getAttribute("aria-pressed"), "false"); b.click(); eq(b.getAttribute("aria-pressed"), "true"); assert(/Звук увімкнено/.test(b.getAttribute("aria-label")) && JSON.parse(env.mem["lf:prefs:v1"]).sound === true); b.click(); eq(b.getAttribute("aria-pressed"), "false"); u.done();
+  });
+  test("Висувне вікно (телефон): кнопка «Події» з лічильником у body, відкриває/закриває вікно, Esc закриває; destroy прибирає все", async function () {
+    const env = fakeEnv({ journal: journal([tEvent({ id: "a", t: NOW })]) }), u = await mountUI(env, { period: "all" });
+    const fab = document.querySelector(".lf-fab"); assert(fab && /Події/.test(fab.textContent) && /1/.test(fab.textContent), "кнопка з лічильником: " + (fab && fab.textContent)); eq(document.querySelectorAll(".lf-fab").length, 1);
+    fab.click(); assert(u.host.classList.contains("lf-open") && fab.getAttribute("aria-expanded") === "true", "відкрито"); q(u, ".lf").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); assert(!u.host.classList.contains("lf-open"), "Esc закриває");
+    q(u, ".lf-close-drawer").click(); u.done(); eq(document.querySelectorAll(".lf-fab").length, 0, "кнопку прибрано"); assert(!document.documentElement.classList.contains("lf-lock"));
+  });
+  test("Спільна система: кілька панелей і повторні монтування не створюють додаткових сокетів, таймерів чи слухачів документа/вікна", async function () {
+    const env = fakeEnv({ journal: journal([], [position()]) }), orig = EventTarget.prototype.addEventListener; let n = 0;
+    EventTarget.prototype.addEventListener = function (t, f, o) { if (this === document || this === window) n++; return orig.call(this, t, f, o); };
+    try {
+      const a = await mountUI(env), b = await mountUI(env); eq(env.sockets.length, 1, "один сокет на дві панелі");
+      a.done(); assert(!env.sockets[0].closedByClient, "друга панель ще використовує сокет"); b.done(); assert(env.sockets[0].closedByClient, "остання панель закрила з'єднання");
+      for (let i = 0; i < 4; i++) { const u = await mountUI(env); u.done(); }
+    } finally { EventTarget.prototype.addEventListener = orig; }
+    eq(env.timers.filter(function (t) { return t.at > env._now; }).length, 0, "жодних зайвих таймерів після закриття"); assert(n <= 10, "слухачі документа/вікна не накопичуються: " + n);
+  });
+
+  // =============== Реальна розкладка сторінки «Ринок» (iframe із справжніми стилями) ===============
+  group("Розкладка сторінки «Ринок»: комп'ютер, планшет, телефон (iframe зі справжніми стилями)");
+  function frame(w, h) {
+    return new Promise(function (res) {
+      const f = document.createElement("iframe"); f.style.cssText = "position:fixed;left:0;top:0;width:" + w + "px;height:" + (h || 800) + "px;border:0;opacity:0;pointer-events:none;z-index:-1"; f.src = "../market.html";
+      f.onload = function () { setTimeout(function () { res(f); }, 600); }; f.onerror = function () { res(null); }; document.body.appendChild(f); setTimeout(function () { res(f); }, 8000);
+    });
+  }
+  test("Комп'ютер (1280 px): графік ≈65 %, стрічка ≈35 %, стрічка має незалежну прокрутку; згортання віддає ширину графіку", async function () {
+    const f = await frame(1280); try {
+      const d = f.contentDocument; const feed = d && d.getElementById("mkFeed"), chart = d && d.getElementById("mkChart"); if (!feed || !chart || !d.querySelector(".lf")) throw new Skip("сторінка не завантажилась");
+      const fw = feed.getBoundingClientRect().width, cw = chart.getBoundingClientRect().width, share = fw / (fw + cw); assert(share > 0.31 && share < 0.37, "частка стрічки " + share.toFixed(3));
+      const list = d.querySelector(".lf-list"); eq(f.contentWindow.getComputedStyle(list).overflowY, "auto", "незалежна прокрутка"); assert(f.contentWindow.getComputedStyle(d.querySelector(".lf-fab")).display === "none", "кнопка «Події» лише на телефоні");
+      const before = chart.getBoundingClientRect().width; d.querySelector(".lf-collapse").click(); await sleep(150); assert(chart.getBoundingClientRect().width > before * 1.4, "графік розширився: " + before + " → " + chart.getBoundingClientRect().width); d.querySelector(".lf-reopen").click();
+    } finally { f && f.remove(); }
+  });
+  test("Планшет (900 px): компактна бічна панель 300 px праворуч від графіка", async function () {
+    const f = await frame(900); try {
+      const d = f.contentDocument; const feed = d && d.getElementById("mkFeed"); if (!feed || !d.querySelector(".lf")) throw new Skip("сторінка не завантажилась");
+      near(feed.getBoundingClientRect().width, 300, 2, "ширина панелі"); assert(feed.getBoundingClientRect().left > d.getElementById("mkChart").getBoundingClientRect().left, "праворуч");
+    } finally { f && f.remove(); }
+  });
+  test("Телефон (375 px): стрічки не видно, кнопка «Події» відкриває висувне вікно в межах екрана; сторінка без горизонтального переповнення", async function () {
+    const f = await frame(375, 700); try {
+      const d = f.contentDocument, w = f.contentWindow; if (!d || !d.querySelector(".lf")) throw new Skip("сторінка не завантажилась");
+      const host = d.getElementById("mkFeed"), fab = d.querySelector(".lf-fab"); assert(w.getComputedStyle(fab).display !== "none", "кнопка «Події» видна"); eq(w.getComputedStyle(host).visibility, "hidden", "вікно закрите");
+      assert(d.documentElement.scrollWidth <= 376, "немає горизонтального переповнення: " + d.documentElement.scrollWidth);
+      fab.click(); await sleep(450); eq(w.getComputedStyle(host).visibility, "visible"); const r = host.getBoundingClientRect(); assert(r.left >= -1 && r.right <= 376 && r.bottom <= 701 && r.top >= 0, "у межах екрана: " + JSON.stringify([r.left, r.top, r.right, r.bottom]));
+      eq(w.getComputedStyle(host).position, "fixed"); d.querySelector(".lf-close-drawer").click(); await sleep(450); eq(w.getComputedStyle(host).visibility, "hidden");
+    } finally { f && f.remove(); }
+  });
+
+  // =============== Запуск ===============
+  async function run() {
+    for (const item of queue) {
+      if (item.group) { section = document.createElement("div"); const h = document.createElement("h2"); h.textContent = item.group; section.appendChild(h); section.appendChild(document.createElement("ul")); out.appendChild(section); continue; }
+      const li = document.createElement("li");
+      try { await item.fn(); pass++; li.className = "ok"; li.textContent = "✓ " + item.name; cleanupUI(); }
+      catch (e) {
+        cleanupUI();
+        if (e instanceof Skip) { skipped++; li.className = "note"; li.textContent = "○ " + item.name + " — пропущено: " + e.message; }
+        else { fail++; li.className = "fail"; li.textContent = "✗ " + item.name + " — " + (e && e.message ? e.message : e); }
+      }
+      section.querySelector("ul").appendChild(li);
+    }
+    const total = pass + fail, s = document.getElementById("sum");
+    s.textContent = (fail ? "Провалено: " + fail + " із " + total : "Усі тести пройдено: " + pass + " із " + total) + (skipped ? " (пропущено: " + skipped + ")" : "");
+    s.className = fail ? "fail" : "ok"; document.title = (fail ? "ПРОВАЛ " : "OK ") + pass + "/" + total;
+    window.__testSummary = { pass: pass, fail: fail, skipped: skipped, total: total };
+  }
+  run();
+})();
+</script>
+</body>
+</html>

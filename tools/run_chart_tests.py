@@ -106,7 +106,8 @@ def main():
     handler_cls = type("Quiet", (http.server.SimpleHTTPRequestHandler,), {"log_message": lambda self, *a: None})
     httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), lambda *a, **k: handler_cls(*a, directory=ROOT, **k))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    site = "http://127.0.0.1:%d/tools/test-chart.html" % httpd.server_address[1]
+    page = sys.argv[1] if len(sys.argv) > 1 else "test-chart.html"                    # python tools/run_chart_tests.py test-feed.html: інша сторінка тестів
+    site = "http://127.0.0.1:%d/tools/%s" % (httpd.server_address[1], page)
     port = free_port()
     prof = tempfile.mkdtemp(prefix="chart_tests_")
     proc = subprocess.Popen([exe, "--headless=new", "--remote-debugging-port=%d" % port, "--user-data-dir=" + prof, "--window-size=1100,900", "--no-first-run", "about:blank"],

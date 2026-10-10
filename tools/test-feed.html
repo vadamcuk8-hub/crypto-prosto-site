@@ -365,36 +365,71 @@
     eq(env.timers.filter(function (t) { return t.at > env._now; }).length, 0, "жодних зайвих таймерів після закриття"); assert(n <= 10, "слухачі документа/вікна не накопичуються: " + n);
   });
 
-  // =============== Реальна розкладка сторінки «Ринок» (iframe із справжніми стилями) ===============
-  group("Розкладка сторінки «Ринок»: комп'ютер, планшет, телефон (iframe зі справжніми стилями)");
-  function frame(w, h) {
+  // =============== Реальна розкладка сторінок (iframe зі справжніми стилями й скриптами) ===============
+  group("Сторінка «Симуляція» зі стрічкою: комп'ютер, вужчий екран, телефон; сторінка «Ринок» без постійної панелі");
+  function frame(page, w, h) {
     return new Promise(function (res) {
-      const f = document.createElement("iframe"); f.style.cssText = "position:fixed;left:0;top:0;width:" + w + "px;height:" + (h || 800) + "px;border:0;opacity:0;pointer-events:none;z-index:-1"; f.src = "../market.html";
-      f.onload = function () { setTimeout(function () { res(f); }, 600); }; f.onerror = function () { res(null); }; document.body.appendChild(f); setTimeout(function () { res(f); }, 8000);
+      const f = document.createElement("iframe"); f.style.cssText = "position:fixed;left:0;top:0;width:" + w + "px;height:" + (h || 900) + "px;border:0;opacity:0;pointer-events:none;z-index:-1"; f.src = "../" + page;
+      f.onload = function () { setTimeout(function () { res(f); }, 900); }; f.onerror = function () { res(null); }; document.body.appendChild(f); setTimeout(function () { res(f); }, 9000);
     });
   }
-  test("Комп'ютер (1280 px): графік ≈65 %, стрічка ≈35 %, стрічка має незалежну прокрутку; згортання віддає ширину графіку", async function () {
-    const f = await frame(1280); try {
-      const d = f.contentDocument; const feed = d && d.getElementById("mkFeed"), chart = d && d.getElementById("mkChart"); if (!feed || !chart || !d.querySelector(".lf")) throw new Skip("сторінка не завантажилась");
-      const fw = feed.getBoundingClientRect().width, cw = chart.getBoundingClientRect().width, share = fw / (fw + cw); assert(share > 0.31 && share < 0.37, "частка стрічки " + share.toFixed(3));
-      const list = d.querySelector(".lf-list"); eq(f.contentWindow.getComputedStyle(list).overflowY, "auto", "незалежна прокрутка"); assert(f.contentWindow.getComputedStyle(d.querySelector(".lf-fab")).display === "none", "кнопка «Події» лише на телефоні");
-      const before = chart.getBoundingClientRect().width; d.querySelector(".lf-collapse").click(); await sleep(150); assert(chart.getBoundingClientRect().width > before * 1.4, "графік розширився: " + before + " → " + chart.getBoundingClientRect().width); d.querySelector(".lf-reopen").click();
+  const sel1 = function (d, s) { return d.querySelector(s); };
+  test("Симуляція, комп'ютер (1500 px): ліворуч поточні розділи (≈65 %), праворуч стрічка (≈35 %) з незалежною прокруткою; розділи й їхні вузли збережені", async function () {
+    const f = await frame("simulation.html", 1500); try {
+      const d = f.contentDocument; if (!d || !d.querySelector(".lf")) throw new Skip("сторінка не завантажилась");
+      const w = f.contentWindow, main = sel1(d, ".sim-main"), side = sel1(d, ".sim-side");
+      ["paper", "history", "testnet", "simAgent"].forEach(function (id) { assert(main.contains(d.getElementById(id)), "розділ #" + id + " у лівій колонці"); });
+      const mw = main.getBoundingClientRect().width, sw = side.getBoundingClientRect().width, share = sw / (mw + sw); assert(share > 0.31 && share < 0.37, "частка стрічки " + share.toFixed(3));
+      eq(w.getComputedStyle(sel1(d, ".lf-list")).overflowY, "auto", "незалежна прокрутка"); assert(!sel1(d, ".sim-events-bar").classList.contains("on") && w.getComputedStyle(sel1(d, ".lf-fab")).display === "none", "кнопки «Події» вгорі на широкому екрані немає");
+      assert(sel1(d, ".sim-scope") && sel1(d, ".lf") && sel1(d, ".sim-scope").parentNode === sel1(d, ".lf"), "блок звуження всередині панелі");
+      const before = main.getBoundingClientRect().width; sel1(d, ".lf-collapse").click(); await sleep(150); assert(main.getBoundingClientRect().width > before * 1.4, "робоча область розширилась: " + before + " → " + main.getBoundingClientRect().width); sel1(d, ".lf-reopen").click(); await sleep(100);
+      eq(d.querySelectorAll(".lf").length, 1, "одна панель; другої системи подій немає"); eq(d.querySelectorAll(".lf-fab").length, 1);
     } finally { f && f.remove(); }
   });
-  test("Планшет (900 px): компактна бічна панель 300 px праворуч від графіка", async function () {
-    const f = await frame(900); try {
-      const d = f.contentDocument; const feed = d && d.getElementById("mkFeed"); if (!feed || !d.querySelector(".lf")) throw new Skip("сторінка не завантажилась");
-      near(feed.getBoundingClientRect().width, 300, 2, "ширина панелі"); assert(feed.getBoundingClientRect().left > d.getElementById("mkChart").getBoundingClientRect().left, "праворуч");
+  test("Симуляція: «лише цей гаманець» і «лише цей бот» звужують стрічку за вибором на сторінці без дублювання; за замовчуванням показано все", async function () {
+    const f = await frame("simulation.html", 1500); try {
+      const d = f.contentDocument; if (!d || !d.querySelector(".lf")) throw new Skip("сторінка не завантажилась");
+      const w = f.contentWindow, pick = function (cap, rule) { d.dispatchEvent(new w.CustomEvent("sim:select", { detail: { cap: cap, rule: rule } })); };
+      const btns = d.querySelectorAll(".sim-scope button"), bw = btns[0], bb = btns[1]; eq(bw.getAttribute("aria-pressed"), "false"); eq(bb.getAttribute("aria-pressed"), "false");
+      const sels = d.querySelectorAll(".lf-select"); eq(Array.prototype.map.call(sels, function (s) { return s.value; }), ["", "", "", "all"], "за замовчуванням: усі пари, боти, гаманці, увесь час");
+      pick(1000, "trend_1h"); await sleep(50); assert(/1\s?000/.test(bw.textContent) && /Лише бот/.test(bb.textContent), "підписи кнопок: " + bw.textContent + " | " + bb.textContent);
+      bw.click(); await sleep(60); eq(bw.getAttribute("aria-pressed"), "true"); eq(d.querySelector(".lf-select[aria-label='Гаманець']").value, "1000");
+      bb.click(); await sleep(60); eq(d.querySelector(".lf-select[aria-label='Бот']").value, "trend_1h");
+      pick(100, "setup_live"); await sleep(60); eq(d.querySelector(".lf-select[aria-label='Гаманець']").value, "100", "слідує за перемиканням гаманця"); eq(d.querySelector(".lf-select[aria-label='Бот']").value, "setup_live", "слідує за перемиканням бота");
+      const n = d.querySelectorAll(".lf-card").length; pick(100, "setup_live"); pick(100, "setup_live"); await sleep(60); eq(d.querySelectorAll(".lf-card").length, n, "повторний вибір не дублює картки");
+      bw.click(); bb.click(); await sleep(60); eq(d.querySelector(".lf-select[aria-label='Гаманець']").value, ""); eq(d.querySelector(".lf-select[aria-label='Бот']").value, "", "знову всі події");
     } finally { f && f.remove(); }
   });
-  test("Телефон (375 px): стрічки не видно, кнопка «Події» відкриває висувне вікно в межах екрана; сторінка без горизонтального переповнення", async function () {
-    const f = await frame(375, 700); try {
+  test("Симуляція, вужчий екран (1100 px): таблиці не стискаються, угорі кнопка «Події» відкриває висувне вікно", async function () {
+    const f = await frame("simulation.html", 1100); try {
       const d = f.contentDocument, w = f.contentWindow; if (!d || !d.querySelector(".lf")) throw new Skip("сторінка не завантажилась");
-      const host = d.getElementById("mkFeed"), fab = d.querySelector(".lf-fab"); assert(w.getComputedStyle(fab).display !== "none", "кнопка «Події» видна"); eq(w.getComputedStyle(host).visibility, "hidden", "вікно закрите");
-      assert(d.documentElement.scrollWidth <= 376, "немає горизонтального переповнення: " + d.documentElement.scrollWidth);
-      fab.click(); await sleep(450); eq(w.getComputedStyle(host).visibility, "visible"); const r = host.getBoundingClientRect(); assert(r.left >= -1 && r.right <= 376 && r.bottom <= 701 && r.top >= 0, "у межах екрана: " + JSON.stringify([r.left, r.top, r.right, r.bottom]));
-      eq(w.getComputedStyle(host).position, "fixed"); d.querySelector(".lf-close-drawer").click(); await sleep(450); eq(w.getComputedStyle(host).visibility, "hidden");
+      const bar = sel1(d, ".sim-events-bar"), host = sel1(d, ".sim-feed"), fab = sel1(d, ".lf-fab"); assert(bar.classList.contains("on") && w.getComputedStyle(fab).display !== "none", "кнопка «Події» вгорі");
+      assert(fab.getBoundingClientRect().top < 400, "у верхній частині сторінки"); assert(sel1(d, ".sim-main").getBoundingClientRect().width > 800, "робоча область займає всю ширину: " + sel1(d, ".sim-main").getBoundingClientRect().width);
+      eq(w.getComputedStyle(host).visibility, "hidden"); fab.click(); await sleep(450); eq(w.getComputedStyle(host).visibility, "visible"); eq(w.getComputedStyle(host).position, "fixed"); d.querySelector(".lf-close-drawer").click(); await sleep(450); eq(w.getComputedStyle(host).visibility, "hidden");
     } finally { f && f.remove(); }
+  });
+  test("Симуляція, телефон (375 px): кнопка «Події» вгорі, висувне вікно в межах екрана, немає горизонтального переповнення сторінки", async function () {
+    const f = await frame("simulation.html", 375, 700); try {
+      const d = f.contentDocument, w = f.contentWindow; if (!d || !d.querySelector(".lf")) throw new Skip("сторінка не завантажилась");
+      const host = sel1(d, ".sim-feed"), fab = sel1(d, ".lf-fab"); assert(sel1(d, ".sim-events-bar").classList.contains("on") && w.getComputedStyle(fab).display !== "none", "кнопка «Події»"); assert(d.documentElement.scrollWidth <= 376, "переповнення: " + d.documentElement.scrollWidth);
+      fab.click(); await sleep(450); const r = host.getBoundingClientRect(); assert(r.left >= -1 && r.right <= 376 && r.top >= 0 && r.bottom <= 701, "у межах екрана: " + JSON.stringify([r.left, r.top, r.right, r.bottom]));
+      Array.prototype.forEach.call(host.querySelectorAll(".sim-scope button"), function (b) { assert(b.getBoundingClientRect().height >= 43.5, "кнопка звуження ≥44 px"); });
+    } finally { f && f.remove(); }
+  });
+  test("Сторінка «Ринок»: постійної панелі подій немає, графік на місці; сторінка «Гаманці» без змін (стрічки там немає)", async function () {
+    let f = await frame("market.html", 1300); try {
+      const d = f.contentDocument; if (!d || !d.getElementById("mkChart")) throw new Skip("сторінка не завантажилась");
+      eq(d.querySelectorAll(".lf, .lf-fab, #mkFeed").length, 0, "панелі подій на «Ринку» немає"); assert(d.querySelector("#mkChart .ct-svg"), "біржовий графік працює");
+    } finally { f && f.remove(); }
+    f = await frame("wallets.html", 1300); try {
+      const d = f.contentDocument; if (!d || !d.body) throw new Skip("сторінка не завантажилась");
+      eq(d.querySelectorAll(".lf, .sim-layout").length, 0, "сторінка гаманців не змінювалась");
+    } finally { f && f.remove(); }
+  });
+  test("Очищення: знищення панелі прибирає кнопку, клас режиму й слухачів медіа-запиту; повторне монтування не дублює", async function () {
+    const env = fakeEnv({ journal: journal([]) }), root = document.createElement("div"), host = document.createElement("div"), bar = document.createElement("div"); root.appendChild(bar); root.appendChild(host); document.body.appendChild(root);
+    for (let i = 0; i < 4; i++) { const inst = LiveFeed.mount(host, { env: env, layoutRoot: root, fabParent: bar, drawerBelow: 99999 }); await flush(); assert(host.classList.contains("lf-drawer") && bar.querySelectorAll(".lf-fab").length === 1, "режим вікна й одна кнопка"); inst.destroy(); eq(bar.querySelectorAll(".lf-fab").length, 0); assert(!host.classList.contains("lf-drawer") && !root.classList.contains("lf-drawer-root"), "класи прибрано"); }
+    root.remove(); eq(env.sockets.length, 0, "сокети не створювались без відкритих позицій");
   });
 
   // =============== Запуск ===============

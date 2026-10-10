@@ -60,7 +60,9 @@ const LiveFeed = (function () {
     const fabBadge = el("span", "lf-fab-badge", ""); fabBadge.hidden = true; fab.appendChild(fabBadge);
     const reopen = el("button", "lf-reopen", "Події"); reopen.type = "button"; reopen.setAttribute("aria-label", "Показати панель подій");
     const reopenBadge = el("span", "lf-fab-badge", ""); reopenBadge.hidden = true; reopen.appendChild(reopenBadge);
-    document.body.appendChild(fab);
+    (opts.fabParent || document.body).appendChild(fab);
+    if (opts.fabParent) fab.classList.add("lf-fab-inline");
+    if (opts.extra) wrap.insertBefore(opts.extra, tabs);
     if (root) root.appendChild(reopen);
 
     function setCollapsed(v) {
@@ -71,14 +73,14 @@ const LiveFeed = (function () {
     }
     function setDrawer(v) {
       host.classList.toggle("lf-open", !!v); fab.setAttribute("aria-expanded", v ? "true" : "false");
-      document.documentElement.classList.toggle("lf-lock", !!v && window.matchMedia && window.matchMedia("(max-width: 767px)").matches);
+      document.documentElement.classList.toggle("lf-lock", !!v && host.classList.contains("lf-drawer"));
       if (v) { startRead(); }
     }
     function startRead() {                                                     // поки панель видно, нові події стають прочитаними через кілька секунд
       clearTimeout(readTimer);
       readTimer = setTimeout(function () { if (!destroyed && visibleNow()) core.markRead(); }, 4000);
     }
-    function visibleNow() { return !document.hidden && !host.classList.contains("lf-collapsed") && (window.matchMedia && window.matchMedia("(max-width: 767px)").matches ? host.classList.contains("lf-open") : true); }
+    function visibleNow() { const dr = host.classList.contains("lf-drawer"); return !document.hidden && (dr || !host.classList.contains("lf-collapsed")) && (dr ? host.classList.contains("lf-open") : true); }
 
     // ---------- Відображення ----------
     function statusInfo() {
@@ -107,9 +109,12 @@ const LiveFeed = (function () {
     function renderControls() {
       const pairs = {}, bots = {};
       st.items.forEach(function (it) { pairs[it.coin] = it.pair; bots[it.bot] = it.botTitle; });
+      if (f.coin && !pairs[f.coin]) pairs[f.coin] = f.coin + "/USDT";                  // вибраний фільтр завжди є в списку, навіть якщо подій за ним ще немає
+      if (f.bot && !bots[f.bot]) bots[f.bot] = f.bot;
+      const wl = st.wallets.slice(); if (f.wallet !== "" && f.wallet !== null && f.wallet !== undefined && wl.map(String).indexOf(String(f.wallet)) < 0) wl.push(f.wallet);
       fillSelect(selPair, "Усі пари", Object.keys(pairs).sort().map(function (k) { return [k, pairs[k]]; }), f.coin);
       fillSelect(selBot, "Усі боти", Object.keys(bots).sort().map(function (k) { return [k, bots[k]]; }), f.bot);
-      fillSelect(selWal, "Усі гаманці", st.wallets.map(function (w) { return [w, C.walletLabel(w)]; }), f.wallet);
+      fillSelect(selWal, "Усі гаманці", wl.map(function (w) { return [w, C.walletLabel(w)]; }), f.wallet);
       const cnt = C.counts(st.items, f, core.now());
       tabs.replaceChildren();
       CATS.forEach(function (c) {
@@ -215,6 +220,16 @@ const LiveFeed = (function () {
     list.addEventListener("scroll", function () { if (list.scrollTop < 8 && st.unread) startRead(); });
     const closeDrawer = el("button", "lf-ibtn lf-close-drawer", "✕"); closeDrawer.type = "button"; closeDrawer.setAttribute("aria-label", "Закрити вікно подій"); closeDrawer.addEventListener("click", function () { setDrawer(false); }); head.appendChild(closeDrawer);
 
+    // режим висувного вікна: вмикається, коли вікно вужче за opts.drawerBelow (за замовчуванням 767 px); панель тоді відкривається кнопкою «Події»
+    const mq = window.matchMedia ? window.matchMedia("(max-width: " + (opts.drawerBelow || 767) + "px)") : null;
+    function applyMode() {
+      const on = !!(mq && mq.matches);
+      host.classList.toggle("lf-drawer", on); if (root) root.classList.toggle("lf-drawer-root", on); fab.classList.toggle("lf-fab-on", on);
+      if (!on) { host.classList.remove("lf-open"); document.documentElement.classList.remove("lf-lock"); }
+      if (typeof opts.onMode === "function") opts.onMode(on);
+    }
+    if (mq) { if (mq.addEventListener) mq.addEventListener("change", applyMode); else if (mq.addListener) mq.addListener(applyMode); }
+    applyMode();
     if (st.prefs.collapsed) setCollapsed(true);
     render(true);
     if (st.prefs.collapsed === false) startRead();
@@ -225,8 +240,8 @@ const LiveFeed = (function () {
       getFilter: function () { return Object.assign({}, f); },
       collapse: setCollapsed, toggleDrawer: setDrawer, showDetail: showDetail, core: core,
       destroy: function () {
-        destroyed = true; clearTimeout(readTimer); off.forEach(function (fn) { fn(); });
-        wrap.remove(); fab.remove(); reopen.remove(); host.classList.remove("lf-host", "lf-collapsed", "lf-open"); if (root) root.classList.remove("lf-root-collapsed");
+        destroyed = true; clearTimeout(readTimer); if (mq) { if (mq.removeEventListener) mq.removeEventListener("change", applyMode); else if (mq.removeListener) mq.removeListener(applyMode); } off.forEach(function (fn) { fn(); });
+        wrap.remove(); fab.remove(); reopen.remove(); host.classList.remove("lf-host", "lf-collapsed", "lf-open", "lf-drawer"); if (root) root.classList.remove("lf-root-collapsed", "lf-drawer-root");
         document.documentElement.classList.remove("lf-lock"); C.release();
       },
     };

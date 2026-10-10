@@ -2302,21 +2302,18 @@ a:hover { color: var(--accent-dark); }
   .lf-sel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .lf-l3 .lf-badge.src { display: none; }
 }
-/* телефон: кнопка «Події» і висувне вікно */
-@media (max-width: 767px) {
-  .mk-terminal { grid-template-columns: minmax(0, 1fr); }
-  .mk-feed { position: static; min-height: 0; }
-  .lf-host, .lf-host.lf-collapsed { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 1200; height: min(82vh, 100% - 40px); height: 82dvh; transform: translateY(105%); visibility: hidden; transition: transform .28s ease, visibility 0s .28s; padding-bottom: env(safe-area-inset-bottom, 0px); background: #11161d; border-radius: 14px 14px 0 0; box-shadow: 0 -10px 40px rgba(0, 0, 0, .6); }
-  .lf-host.lf-open { transform: none; visibility: visible; transition: transform .28s ease; }
-  .lf { position: static; height: 100%; border-radius: 14px 14px 0 0; }
-  .lf-fab { display: inline-flex; }
-  .lf-reopen, .lf-root-collapsed .lf-reopen { display: none; }
-  .lf-collapse { display: none; }
-  .lf-close-drawer { display: inline-block; }
-  .lf-sel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .lf-select, .lf-tab { min-height: 44px; }
-  .lf-ibtn { width: 44px; height: 44px; }
-}
+/* висувне вікно (телефон, а на «Симуляції» й вужчі за 1360 px екрани): режим вмикає сам модуль класом lf-drawer */
+@media (max-width: 767px) { .mk-terminal { grid-template-columns: minmax(0, 1fr); } .mk-feed { position: static; min-height: 0; } }
+.lf-fab.lf-fab-on { display: inline-flex; }
+.lf-host.lf-drawer, .lf-host.lf-drawer.lf-collapsed { display: block; position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 1200; height: 82vh; height: 82dvh; transform: translateY(105%); visibility: hidden; transition: transform .28s ease, visibility 0s .28s; padding-bottom: env(safe-area-inset-bottom, 0px); background: #11161d; border-radius: 14px 14px 0 0; box-shadow: 0 -10px 40px rgba(0, 0, 0, .6); }
+.lf-host.lf-drawer.lf-open { transform: none; visibility: visible; transition: transform .28s ease; }
+.lf-host.lf-drawer .lf { position: static; height: 100%; border-radius: 14px 14px 0 0; }
+.lf-drawer-root .lf-reopen, .lf-drawer-root.lf-root-collapsed .lf-reopen { display: none; }
+.lf-host.lf-drawer .lf-collapse { display: none; }
+.lf-host.lf-drawer .lf-close-drawer { display: inline-block; }
+.lf-host.lf-drawer .lf-select, .lf-host.lf-drawer .lf-tab { min-height: 44px; }
+.lf-host.lf-drawer .lf-ibtn { width: 44px; height: 44px; }
+.lf-fab.lf-fab-inline { position: static; width: 100%; justify-content: center; min-height: 46px; box-shadow: none; border-radius: 10px; }
 html.lf-lock { overflow: hidden; }
 
 .lf-foot { padding: 6px 12px; }
@@ -2327,3 +2324,20 @@ html.lf-lock { overflow: hidden; }
 
 .lf-sel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .lf-l2 { line-height: 1.35; }
+
+.mk-terminal { grid-template-columns: minmax(0, 1fr); }
+/* «Симуляція»: ліворуч поточний інтерфейс, праворуч жива стрічка (на широкому екрані), на вужчому — кнопка «Події» вгорі */
+.sim-layout { display: grid; grid-template-columns: minmax(0, 65fr) minmax(0, 35fr); gap: 14px; align-items: start; }
+.sim-layout.lf-root-collapsed { grid-template-columns: minmax(0, 1fr); }
+.sim-layout.lf-drawer-root { grid-template-columns: minmax(0, 1fr); }
+.sim-main { min-width: 0; }
+.sim-side { position: sticky; top: 8px; align-self: start; }
+.sim-layout.lf-drawer-root .sim-side { position: static; }
+.sim-feed { position: relative; height: calc(100vh - 24px); min-height: 460px; }
+.sim-feed.lf-drawer { height: 82dvh; min-height: 0; }
+.sim-events-bar { display: none; position: sticky; top: 0; z-index: 40; padding: 6px 0; }
+.sim-events-bar.on { display: block; }
+.sim-scope { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 12px 6px; }
+.sim-scope button { min-height: 32px; max-width: 100%; padding: 2px 10px; border: 1px solid #29313d; border-radius: 8px; background: #171d26; color: #848e9c; font: inherit; font-size: .76rem; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sim-scope button[aria-pressed="true"] { color: #f0b90b; border-color: #f0b90b; }
+.lf-host.lf-drawer .sim-scope button { min-height: 44px; }

@@ -992,6 +992,7 @@
     if (!sim || !sim.paper) return;
     const id = pStrat.value || sim.strategies[0].id, st = sim.paper.strategies[id];
     if (!st) return;
+    document.dispatchEvent(new CustomEvent("sim:select", { detail: { cap: activeCap, rule: id } }));     // для панелі подій: який гаманець і бот зараз відкриті
     const m = liveMarks(id), er = (m.eq - 1) * 100, hr = (m.hold - 1) * 100;
 
     const tp = document.createElement("div"), wt = document.createElement("div");

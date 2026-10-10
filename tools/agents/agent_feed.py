@@ -246,6 +246,9 @@ def run():
             new.append(e)
             by_id[e["id"]] = e
     events = sorted(by_id.values(), key=lambda x: (x["t"], x["id"]))
+    for e in events:                                                              # журнали, створені до появи прапорця initial: дописуємо його за записом рушія (причина стартової позиції)
+        if e["source"] == "sim" and e["type"] == "open" and "initial" not in e and str(e.get("reason") or "").startswith("Початкова позиція"):
+            e["initial"] = True
     pair_events(events, fee)
     total_before_trim = len(events)
     events = events[-MAX_EVENTS:]

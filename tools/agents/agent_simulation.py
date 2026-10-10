@@ -297,7 +297,40 @@ def setup_exit(rule, co, P, s15):
     return None
 
 
-def setup_step(rule, sd, ptf, fee, ctx, events, now):
+BOOKS = {}          # {монета: {"bids": [(ціна, к-сть)], "asks": [...]}}: жива книга заявок Binance на момент запуску
+
+
+class Costs:
+    """Витрати однієї угоди: комісія біржі + проковзання. Проковзання рахуємо з книги заявок: ордер «проходить» рівні від найкращої ціни,
+    тож більша сума купує гірше за середню. Якщо книги немає, береться фіксоване проковзання. Також: мінімальний розмір ордера."""
+
+    def __init__(self, kb, cap):
+        self.fee, self.slip, self.cap, self.min_order = kb["fee"], kb.get("slippage", 0.0), cap, kb.get("min_order_usd", 0)
+
+    def slip_of(self, sym, side, usd):
+        b = BOOKS.get(sym)
+        if not b or not b["bids"] or not b["asks"]:
+            return self.slip
+        mid = (b["bids"][0][0] + b["asks"][0][0]) / 2
+        need, qty = usd, 0.0
+        for p, q in (b["asks"] if side == "BUY" else b["bids"]):
+            take = min(q * p, need)
+            qty += take / p
+            need -= take
+            if need <= 1e-9:
+                break
+        if need > 1e-6 or qty <= 0:
+            return 0.01                                         # глибини книги не вистачає: заявка суттєво зсунула б ціну
+        return abs(usd / qty / mid - 1)
+
+    def __call__(self, sym, side, w, eq):
+        return self.fee + self.slip_of(sym, side, self.cap * w * eq)
+
+    def can_open(self, w, eq=1.0):
+        return not self.min_order or self.cap * w * eq >= self.min_order
+
+
+def setup_step(rule, sd, ptf, cost, ctx, events, now):
     """Правило-«сканер умов»: не чекає закриття свічок за розкладом. При КОЖНОМУ запуску (≈10 хв) дивиться на живу ціну й закриті
     15-хвилинні та годинні свічки: якщо умови входу зійшлися, купує одразу; вихід: стоп-лос, тейк-профіт, трейлінг-стоп чи злам тренду.
     Між запусками виходи перевіряються і за закриттями 15-хвилинних свічок, що пройшли."""
@@ -318,11 +351,15 @@ def setup_step(rule, sd, ptf, fee, ctx, events, now):
         co = sd["coins"].get(sym)
         if co is None:
             why = setup_entry(rule, P, i15, i1h, c)
-            co = {"pos": bool(why), "eq": (1 - fee) if why else 1.0, "hold": 1 - fee, "px": P, "t": t[len(c) - 2], "entry": P if why else None, "peak": P if why else None, "cool": 0}
+            if why and not cost.can_open(w):
+                why = None                                      # ордер менший за мінімальний на біржі: угоди не буде
+            c0 = cost(sym, "BUY", w, 1.0)
+            co = {"pos": bool(why), "eq": (1 - c0) if why else 1.0, "hold": 1 - c0, "px": P, "t": t[len(c) - 2], "entry": P if why else None, "peak": P if why else None, "cool": 0}
             sd["trades"] += 1 if why else 0
             if why:
                 ev0 = make_event(rule, sym, "BUY", c, len(c) - 1, scores, t, ctx, now, 1.0, initial=True, w=round(w, 4), why_info=("setup", why))
                 ev0["price"] = P
+                ev0["cost"] = round(c0, 5)
                 events.setdefault(rule["id"], []).append(ev0)
         else:
             # 1) закриті 15-хвилинні свічки від минулого запуску: оновлюємо рахунок і перевіряємо вихід за ціною свічки
@@ -339,11 +376,13 @@ def setup_step(rule, sd, ptf, fee, ctx, events, now):
                 if co["pos"]:
                     ex = setup_exit(rule, co, c[k], None)
                     if ex:
-                        eqb = co["eq"]
-                        co["eq"] *= 1 - fee
+                        cs = cost(sym, "SELL", w, co["eq"])
+                        co["eq"] *= 1 - cs
                         co.update(pos=False, entry=None, peak=None, cool=now_ms + rule.get("cooldown_min", 30) * 60000)
                         sd["trades"] += 1
-                        events.setdefault(rule["id"], []).append(make_event(rule, sym, "SELL", c, k, scores, t, ctx, now, co["eq"], w=round(w, 4), why_info=("setup", ex[0])))
+                        evs = make_event(rule, sym, "SELL", c, k, scores, t, ctx, now, co["eq"], w=round(w, 4), why_info=("setup", ex[0]))
+                        evs["cost"] = round(cs, 5)
+                        events.setdefault(rule["id"], []).append(evs)
             # 2) жива ціна зараз: оцінюємо рахунок і, якщо умови зійшлись, діємо одразу
             r = P / co["px"]
             co["px"] = P
@@ -354,18 +393,24 @@ def setup_step(rule, sd, ptf, fee, ctx, events, now):
             if co["pos"]:
                 ex = setup_exit(rule, co, P, i15["sma50"])
                 if ex:
-                    co["eq"] *= 1 - fee
+                    cs = cost(sym, "SELL", w, co["eq"])
+                    co["eq"] *= 1 - cs
                     co.update(pos=False, entry=None, peak=None, cool=now_ms + rule.get("cooldown_min", 30) * 60000)
                     sd["trades"] += 1
-                    events.setdefault(rule["id"], []).append(make_event(rule, sym, "SELL", c, len(c) - 1, scores, t, ctx, now, co["eq"], w=round(w, 4), why_info=("setup", ex[0])))
+                    evs = make_event(rule, sym, "SELL", c, len(c) - 1, scores, t, ctx, now, co["eq"], w=round(w, 4), why_info=("setup", ex[0]))
+                    evs["cost"] = round(cs, 5)
+                    events.setdefault(rule["id"], []).append(evs)
             elif now_ms >= co.get("cool", 0):
                 why = setup_entry(rule, P, i15, i1h, c)
-                if why:
+                if why and cost.can_open(w, co["eq"]):
                     eqb = co["eq"]
-                    co["eq"] *= 1 - fee
+                    cb = cost(sym, "BUY", w, co["eq"])
+                    co["eq"] *= 1 - cb
                     co.update(pos=True, entry=P, peak=P)
                     sd["trades"] += 1
-                    events.setdefault(rule["id"], []).append(make_event(rule, sym, "BUY", c, len(c) - 1, scores, t, ctx, now, eqb, w=round(w, 4), why_info=("setup", why)))
+                    evb = make_event(rule, sym, "BUY", c, len(c) - 1, scores, t, ctx, now, eqb, w=round(w, 4), why_info=("setup", why))
+                    evb["cost"] = round(cb, 5)
+                    events.setdefault(rule["id"], []).append(evb)
         sd["coins"][sym] = co
     eq = round(sum(sd["w"].get(sym, 0) * sd["coins"][sym]["eq"] for sym in coins), 5)
     hold = round(sum(sd["w"].get(sym, 0) * sd["coins"][sym]["hold"] for sym in coins), 5)
@@ -384,6 +429,8 @@ def paper_update(ptf, kb, now, tag=""):
     і розмір позиції за мінливістю (sizing: vol). Відсотки однакові для будь-якої суми; долари множить сайт.
     Стан у data/_paper.json, журнал рішень у data/paper_events.json; крива й архів обмежені (самоочищення)."""
     fee = kb["fee"] + kb.get("slippage", 0.0)
+    caps_ = kb["accounts"]
+    cost = Costs(kb, caps_[min(1, len(caps_) - 1)] if len(caps_) != 1 else caps_[0])
     st = load(PAPER + tag) or {}
     ctx, events = outlook_context(), load(EVENTS + tag) or {}
     if st and st.get("v") != STATE_V:                       # версія розрахунку змінилась: новий раунд зі спільною стартовою ціною для всіх правил
@@ -412,7 +459,7 @@ def paper_update(ptf, kb, now, tag=""):
             continue
         sd = st["strategies"].setdefault(rule["id"], {"coins": {}, "curve": [], "trades": 0, "last": None})
         if rule["kind"] == "setup":                                 # сканер умов: рішення за живою ціною при кожному запуску
-            res = setup_step(rule, sd, ptf, fee, ctx, events, now)
+            res = setup_step(rule, sd, ptf, cost, ctx, events, now)
             if res:
                 sd["curve"] = sd["curve"][-kb["curve_points"]:]
                 res["curve"] = sd["curve"]
@@ -427,12 +474,16 @@ def paper_update(ptf, kb, now, tag=""):
             co = sd["coins"].get(sym)
             if co is None:
                 pos = bool(decide(rule, closed, False, scores, s50, c, (sym, t[closed])))
+                if pos and not cost.can_open(w):
+                    pos = False                                 # ордер менший за мінімальний на біржі: угоди не буде
                 sp = c[-1]                                    # фактична ціна на старті раунду: від неї рахуємо ВСІХ (і денні, і хвилинні правила)
-                co = {"pos": pos, "eq": (1 - fee) if pos else 1.0, "hold": 1 - fee, "t": t[closed], "entry": sp if pos else None, "blocked": False, "sp": sp, "cool": 0}
+                c0 = cost(sym, "BUY", w, 1.0)
+                co = {"pos": pos, "eq": (1 - c0) if pos else 1.0, "hold": 1 - c0, "t": t[closed], "entry": sp if pos else None, "blocked": False, "sp": sp, "cool": 0}
                 sd["trades"] += 1 if pos else 0
                 if pos:
                     ev0 = make_event(rule, sym, "BUY", c, closed, scores, t, ctx, now, 1.0, initial=True, w=round(w, 4))
                     ev0["price"] = sp
+                    ev0["cost"] = round(c0, 5)
                     events.setdefault(rule["id"], []).append(ev0)
             else:
                 first_sp = co.get("sp")
@@ -461,16 +512,20 @@ def paper_update(ptf, kb, now, tag=""):
                             want, info, co["blocked"] = False, ("stop", co["entry"], 100 * chg), True
                         elif rule.get("take") and chg >= rule["take"] / 100:
                             want, info, co["blocked"] = False, ("take", co["entry"], 100 * chg), True
+                    if want and not co["pos"] and not cost.can_open(w, co["eq"]):
+                        want = False                                 # ордер менший за мінімальний на біржі
                     if want != co["pos"]:
                         eq_before = co["eq"]
-                        co["eq"] *= 1 - fee
+                        cc = cost(sym, "BUY" if want else "SELL", w, co["eq"])
+                        co["eq"] *= 1 - cc
                         co["pos"] = want
                         co["entry"] = c[k] if want else None
                         if not want:
                             co["cool"] = rule.get("cooldown", 0)
                         sd["trades"] += 1
-                        events.setdefault(rule["id"], []).append(make_event(rule, sym, "BUY" if want else "SELL", c, k, scores, t, ctx, now,
-                                                                            eq_before if want else co["eq"], w=round(w, 4), why_info=info))
+                        evn = make_event(rule, sym, "BUY" if want else "SELL", c, k, scores, t, ctx, now, eq_before if want else co["eq"], w=round(w, 4), why_info=info)
+                        evn["cost"] = round(cc, 5)
+                        events.setdefault(rule["id"], []).append(evn)
                     co["t"] = t[k]
             sd["coins"][sym] = co
             base = co.get("sp") or c[closed]                       # до першої закритої свічки відлік іде від стартової ціни
@@ -564,7 +619,23 @@ def run():
             if ser:
                 sc, s50x = scores_series(ser[0], sk["weights"], sk["thresholds"])
                 ptf[tf][sym] = (ser[0], ser[1], sc, s50x)
+    BOOKS.clear()
+    def one_book(sym):
+        for host in HOSTS:
+            try:
+                d = get_json("%s/api/v3/depth?symbol=%sUSDT&limit=100" % (host, sym), retries=0)
+                return sym, {"bids": [(float(a), float(b)) for a, b in d["bids"]], "asks": [(float(a), float(b)) for a, b in d["asks"]]}
+            except Exception:    # noqa: BLE001 — пробуємо наступне джерело; без книги діє фіксоване проковзання
+                pass
+        return sym, None
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        for sym, b in pool.map(one_book, pcoins):
+            if b:
+                BOOKS[sym] = b
     paper = paper_wallets(ptf, kb, datetime.now(timezone.utc))
+    probe = Costs(kb, 1000)                                          # показник якості виконання: скільки коштує ордер 100 / 1 000 / 10 000 $ у книзі
+    paper["exec"] = {sym: {"spread": round((BOOKS[sym]["asks"][0][0] / BOOKS[sym]["bids"][0][0] - 1) * 100, 4),
+                           "slip": {str(u): round(probe.slip_of(sym, "BUY", u) * 100, 4) for u in (100, 1000, 10000)}} for sym in BOOKS}
     if fresh:
         # історичну частину не чіпаємо: вона оновлюється раз на cache_hours; у «живому» файлі лише паперовий рахунок
         result = {k: v for k, v in prev.items() if k not in ("agent", "title", "source", "generated_at")}

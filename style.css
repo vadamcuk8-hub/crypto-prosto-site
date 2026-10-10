@@ -2150,3 +2150,30 @@ a:hover { color: var(--accent-dark); }
 .ct-rsi-line { fill: none; stroke: #cc7ee8; stroke-width: 1.4; } .ct-rsi-t { fill: var(--b-muted); font-size: 11px; }
 .ct-fib { stroke: #cc7ee8; stroke-width: 1; opacity: .8; } .ct-fib-edge { opacity: 1; stroke-width: 1.4; }
 .ct-fib-t { fill: #cc7ee8; font-size: 10.5px; font-weight: 700; paint-order: stroke; stroke: var(--card); stroke-width: 3px; }
+
+/* Цінова шкала графіка */
+.ct-pct-base { fill: var(--b-muted); font-size: 11px; paint-order: stroke; stroke: var(--b-chart); stroke-width: 3px; }
+.ct-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Індикатори: панель керування, VWAP, MACD */
+.ct-ipanel { margin: 6px 0; padding: 8px 10px; border: 1px solid var(--b-grid, var(--line)); border-radius: 8px; background: var(--b-bg, var(--card)); max-height: 56vh; overflow: auto; }
+.ct-ipanel[hidden] { display: none; }
+.ct-ip-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.ct-ip-add { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.ct-ip-add select, .ct-ictl select, .ct-ictl input[type="number"] { padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; font-size: .85rem; }
+.ct-ictl input[type="number"] { width: 4.6em; }
+.ct-irow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+.ct-irow.off { opacity: .55; }
+.ct-iname { font-weight: 700; min-width: 8.5em; }
+.ct-ival { flex: 1 1 10em; font-size: .82rem; color: var(--b-muted, var(--muted)); font-variant-numeric: tabular-nums; }
+.ct-ictl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.ct-ipar { display: flex; align-items: center; gap: 4px; font-size: .8rem; color: var(--b-muted, var(--muted)); }
+.ct-ictl input[type="color"] { width: 30px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; cursor: pointer; }
+.ct-ieye { min-width: 32px; }
+.ct-ip-note { margin: 8px 0 0; font-size: .78rem; color: var(--b-muted, var(--muted)); }
+.ct-gear.active { background: var(--b-yellow, var(--accent)); color: #14161a; }
+.ct-vwap { fill: none; }
+.ct-ema { fill: none; }
+.ct-macd-line { fill: none; }
+.ct-macd-h.ct-up { fill: var(--b-up); opacity: .6; } .ct-macd-h.ct-down { fill: var(--b-down); opacity: .6; }
+@media (max-width: 560px) { .ct-iname { min-width: 0; flex: 1 1 100%; } .ct-ictl { width: 100%; } }

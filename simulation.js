@@ -259,7 +259,7 @@
     const all = ((E && E[id]) || []).slice().sort(function (a, b) { return a.candle - b.candle; });
     pairEvents(all);
     const fee = P.fee || 0, out = [], start = [];
-    function qOf(e) { return cap * (e.w || 1 / Math.max(1, P.coins.length)) * e.eq * (1 - fee) / e.price; }
+    function qOf(e) { return cap * (e.w || 1 / Math.max(1, P.coins.length)) * e.eq * (1 - (e.cost !== undefined ? e.cost : fee)) / e.price; }
     const lastSell = {}, costPct = (1 - (1 - fee) * (1 - fee)) * 100;
     all.forEach(function (e) {
       if (e.side !== "BUY") { lastSell[e.coin] = e.candle; return; }
@@ -267,11 +267,11 @@
       const flapMs = !isStart && lastSell[e.coin] !== undefined && e.candle - lastSell[e.coin] <= 3600000 ? e.candle - lastSell[e.coin] : null;
       const sst = P.strategies[id] && P.strategies[id].state[e.coin], px = live[e.coin] || (sst ? sst[3] : null);   // запасна ціна: остання закрита свічка, поки не прийшла жива
       if (e.__sell) {
-        const s = e.__sell, w = e.w || 1 / Math.max(1, P.coins.length), usdPl = cap * w * (s.eq - e.eq);
-        out.push({ rid: id, kind: "pair", coin: e.coin, buy: e, sell: s, q: q, ts: s.candle, sum: q * e.price, pl: (s.eq / (e.eq * (1 - fee)) - 1) * 100, usd: usdPl,
-          costs: q * e.price * fee + q * s.price * fee, held: s.candle - e.candle, costPct: costPct, flapMs: flapMs });
+        const s = e.__sell, ce = e.cost !== undefined ? e.cost : fee, cs = s.cost !== undefined ? s.cost : fee, w = e.w || 1 / Math.max(1, P.coins.length), usdPl = cap * w * (s.eq - e.eq);
+        out.push({ rid: id, kind: "pair", coin: e.coin, buy: e, sell: s, q: q, ts: s.candle, sum: q * e.price, pl: (s.eq / (e.eq * (1 - ce)) - 1) * 100, usd: usdPl,
+          costs: q * e.price * ce + q * s.price * cs, held: s.candle - e.candle, costPct: (1 - (1 - ce) * (1 - cs)) * 100, flapMs: flapMs });
       } else {
-        out.push({ rid: id, kind: "open", isStart: isStart, coin: e.coin, buy: e, q: q, ts: e.candle, sum: q * e.price, pl: px ? (px / e.price - 1) * 100 : null, usd: px ? q * (px - e.price) : null, costs: q * e.price * fee, costPct: costPct, flapMs: flapMs });
+        out.push({ rid: id, kind: "open", isStart: isStart, coin: e.coin, buy: e, q: q, ts: e.candle, sum: q * e.price, pl: px ? (px / e.price - 1) * 100 : null, usd: px ? q * (px - e.price) : null, costs: q * e.price * (e.cost !== undefined ? e.cost : fee), costPct: (1 - (1 - (e.cost !== undefined ? e.cost : fee)) * (1 - fee)) * 100, flapMs: flapMs });
       }
     });
     if (start.length) {
@@ -317,12 +317,11 @@
     if (c && Date.now() - c.at < 60000) return c.data;
     if (!c || !c.busy) {
       klCache[key] = { at: c ? c.at : 0, data: c ? c.data : null, busy: true };
-      const path = "/api/v3/klines?symbol=" + coin + "USDT&interval=" + tf + "&limit=400";
-      function get(host) { return fetch(host + path).then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); }); }
-      get("https://api.binance.com").catch(function () { return get("https://data-api.binance.vision"); })      // запасна адреса, якщо основна недоступна
+      // Свічки беремо зі спільного шару даних (chart-data.js): той самий запит, що й у графіка угоди, виконується один раз
+      ChartData.fetchKlines(coin, tf, { limit: 500 })
         .then(function (rows) {
-          if (!Array.isArray(rows) || !rows.length) throw new Error("порожньо");
-          klCache[key] = { at: Date.now(), data: rows.map(function (x) { return { t: x[0], c: parseFloat(x[4]) }; }) };
+          if (!rows.length) throw new Error("порожньо");
+          klCache[key] = { at: Date.now(), data: rows.map(function (x) { return { t: x.t, c: x.c }; }) };
           renderPaper(false);
         }).catch(function () { klCache[key] = { at: Date.now(), data: [], busy: false }; });
     }
@@ -933,6 +932,23 @@
         tr.appendChild(el("td", ts.length ? cls(av) : "", ts.length ? pc(av, 2) : "—")); tr.appendChild(el("td", ts.length ? cls(sm) : "", ts.length ? money(sm) : "—")); bb.appendChild(tr);
       });
       bt.appendChild(bb); const bw = el("div", "agent-table-wrap"); bw.appendChild(bt); tmp.appendChild(bw);
+    }
+
+    // якість виконання: що реально коштує ордер за живою книгою заявок Binance
+    const ex = sim.paper.exec || (paperRaw && paperRaw.exec);
+    if (ex && Object.keys(ex).length) {
+      tmp.appendChild(el("h4", "sub", "Якість виконання ордерів (жива книга заявок Binance)"));
+      tmp.appendChild(el("p", "small muted", "Скільки гірше за середню ціну купується ордер залежно від суми. Комісія біржі (0,1 % за операцію) береться окремо. Чим глибша книга, тим менше проковзання."));
+      const et = el("table", "agent-table"), eh = el("tr");
+      ["Монета", "Спред", "Ордер 100 $", "Ордер 1 000 $", "Ордер 10 000 $"].forEach(function (x) { eh.appendChild(el("th", "", x)); });
+      et.appendChild(el("thead")).appendChild(eh); const eb = el("tbody");
+      Object.keys(ex).forEach(function (c) {
+        const tr = el("tr"), v = ex[c];
+        tr.appendChild(el("td", "", c)); tr.appendChild(el("td", "", f2(v.spread) + "%"));
+        ["100", "1000", "10000"].forEach(function (u) { const s2 = v.slip[u]; tr.appendChild(el("td", s2 > 0.05 ? "tone-negative" : "", f2(s2) + "%")); });
+        eb.appendChild(tr);
+      });
+      et.appendChild(eb); const ew = el("div", "agent-table-wrap"); ew.appendChild(et); tmp.appendChild(ew);
     }
 
     // 6. висновки простими словами

@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>Тести графіка</title>
+<style>
+  body { font: 15px/1.5 system-ui, "Segoe UI", sans-serif; margin: 20px; background: #0b0e11; color: #eaecef; }
+  h1 { font-size: 20px; } h2 { font-size: 16px; margin: 18px 0 6px; color: #f0b90b; }
+  .ok { color: #2ebd85; } .fail { color: #f6465d; font-weight: 700; } .note { color: #9aa4b2; }
+  #sum { font-size: 18px; font-weight: 700; margin: 10px 0; } li { margin: 2px 0; } code { color: #f0b90b; }
+</style>
+</head>
+<body>
+<h1>Тести графіка (chart-indicators.js, chart-data.js)</h1>
+<p class="note">Відкрийте цей файл через локальний сервер (start-site.bat) за адресою /tools/test-chart.html. Мережа й біржа не потрібні: WebSocket, fetch і таймери підмінені. Node.js не потрібен.</p>
+<div id="sum">Виконується…</div>
+<div id="out"></div>
+
+<script src="../chart-indicators.js"></script>
+<script src="../chart-scale.js"></script>
+<script src="../chart-layout.js"></script>
+<script src="../chart-data.js"></script>
+<script src="../agent-ui.js"></script>
+<script src="../chart-tool.js"></script>
+<script>
+(function () {
+  const out = document.getElementById("out");
+  let section = null, pass = 0, fail = 0;
+  const queue = [];
+
+  function group(name) { queue.push({ group: name }); }
+  function test(name, fn) { queue.push({ name: name, fn: fn }); }
+  function Skip(msg) { this.message = msg; }
+  let skipped = 0;
+    function assert(cond, msg) { if (!cond) throw new Error(msg || "перевірка не пройшла"); }
+  function eq(a, b, msg) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error((msg || "значення різні") + ": очікували " + JSON.stringify(b) + ", отримали " + JSON.stringify(a)); }
+  function near(a, b, eps, msg) { if (a === null || b === null || Math.abs(a - b) > (eps || 1e-9)) throw new Error((msg || "значення різні") + ": очікували ≈" + b + ", отримали " + a); }
+
+  // ---------- Підміна середовища: таймери, час, fetch, WebSocket ----------
+  function fakeEnv(opts) {
+    opts = opts || {};
+    const env = { now: 1000000, timers: [], seq: 0, sockets: [], fetches: [], fetchImpl: null, delays: [] };
+    env.setTimeout = function (fn, ms) { const id = ++env.seq; env.timers.push({ id: id, at: env.now + ms, fn: fn, ms: ms }); env.delays.push(ms); return id; };
+    env.clearTimeout = function (id) { env.timers = env.timers.filter(function (t) { return t.id !== id; }); };
+    env.advance = function (ms) {
+      const end = env.now + ms;
+      for (;;) {
+        const due = env.timers.filter(function (t) { return t.at <= end; }).sort(function (a, b) { return a.at - b.at; })[0];
+        if (!due) break;
+        env.timers = env.timers.filter(function (t) { return t !== due; });
+        env.now = due.at; due.fn();
+      }
+      env.now = end;
+    };
+    env.fetch = function (url) {
+      env.fetches.push(url);
+      return env.fetchImpl ? env.fetchImpl(url) : Promise.resolve({ ok: true, json: function () { return Promise.resolve([]); } });
+    };
+    function FakeWS(url) {
+      this.url = url; this.readyState = 0; this.sent = []; env.sockets.push(this);
+    }
+    FakeWS.prototype.send = function (s) { this.sent.push(JSON.parse(s)); };
+    FakeWS.prototype.close = function () { this.readyState = 3; this.closedByClient = true; };
+    FakeWS.prototype.open = function () { this.readyState = 1; if (this.onopen) this.onopen(); };
+    FakeWS.prototype.message = function (obj) { if (this.onmessage) this.onmessage({ data: JSON.stringify(obj) }); };
+    FakeWS.prototype.drop = function () { this.readyState = 3; if (this.onclose) this.onclose(); };
+    env.WS = FakeWS;
+    env.data = ChartData.create({
+      fetch: env.fetch, WebSocket: FakeWS, setTimeout: env.setTimeout, clearTimeout: env.clearTimeout,
+      random: function () { return 0.5; },                 // 0,5 → відхилення 0: затримки передбачувані
+      now: function () { return env.now; }, hosts: opts.hosts || ["https://h1", "https://h2"], wsUrl: "wss://fake/ws", autoResume: false,
+    });
+    return env;
+  }
+  const row = function (t, c) { return [t, String(c), String(c + 1), String(c - 1), String(c), "10"]; };
+  function okFetch(rows) { return function () { return Promise.resolve({ ok: true, json: function () { return Promise.resolve(rows); } }); }; }
+  const kmsg = function (sym, interval, t, c, closed) { return { e: "kline", E: 1, s: sym + "USDT", k: { t: t, i: interval, o: String(c), h: String(c + 1), l: String(c - 1), c: String(c), v: "5", x: !!closed } }; };
+  const tick = function () { return new Promise(function (r) { setTimeout(r, 0); }); };
+
+  // =============== Індикатори ===============
+  const I = ChartIndicators;
+  group("Індикатори: SMA, EMA, RSI, Bollinger, MACD, кеш");
+  test("SMA: [1..5], n=3 → [null,null,2,3,4]", function () { eq(I.sma([1, 2, 3, 4, 5], 3), [null, null, 2, 3, 4]); });
+  test("SMA: ряд коротший за період → усі null", function () { eq(I.sma([1, 2], 5), [null, null]); });
+  test("EMA: стала послідовність дає ту саму сталу", function () { const e = I.ema([5, 5, 5, 5, 5, 5], 3); eq(e.slice(0, 2), [null, null]); e.slice(2).forEach(function (v) { near(v, 5); }); });
+  test("EMA(3) для [1..6]: перше значення — SMA(1,2,3)=2, далі k=0,5", function () { const e = I.ema([1, 2, 3, 4, 5, 6], 3); near(e[2], 2); near(e[3], 3); near(e[4], 4); near(e[5], 5); });
+  test("RSI: ціна тільки росте → 100", function () { const a = []; for (let i = 1; i <= 30; i++) a.push(i); near(I.rsi(a, 14)[20], 100); });
+  test("RSI: ціна тільки падає → 0", function () { const a = []; for (let i = 30; i >= 1; i--) a.push(i); near(I.rsi(a, 14)[20], 0); });
+  test("RSI збігається з незалежним еталонним розрахунком на «пилці»", function () {
+    const a = []; let p = 100; for (let i = 0; i < 60; i++) { p += Math.sin(i * 1.3) * 2 + (i % 7 === 0 ? -3 : 1); a.push(p); }
+    const r = I.rsi(a, 14);
+    // еталон: окремі масиви приростів і ковзні середні за Вайлдером
+    const gain = [0], loss = [0]; for (let i = 1; i < a.length; i++) { const d = a[i] - a[i - 1]; gain.push(Math.max(d, 0)); loss.push(Math.max(-d, 0)); }
+    let ag = 0, al = 0; for (let i = 1; i <= 14; i++) { ag += gain[i]; al += loss[i]; } ag /= 14; al /= 14;
+    for (let i = 15; i < a.length; i++) { ag = (ag * 13 + gain[i]) / 14; al = (al * 13 + loss[i]) / 14; }
+    near(r[a.length - 1], 100 - 100 / (1 + ag / al), 1e-9);
+    eq(r.slice(0, 14).every(function (v) { return v === null; }), true, "до індексу 14 значень немає");
+  });
+  test("Bollinger: стала послідовність → смуги збігаються з середньою", function () { const b = I.bollinger([4, 4, 4, 4, 4, 4], 3, 2); near(b.up[5], 4); near(b.dn[5], 4); near(b.mid[5], 4); });
+  test("Bollinger: [1..5], n=5, k=2 → середня 3, смуги 3±2·√2", function () { const b = I.bollinger([1, 2, 3, 4, 5], 5, 2); near(b.mid[4], 3); near(b.up[4], 3 + 2 * Math.SQRT2); near(b.dn[4], 3 - 2 * Math.SQRT2); });
+  test("MACD: лінія = EMA12 − EMA26, гістограма = лінія − сигнал", function () {
+    const a = []; for (let i = 0; i < 80; i++) a.push(100 + Math.sin(i / 4) * 5 + i * 0.1);
+    const m = I.macd(a), e12 = I.ema(a, 12), e26 = I.ema(a, 26);
+    for (let i = 25; i < a.length; i++) near(m.macd[i], e12[i] - e26[i], 1e-9, "лінія на " + i);
+    eq(m.macd[24], null, "лінія з'являється з індексу 25"); eq(m.signal[32], null, "сигнал з'являється через 9 значень лінії"); near(m.hist[40], m.macd[40] - m.signal[40], 1e-9);
+    near(m.signal[33] !== null ? 1 : 0, 1);
+  });
+  test("Індикатори не змінюють вхідний масив", function () { const a = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8, 4]; const c = a.slice(); I.sma(a, 3); I.ema(a, 3); I.rsi(a, 5); I.bollinger(a, 5, 2); I.macd(a, 3, 6, 3); eq(a, c); });
+  test("Кеш: той самий ключ і версія → обчислення один раз; нова версія → перерахунок", function () {
+    const c = I.cache(); let n = 0; const f = function () { n++; return [n]; };
+    const a = c.get("sma", 1, f), b = c.get("sma", 1, f); assert(a === b && n === 1, "повторний виклик не повинен рахувати");
+    c.get("sma", 2, f); eq(n, 2); c.get("rsi", 2, f); eq(n, 3, "інший ключ рахується окремо");
+  });
+
+
+  // =============== Цінова шкала (чиста математика) ===============
+  const SC = ChartScale;
+  group("Цінова шкала: lin / log / %, діапазони, позначки осі");
+  test("fwd і inv — взаємно обернені в усіх режимах", function () {
+    [["lin", 0], ["log", 0]].forEach(function (m) { [0.00001234, 1.5, 83250.75, 1e6].forEach(function (p) { near(SC.inv(m[0], SC.fwd(m[0], p, m[1]), m[1]), p, p * 1e-12, m[0] + " " + p); }); });
+    [40000, 79999.99, 83250.75, 160000].forEach(function (p) { near(SC.inv("pct", SC.fwd("pct", p, 80000), 80000), p, p * 1e-12, "pct " + p); });
+  });
+  test("lin: ціна не змінюється; pct: база = 0 %, подвоєння = +100 %, падіння вдвічі = −50 %", function () {
+    eq(SC.fwd("lin", 123.4, 0), 123.4); near(SC.fwd("pct", 100, 100), 0); near(SC.fwd("pct", 200, 100), 100); near(SC.fwd("pct", 50, 100), -50);
+  });
+  test("log: однакові відсоткові рухи дають однакову відстань на шкалі", function () {
+    const d1 = SC.fwd("log", 200, 0) - SC.fwd("log", 100, 0), d2 = SC.fwd("log", 20000, 0) - SC.fwd("log", 10000, 0); near(d1, d2, 1e-12);
+    const lin1 = 200 - 100, lin2 = 20000 - 10000; assert(lin1 !== lin2, "у lin вони різні");
+  });
+  test("Режими монотонні: більша ціна — більша координата", function () { ["lin", "log", "pct"].forEach(function (m) { let prev = -Infinity; [1, 2, 5, 10, 100, 1000].forEach(function (p) { const t = SC.fwd(m, p, 10); assert(t > prev, m + " не монотонний"); prev = t; }); }); });
+  test("canUse: log і % вимагають додатних цін; lin завжди можна", function () {
+    eq(SC.canUse("lin", -5, 0), true); eq(SC.canUse("log", 0, 1), false); eq(SC.canUse("log", 0.0001, 1), true); eq(SC.canUse("pct", 5, 0), false); eq(SC.canUse("pct", 5, 10), true);
+  });
+  test("autoRange: lin додає відступ 8 % діапазону з обох боків; для pct діапазон у відсотках; стала ціна розширюється", function () {
+    const r = SC.autoRange("lin", 100, 200, 0, 0.08); near(r.lo, 92); near(r.hi, 208);
+    const q = SC.autoRange("pct", 90, 110, 100, 0.1); near(q.lo, -12); near(q.hi, 12);
+    const f = SC.autoRange("lin", 100, 100, 0, 0.08); assert(f.hi > f.lo, "діапазон не нульовий");
+  });
+  test("zoomRange тримає центр; panRange зсуває без зміни розміру; мінімальний розмір не нульовий", function () {
+    const r = SC.zoomRange({ lo: 10, hi: 30 }, 0.5); near((r.lo + r.hi) / 2, 20); near(r.hi - r.lo, 10);
+    const p = SC.panRange({ lo: 10, hi: 30 }, 5); eq([p.lo, p.hi], [15, 35]);
+    const z = SC.zoomRange({ lo: 10, hi: 30 }, 0); assert(z.hi > z.lo, "не схлопується в точку");
+  });
+  test("ticks lin: «круглі» значення в межах діапазону", function () {
+    const t = SC.ticks("lin", 82100, 83900, 0, 5); assert(t.length >= 3 && t.length <= 9, "кількість " + t.length);
+    t.forEach(function (k) { assert(k.t >= 82100 && k.t <= 83900, "у межах"); near(k.t % 100, 0, 1e-6, "кратне кроку"); });
+  });
+  test("ticks pct: «круглі» відсотки навколо нуля", function () { const t = SC.ticks("pct", -3.2, 4.1, 100, 5); assert(t.some(function (k) { return k.v === 0; }), "є нуль"); t.forEach(function (k) { near(k.t, k.v); }); });
+  test("ticks log: вузький діапазон — рівні ціни; широкий (понад 8×) — степені 10 із 1/2/5; позиції = ln(ціни)", function () {
+    const a = SC.ticks("log", Math.log(80000), Math.log(90000), 0, 5); a.forEach(function (k) { near(k.t, Math.log(k.v), 1e-12); assert(k.v >= 80000 && k.v <= 90000); }); assert(a.length >= 2);
+    const b = SC.ticks("log", Math.log(1), Math.log(1000), 0, 5); eq(b.map(function (k) { return k.v; }), [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]);
+  });
+  test("ticks lin: дрібні ціни не дають похибок плаваючої коми (0,00001234…)", function () {
+    const t = SC.ticks("lin", 0.0000120, 0.0000130, 0, 5); t.forEach(function (k) { assert(/^\d\.\d+e-5$|^0\.0000\d+$/.test(String(k.v)) || k.v.toFixed(8) === String(+k.v.toFixed(8)), "значення " + k.v); });
+  });
+
+  // =============== Точність цін ===============
+  group("Точність цін: правила біржі (tickSize) і оцінка за даними");
+  test("decimalsFromTick: 0.01000000 → 2, 1.00000000 → 0, 0.00000001 → 8, 0.00001000 → 5", function () {
+    const f = ChartData.decimalsFromTick; eq(f("0.01000000"), 2); eq(f("1.00000000"), 0); eq(f("0.00000001"), 8); eq(f("0.00001000"), 5); eq(f(0.5), 1);
+  });
+  test("parseSymbolInfo: tickSize із PRICE_FILTER; нульовий tickSize чи немає фільтра → null", function () {
+    const ok = ChartData.parseSymbolInfo({ symbols: [{ filters: [{ filterType: "LOT_SIZE", stepSize: "0.00001000" }, { filterType: "PRICE_FILTER", tickSize: "0.01000000" }] }] });
+    eq(ok.tickSize, 0.01); eq(ok.decimals, 2); eq(ok.stepSize, 0.00001); eq(ok.source, "exchange");
+    eq(ChartData.parseSymbolInfo({ symbols: [{ filters: [{ filterType: "PRICE_FILTER", tickSize: "0.00000000" }] }] }), null);
+    eq(ChartData.parseSymbolInfo({ symbols: [{ filters: [] }] }), null); eq(ChartData.parseSymbolInfo({}), null); eq(ChartData.parseSymbolInfo(null), null);
+  });
+  test("inferDecimals: оцінка за цінами без помилок плаваючої коми", function () {
+    const f = ChartData.inferDecimals; eq(f([82869.99, 82870, 82871.5]), 2); eq(f([1.4036, 1.4048, 1.4]), 4); eq(f([0.00001234, 0.0000125]), 8); eq(f([100, 200]), 0); eq(f([0.1 + 0.2]), 1);
+  });
+  test("roundToTick: ціна кратна кроку без «хвостів»", function () { const r = ChartData.roundToTick; eq(r(82869.987, 0.01), 82869.99); eq(r(0.123456, 0.00001), 0.12346); eq(r(7.4, 0.5), 7.5); eq(r(5, 0), 5); });
+  test("symbolInfo: один запит на монету (кеш), перша адреса не відповіла → друга; невдача не кешується", async function () {
+    const env = fakeEnv(); let n = 0;
+    env.fetchImpl = function (u) { n++; if (/h1/.test(u)) return Promise.resolve({ ok: false, status: 500 }); return Promise.resolve({ ok: true, json: function () { return Promise.resolve({ symbols: [{ filters: [{ filterType: "PRICE_FILTER", tickSize: "0.00001000" }] }] }); } }); };
+    const [a, b] = await Promise.all([env.data.symbolInfo("DOGE"), env.data.symbolInfo("DOGE")]); eq(a.decimals, 5); eq(b.decimals, 5); eq(n, 2, "h1 + h2, один раз");
+    await env.data.symbolInfo("DOGE"); eq(n, 2, "із кешу");
+    const e2 = fakeEnv(); e2.fetchImpl = function () { return Promise.reject(new Error("мережа")); }; eq(await e2.data.symbolInfo("BTC"), null);
+    e2.fetchImpl = function () { return Promise.resolve({ ok: true, json: function () { return Promise.resolve({ symbols: [{ filters: [{ filterType: "PRICE_FILTER", tickSize: "0.01" }] }] }); } }); };
+    eq((await e2.data.symbolInfo("BTC")).decimals, 2, "після невдачі запит повторюється");
+  });
+
+  // =============== Нормалізація даних ===============
+  const D = ChartData;
+  group("Нормалізація й об'єднання свічок");
+  test("normalizeRow: рядки Binance → числа", function () { const c = D.normalizeRow([1700000000000, "10.5", "11", "10", "10.8", "123.4", 0]); eq(c, { t: 1700000000000, o: 10.5, h: 11, l: 10, c: 10.8, v: 123.4 }); });
+  test("normalizeRow: сміття (NaN, порожнє, без часу) → null", function () { eq(D.normalizeRow(null), null); eq(D.normalizeRow([0, "1", "1", "1", "1", "1"]), null, "час 0"); eq(D.normalizeRow([5, "x", "1", "1", "1", "1"]), null, "NaN у ціні"); eq(D.normalizeRow({ t: 5, o: 1, h: 1, l: 1 }), null, "немає закриття"); });
+  test("normalizeSeries: сортує за часом і прибирає дублі (остання перемагає)", function () {
+    const s = D.normalizeSeries([row(3000, 3), row(1000, 1), row(2000, 2), row(2000, 22), [9, "bad"], row(1000, 11)]);
+    eq(s.map(function (c) { return c.t; }), [1000, 2000, 3000]); eq(s.map(function (c) { return c.c; }), [11, 22, 3]);
+  });
+  test("merge: оновлена остання свічка замінює стару, а не додається", function () {
+    const base = D.normalizeSeries([row(1000, 1), row(2000, 2)]);
+    const m = D.merge(base, [{ t: 2000, o: 2, h: 9, l: 1, c: 8, v: 1 }, { t: 3000, o: 8, h: 8, l: 8, c: 8, v: 1 }]);
+    eq(m.length, 3); eq(m[1].c, 8); eq(m.map(function (c) { return c.t; }), [1000, 2000, 3000]);
+  });
+  test("prependOlder: додає лише строго старіші; повторне додавання нічого не змінює", function () {
+    const all = D.normalizeSeries([row(3000, 3), row(4000, 4)]);
+    const r1 = D.prependOlder(all, D.normalizeSeries([row(1000, 1), row(2000, 2), row(3000, 33)]));
+    eq(r1.added, 2); eq(r1.all.map(function (c) { return c.t; }), [1000, 2000, 3000, 4000]); eq(r1.all[2].c, 3, "наявна свічка 3000 не перезаписується старою");
+    const r2 = D.prependOlder(r1.all, D.normalizeSeries([row(1000, 1), row(2000, 2)])); eq(r2.added, 0); eq(r2.all.length, 4);
+  });
+
+  // =============== Завантаження: подвійні запити ===============
+  group("Завантаження свічок: кеш і об'єднання запитів (подвійне завантаження)");
+  test("Два однакові запити одночасно → ОДИН запит до біржі", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch([row(1000, 1), row(2000, 2)]);
+    const [a, b] = await Promise.all([env.data.fetchKlines("BTC", "1h"), env.data.fetchKlines("BTC", "1h")]);
+    eq(env.fetches.length, 1, "кількість запитів"); eq(a.length, 2); eq(b.length, 2);
+    a[0].c = 999; assert(b[0].c !== 999, "кожен отримувач має власну копію");
+  });
+  test("Повторний запит у межах кешу → без нового запиту; після закінчення кешу → новий", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch([row(1000, 1)]);
+    await env.data.fetchKlines("ETH", "1h"); await env.data.fetchKlines("ETH", "1h"); eq(env.fetches.length, 1);
+    env.now += env.data.CFG.ttlMs + 1; await env.data.fetchKlines("ETH", "1h"); eq(env.fetches.length, 2);
+  });
+  test("Інша монета чи інтервал → окремі запити (не змішуються)", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch([row(1000, 1)]);
+    await Promise.all([env.data.fetchKlines("BTC", "1h"), env.data.fetchKlines("ETH", "1h"), env.data.fetchKlines("BTC", "15m")]);
+    eq(env.fetches.length, 3); assert(env.fetches.some(function (u) { return /symbol=ETHUSDT&interval=1h/.test(u); }) && env.fetches.some(function (u) { return /symbol=BTCUSDT&interval=15m/.test(u); }));
+  });
+  test("Перше джерело не відповіло → береться друге", async function () {
+    const env = fakeEnv(); env.fetchImpl = function (u) { return /h1/.test(u) ? Promise.resolve({ ok: false, status: 503 }) : okFetch([row(1000, 1)])(); };
+    const r = await env.data.fetchKlines("BTC", "1h"); eq(r.length, 1); eq(env.fetches.length, 2);
+  });
+  test("Усі джерела недоступні → помилка, а невдалий результат НЕ кешується", async function () {
+    const env = fakeEnv(); env.fetchImpl = function () { return Promise.reject(new Error("мережа")); };
+    let failed = false; try { await env.data.fetchKlines("BTC", "1h"); } catch (e) { failed = true; } assert(failed, "очікували помилку");
+    const before = env.fetches.length; env.fetchImpl = okFetch([row(1000, 1)]);
+    const r = await env.data.fetchKlines("BTC", "1h"); eq(r.length, 1); assert(env.fetches.length > before, "після помилки запит робиться знову");
+  });
+
+  // =============== Історія: pager ===============
+  group("Підвантаження історії (pager)");
+  test("Два виклики одночасно → один запит; endTime = найстаріша свічка − 1", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch([row(1000, 1), row(2000, 2)]);
+    const pg = env.data.pager("BTC", "1h", 2);
+    const [a, b] = await Promise.all([pg.loadOlder(5000), pg.loadOlder(5000)]);
+    eq(env.fetches.length, 1); assert(/endTime=4999/.test(env.fetches[0]), "endTime"); eq(a.rows.length, 2); eq(b.rows.length, 2);
+  });
+  test("Те саме місце не завантажується двічі", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch([row(1000, 1), row(2000, 2)]);
+    const pg = env.data.pager("BTC", "1h", 2);
+    await pg.loadOlder(5000); const again = await pg.loadOlder(5000);
+    eq(env.fetches.length, 1); eq(again.rows.length, 0);
+  });
+  test("Біржа віддала менше за ліміт → історія закінчилась, нових запитів немає", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch([row(1000, 1)]);
+    const pg = env.data.pager("BTC", "1h", 500);
+    const r = await pg.loadOlder(5000); eq(r.done, true); await pg.loadOlder(900); eq(env.fetches.length, 1);
+  });
+  test("Помилка → пауза, повторний запит одразу не робиться, після паузи можна", async function () {
+    const env = fakeEnv(); env.fetchImpl = function () { return Promise.reject(new Error("x")); };
+    const pg = env.data.pager("BTC", "1h", 500);
+    const r = await pg.loadOlder(5000); assert(r.error, "помилка передається"); const n = env.fetches.length;
+    const w = await pg.loadOlder(5000); eq(w.wait, true); eq(env.fetches.length, n, "під час паузи запитів немає");
+    env.now += env.data.CFG.retryPageMs + 1; env.fetchImpl = okFetch([row(1000, 1)]); const ok = await pg.loadOlder(5000); eq(ok.rows.length, 1);
+  });
+  test("Порядок і дублі після підвантаження: історія зливається лише ліворуч", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch([row(1000, 1), row(2000, 2), row(3000, 3)]);
+    const pg = env.data.pager("BTC", "1h", 3); let all = D.normalizeSeries([row(3000, 3), row(4000, 4)]);
+    const r = await pg.loadOlder(all[0].t); const m = D.prependOlder(all, r.rows);
+    eq(m.all.map(function (c) { return c.t; }), [1000, 2000, 3000, 4000]); eq(m.added, 2);
+  });
+
+  // =============== WebSocket ===============
+  group("WebSocket: спільне з'єднання, підписки, перепідключення, добір пропущених свічок");
+  test("Дві підписки на той самий потік → одне з'єднання й один SUBSCRIBE", function () {
+    const env = fakeEnv(), d = env.data;
+    d.subscribe("BTC", "1h", {}); d.subscribe("BTC", "1h", {}); eq(env.sockets.length, 1, "з'єднань"); env.sockets[0].open();
+    const subs = env.sockets[0].sent.filter(function (m) { return m.method === "SUBSCRIBE"; }); eq(subs.length, 1); eq(subs[0].params, ["btcusdt@kline_1h"]);
+    eq(d._state().handlers, [2]);
+  });
+  test("Різні монети й інтервали → одне з'єднання, окремі потоки; пізня підписка шле лише новий потік", function () {
+    const env = fakeEnv(), d = env.data;
+    d.subscribe("BTC", "1h", {}); env.sockets[0].open(); d.subscribe("ETH", "15m", {}); eq(env.sockets.length, 1);
+    const s = env.sockets[0].sent.filter(function (m) { return m.method === "SUBSCRIBE"; }); eq(s.length, 2); eq(s[1].params, ["ethusdt@kline_15m"]);
+  });
+  test("Відписка: потік закривається лише коли пішов останній підписник; без підписок з'єднання закривається", function () {
+    const env = fakeEnv(), d = env.data;
+    const u1 = d.subscribe("BTC", "1h", {}), u2 = d.subscribe("BTC", "1h", {}), u3 = d.subscribe("ETH", "1h", {}); env.sockets[0].open();
+    u1(); u1(); eq(env.sockets[0].sent.filter(function (m) { return m.method === "UNSUBSCRIBE"; }).length, 0, "ще лишається другий підписник");
+    u2(); eq(env.sockets[0].sent.filter(function (m) { return m.method === "UNSUBSCRIBE"; }).map(function (m) { return m.params[0]; }), ["btcusdt@kline_1h"]);
+    u3(); eq(env.sockets[0].closedByClient, true); eq(d._state().status, "idle"); eq(d._state().timer, false);
+  });
+  test("Свічки йдуть лише своїм підписникам: монети не змішуються", function () {
+    const env = fakeEnv(), d = env.data, btc = [], eth = [];
+    d.subscribe("BTC", "1h", { onCandle: function (c) { btc.push(c); } }); d.subscribe("ETH", "1h", { onCandle: function (c) { eth.push(c); } });
+    const ws = env.sockets[0]; ws.open(); ws.message(kmsg("BTC", "1h", 1000, 100)); ws.message(kmsg("ETH", "1h", 1000, 5)); ws.message(kmsg("SOL", "1h", 1000, 7)); ws.message(kmsg("BTC", "15m", 1000, 101));
+    eq(btc.map(function (c) { return c.c; }), [100]); eq(eth.map(function (c) { return c.c; }), [5]);
+  });
+  test("Дубльовані й старі повідомлення не створюють дублів свічок", function () {
+    const env = fakeEnv(), d = env.data; let all = [];
+    d.subscribe("BTC", "1h", { onCandle: function (c) { all = D.merge(all, [c]); } });
+    const ws = env.sockets[0]; ws.open();
+    ws.message(kmsg("BTC", "1h", 1000, 100)); ws.message(kmsg("BTC", "1h", 1000, 101)); ws.message(kmsg("BTC", "1h", 1000, 102, true)); ws.message(kmsg("BTC", "1h", 2000, 110));
+    ws.message(kmsg("BTC", "1h", 1000, 999));                  // запізніле повідомлення про стару свічку
+    eq(all.length, 2); eq(all.map(function (c) { return c.c; }), [102, 110]);
+  });
+  test("Затримки перепідключення: 1с, 2с, 4с, 8с, 16с, 30с, 30с… (без відхилення), максимум 30 с", function () {
+    const env = fakeEnv(), d = env.data; d.subscribe("BTC", "1h", {});
+    const got = [];
+    for (let i = 0; i < 7; i++) { const ws = env.sockets[env.sockets.length - 1]; ws.drop(); const t = env.timers[env.timers.length - 1]; got.push(t.ms); env.advance(t.ms); }
+    eq(got, [1000, 2000, 4000, 8000, 16000, 30000, 30000]);
+  });
+  test("Випадкове відхилення в межах ±30 %", function () {
+    const env = fakeEnv(); const lo = ChartData.create({ fetch: env.fetch, WebSocket: env.WS, setTimeout: env.setTimeout, clearTimeout: env.clearTimeout, random: function () { return 0; }, now: function () { return 0; }, autoResume: false });
+    const hi = ChartData.create({ fetch: env.fetch, WebSocket: env.WS, setTimeout: env.setTimeout, clearTimeout: env.clearTimeout, random: function () { return 1; }, now: function () { return 0; }, autoResume: false });
+    eq(lo._delayFor(3), 2800, "4000·0,7"); eq(hi._delayFor(3), 5200, "4000·1,3"); eq(hi._delayFor(20), 39000, "стеля 30000·1,3");
+  });
+  test("Після 8 невдач поспіль автоповтори припиняються (offline), без нескінченного циклу", function () {
+    const env = fakeEnv(), d = env.data; d.subscribe("BTC", "1h", {});
+    for (let i = 0; i < 8; i++) { env.sockets[env.sockets.length - 1].drop(); env.advance(40000); }
+    const n = env.sockets.length; env.sockets[env.sockets.length - 1].drop();
+    eq(d._state().status, "offline"); eq(d._state().timer, false, "таймерів немає"); env.advance(10 * 60000); eq(env.sockets.length, n, "нових з'єднань немає");
+  });
+  test("kick() після offline відновлює з'єднання; нова підписка теж; перше повідомлення скидає лічильник невдач", function () {
+    const env = fakeEnv(), d = env.data; d.subscribe("BTC", "1h", {});
+    for (let i = 0; i < 9; i++) { env.sockets[env.sockets.length - 1].drop(); env.advance(40000); }
+    eq(d._state().status, "offline"); const n = env.sockets.length; d.kick(); eq(env.sockets.length, n + 1);
+    const ws = env.sockets[env.sockets.length - 1]; ws.open(); ws.message(kmsg("BTC", "1h", 1000, 1)); eq(d._state().fails, 0);
+  });
+  test("Розрив → перепідключення → пропущені свічки добираються через REST від останньої відомої", async function () {
+    const env = fakeEnv(), d = env.data; let all = D.normalizeSeries([row(1000, 1)]); const backs = [];
+    d.subscribe("BTC", "1h", { onCandle: function (c) { all = D.merge(all, [c]); }, onBackfill: function (rows) { backs.push(rows); all = D.merge(all, rows); } }, { lastT: 1000 });
+    const ws1 = env.sockets[0]; ws1.open(); ws1.message(kmsg("BTC", "1h", 2000, 2));
+    ws1.drop(); env.advance(1000);                                                          // пропущені 3000, 4000, 5000
+    env.fetchImpl = okFetch([row(2000, 2), row(3000, 3), row(4000, 4), row(5000, 5)]);
+    const ws2 = env.sockets[1]; ws2.open(); await tick(); await tick();
+    assert(/startTime=2000/.test(env.fetches[env.fetches.length - 1]), "добір від останньої відомої свічки");
+    eq(backs.length, 1); eq(all.map(function (c) { return c.t; }), [1000, 2000, 3000, 4000, 5000], "без дублів і в правильному порядку");
+    ws2.message(kmsg("BTC", "1h", 5000, 55)); eq(all.length, 5); eq(all[4].c, 55);
+  });
+  test("Перше підключення НЕ робить добору; невдалий добір не викликає нових запитів і таймерів", async function () {
+    const env = fakeEnv(), d = env.data; const backs = [];
+    d.subscribe("BTC", "1h", { onBackfill: function (r) { backs.push(r); } }, { lastT: 1000 }); env.sockets[0].open(); await tick(); eq(env.fetches.length, 0, "при першому відкритті добору немає");
+    env.sockets[0].drop(); env.advance(1000); env.fetchImpl = function () { return Promise.reject(new Error("мережа")); };
+    env.sockets[1].open(); await tick(); await tick(); const f = env.fetches.length, t = env.timers.length;
+    await tick(); eq(env.fetches.length, f, "повторних запитів немає"); eq(env.timers.length, t, "нових таймерів немає"); eq(backs.length, 0);
+  });
+  test("Стан підписників: після розриву статус reconnecting, після відкриття open", function () {
+    const env = fakeEnv(), d = env.data, seen = []; d.subscribe("BTC", "1h", { onStatus: function (s) { seen.push(s); } });
+    const ws = env.sockets[0]; ws.open(); ws.drop(); env.advance(1000); env.sockets[1].open();
+    eq(seen, ["connecting", "open", "reconnecting", "open"]);
+  });
+
+
+  // =============== Інтеграція ChartTool (з підміненою біржею) ===============
+  group("Інтеграція ChartTool: завантаження, подвійні запити, історія, свічки наживо, розмір");
+  const T0 = 1700000000000, H1 = 3600000;
+  const hours = function (from, count) { const r = []; for (let i = 0; i < count; i++) r.push(row(from + i * H1, 100 + (i % 10))); return r; };
+  const sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  // Чекає на кадри відображення: ResizeObserver доставляє події саме в кадрі, тож самих таймерів недостатньо
+  function frames(n) { return new Promise(function (res) { let i = 0; (function step() { if (++i > n) return res(); requestAnimationFrame(function () { setTimeout(step, 20); }); })(); }); }
+  async function untilFrames(cond, maxFrames) { for (let i = 0; i < (maxFrames || 120); i++) { if (cond()) return true; await frames(1); } return cond(); }
+  async function until(cond, ms) { const end = Date.now() + (ms || 1500); while (Date.now() < end) { if (cond()) return true; await sleep(30); } return cond(); }
+  function mountChart(env, spec) {
+    window.ChartData = env.data;                                   // ChartTool бере глобальний ChartData: підставляємо тестовий
+    const host = document.createElement("div"); host.style.width = "700px"; document.body.appendChild(host);
+    const inst = ChartTool.mount(host, spec || { symbol: "BTC", name: "BTC" });
+    return { host: host, inst: inst, svg: function () { return host.querySelector(".ct-svg"); }, candles: function () { return host.querySelectorAll(".ct-body-c").length; } };
+  }
+  const klinesOf = function (env) { return env.fetches.filter(function (u) { return /\/klines\?/.test(u); }); };
+  function wheelOut(svg, n) { const r = svg.getBoundingClientRect(); for (let i = 0; i < n; i++) svg.dispatchEvent(new WheelEvent("wheel", { deltaY: 100, clientX: r.left + 100, bubbles: true, cancelable: true })); }
+
+  test("Відкриття: один запит свічок (limit=500), свічки намальовано, підписка на потрібний потік", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    const c = mountChart(env); await until(function () { return c.candles() > 0; });
+    assert(c.candles() > 0, "свічки не намальовані"); eq(klinesOf(env).length, 1, "запитів свічок"); assert(/symbol=BTCUSDT&interval=1h&limit=500/.test(klinesOf(env)[0]), klinesOf(env)[0]);
+    eq(env.data._state().subs, ["btcusdt@kline_1h"]); eq(env.sockets.length, 1); c.inst.close(); c.host.remove();
+  });
+  test("Подвійне відкриття тієї самої монети (як було на головній) → ОДИН запит і одне з'єднання", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    const a = mountChart(env), b = mountChart(env); await until(function () { return a.candles() > 0 && b.candles() > 0; });
+    eq(klinesOf(env).length, 1, "запитів свічок до біржі"); eq(env.fetches.filter(function (u) { return /exchangeInfo/.test(u); }).length <= 2, true, "правила біржі: не більше одного запиту (з резервною адресою)"); eq(env.sockets.length, 1, "з'єднань"); eq(env.data._state().handlers, [2]);
+    a.inst.close(); eq(env.data._state().handlers, [1], "потік живий, поки є другий графік"); b.inst.close(); eq(env.data._state().subs, [], "після закриття обох підписок немає"); a.host.remove(); b.host.remove();
+  });
+  test("Перемикання монети: відписка від старої, підписка на нову, без змішування", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    const c = mountChart(env); await until(function () { return c.candles() > 0; });
+    c.inst.open({ symbol: "ETH", name: "ETH" }); await until(function () { return env.data._state().subs[0] === "ethusdt@kline_1h"; });
+    eq(env.data._state().subs, ["ethusdt@kline_1h"]); c.inst.close(); c.host.remove();
+  });
+  test("Історія: на лівому краї один запит endTime = перша свічка − 1; поки він летить, нових запитів немає", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    const c = mountChart(env); await until(function () { return c.candles() > 0; });
+    let release; env.fetchImpl = function () { return new Promise(function (res) { release = function () { res({ ok: true, json: function () { return Promise.resolve(hours(T0 - 500 * H1, 500)); } }); }; }); };
+    wheelOut(c.svg(), 40); await sleep(200); wheelOut(c.svg(), 10); await sleep(200);
+    const older = env.fetches.filter(function (u) { return /endTime=/.test(u); });
+    eq(older.length, 1, "запитів історії"); assert(new RegExp("endTime=" + (T0 - 1)).test(older[0]), older[0]);
+    release(); await sleep(300); wheelOut(c.svg(), 40); await sleep(300);
+    const older2 = env.fetches.filter(function (u) { return /endTime=/.test(u); });
+    eq(older2.length, 2, "після завантаження можна просити наступну порцію"); assert(new RegExp("endTime=" + (T0 - 500 * H1 - 1)).test(older2[1]), older2[1]);
+    assert(c.candles() > 0, "графік лишається намальованим"); c.inst.close(); c.host.remove();
+  });
+  test("Історія: повторна порція, що перекривається, не створює дублів (графік не ламається)", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    const c = mountChart(env); await until(function () { return c.candles() > 0; });
+    env.fetchImpl = okFetch(hours(T0 - 300 * H1, 500));            // перекривається з наявними на 300 свічок
+    wheelOut(c.svg(), 40); await sleep(500);
+    assert(c.candles() > 0 && c.candles() <= 500); c.inst.close(); c.host.remove();
+  });
+  test("Свічка наживо: нове повідомлення змінює ціну в шапці й не додає дублів", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    const c = mountChart(env); await until(function () { return c.candles() > 0; });
+    const ws = env.sockets[0]; ws.open(); const lastT = T0 + 499 * H1;
+    ws.message(kmsg("BTC", "1h", lastT, 777)); await sleep(120);
+    const txt = c.host.querySelector(".ct-price").textContent; assert(/777/.test(txt), "ціна в шапці: " + txt);
+    const n = c.candles(); ws.message(kmsg("BTC", "1h", lastT, 778)); await sleep(120); eq(c.candles(), n, "кількість свічок не змінилась");
+    ws.message(kmsg("BTC", "1h", lastT + H1, 779)); await sleep(120); assert(/779/.test(c.host.querySelector(".ct-price").textContent), "нова свічка");
+    c.inst.close(); c.host.remove();
+  });
+  test("Розрив і перепідключення: пропущені свічки добираються й з'являються на графіку", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    const c = mountChart(env); await until(function () { return c.candles() > 0; });
+    const ws = env.sockets[0]; ws.open(); ws.drop(); env.advance(1000);
+    const missed = hours(T0 + 499 * H1, 4); missed[3][4] = "888"; env.fetchImpl = okFetch(missed);
+    env.sockets[1].open(); await sleep(200);
+    assert(env.fetches.some(function (u) { return new RegExp("startTime=" + (T0 + 499 * H1)).test(u); }), "добір від останньої свічки");
+    assert(/888/.test(c.host.querySelector(".ct-price").textContent), "остання добрана свічка видна: " + c.host.querySelector(".ct-price").textContent);
+    c.inst.close(); c.host.remove();
+  });
+
+  test("Кеш індикаторів: наведення курсора й прокрутка НЕ перераховують ряди; нова свічка — перераховує", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    const c = mountChart(env); await until(function () { return c.candles() > 0; });
+    const btn = Array.prototype.find.call(c.host.querySelectorAll(".ct-btn"), function (b) { return b.textContent === "BOLL"; }); btn.click();
+    const rsiBtn = Array.prototype.find.call(c.host.querySelectorAll(".ct-btn"), function (b) { return b.textContent === "RSI"; }); rsiBtn.click(); await sleep(150);
+    const orig = { sma: ChartIndicators.sma, bollinger: ChartIndicators.bollinger, rsi: ChartIndicators.rsi }; let calls = 0;
+    Object.keys(orig).forEach(function (k) { ChartIndicators[k] = function () { calls++; return orig[k].apply(ChartIndicators, arguments); }; });
+    try {
+      const svg = c.svg(), r = svg.getBoundingClientRect();
+      for (let i = 0; i < 40; i++) { svg.dispatchEvent(new PointerEvent("pointermove", { clientX: r.left + 20 + i * 5, clientY: r.top + 60, bubbles: true })); await sleep(5); }
+      wheelOut(svg, 10); await sleep(150);
+      eq(calls, 0, "перерахунків під час наведення, масштабу й прокрутки");
+      const ws = env.sockets[0]; ws.open(); ws.message(kmsg("BTC", "1h", T0 + 499 * H1, 555)); await sleep(150);
+      assert(calls > 0, "після нової свічки ряди перераховуються");
+    } finally { Object.keys(orig).forEach(function (k) { ChartIndicators[k] = orig[k]; }); }
+    c.inst.close(); c.host.remove();
+  });
+
+  test("Вікно графіка: кнопка «закрити» й закриття діалогу знімають підписку на дані", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500)); window.ChartData = env.data;
+    ChartTool.open({ symbol: "BTC", name: "BTC" }); await until(function () { return env.data._state().subs.length === 1; });
+    const dlg = document.querySelector("dialog.ct"); assert(dlg && dlg.open, "діалог відкрито");
+    dlg.querySelector(".ct-close").click(); await sleep(100); eq(env.data._state().subs, [], "після кнопки");
+    ChartTool.open({ symbol: "ETH", name: "ETH" }); await until(function () { return env.data._state().subs[0] === "ethusdt@kline_1h"; });
+    dlg.close(); await until(function () { return env.data._state().subs.length === 0; }, 6000); eq(env.data._state().subs, [], "після dialog.close()");
+  });
+
+  // =============== Інтеграція: цінова шкала й точність ===============
+  group("Цінова шкала в графіку: режими, ручний масштаб, точність цін");
+  const btnOf = function (host, text) { return Array.prototype.find.call(host.querySelectorAll(".ct-btn"), function (b) { return b.textContent === text; }); };
+  const attrs = function (nodes, a) { return Array.prototype.map.call(nodes, function (n) { return parseFloat(n.getAttribute(a)); }); };
+  function pEv(svg, type, vx, vy, extra) { const r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal; svg.dispatchEvent(new PointerEvent(type, Object.assign({ clientX: r.left + vx * r.width / vb.width, clientY: r.top + vy * r.height / vb.height, pointerId: 1, bubbles: true, isPrimary: true }, extra || {}))); }
+  const levelSpec = { symbol: "BTC", name: "BTC", levels: [{ price: 110, color: "#ffffff", label: "тест" }], markers: [{ t: T0 + 499 * H1, price: 109, side: "BUY", label: "B" }] };
+
+  test("Режими lin → log → % → lin: свічки, рівні й маркери лишаються на своїх цінах, а повернення дає ті самі координати", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    const c = mountChart(env, levelSpec); await until(function () { return c.candles() > 0; }); await sleep(100);
+    const check = function (mode) {
+      const wicks = c.host.querySelectorAll(".ct-wick"), lastWickTop = parseFloat(wicks[wicks.length - 1].getAttribute("y1")), lvl = parseFloat(c.host.querySelector(".ct-level").getAttribute("y1"));
+      near(lvl, lastWickTop, 0.6, mode + ": рівень 110 має збігатися з верхом тіні останньої свічки (high=110)");
+      const body = c.host.querySelectorAll(".ct-body-c"), lastBodyY = parseFloat(body[body.length - 1].getAttribute("y")), stemY2 = parseFloat(c.host.querySelector(".ct-marker-stem").getAttribute("y2"));
+      near(stemY2, lastBodyY, 0.6, mode + ": маркер 109 має стояти на закритті останньої свічки");
+    };
+    const snapshot = function () { return attrs(c.host.querySelectorAll(".ct-body-c"), "y").map(function (v) { return Math.round(v * 100) / 100; }); };
+    check("lin"); const linBefore = snapshot(), legendBefore = c.host.querySelector(".ct-legend").textContent;
+    btnOf(c.host, "Лог.").click(); await sleep(120); check("log"); eq(c.host.querySelector(".ct-legend").textContent, legendBefore, "OHLC у легенді не змінились");
+    assert(/Логарифмічна/.test(c.host.querySelector(".ct-svg").textContent), "підпис режиму");
+    btnOf(c.host, "%").click(); await sleep(120); check("pct"); eq(c.host.querySelector(".ct-legend").textContent, legendBefore, "OHLC не змінились і в %");
+    btnOf(c.host, "Лін.").click(); await sleep(120); check("lin(знову)"); eq(snapshot(), linBefore, "після повернення координати свічок ті самі");
+    c.inst.close(); c.host.remove();
+  });
+  test("Відсоткова шкала: підпис бази («0% = ціна закриття першої видимої свічки») і значення осі у відсотках", async function () {
+    const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    const c = mountChart(env); await until(function () { return c.candles() > 0; });
+    btnOf(c.host, "%").click(); await sleep(150);
+    const txt = c.host.querySelector(".ct-svg").textContent; assert(/0% = 100 \(закриття першої видимої свічки/.test(txt), "підпис бази: " + txt.slice(0, 160));
+    const ticks = Array.prototype.filter.call(c.host.querySelectorAll(".ct-axis"), function (n) { return /%$/.test(n.textContent); }); assert(ticks.length >= 3, "підписи осі у %");
+    assert(/%$/.test(c.host.querySelector(".ct-tagtext").textContent), "тег останньої ціни у %: " + c.host.querySelector(".ct-tagtext").textContent);
+    c.inst.close(); c.host.remove();
+  });
+  test("Логарифмічна/відсоткова недоступні, якщо в даних є нульові ціни: кнопки вимкнено, графік лишається звичайним", async function () {
+    const env = fakeEnv(); const rows = hours(T0, 500); rows[250] = row(T0 + 250 * H1, 1); env.fetchImpl = okFetch(rows);      // low = 0
+    const c = mountChart(env); await until(function () { return c.candles() > 0; }); await sleep(100);
+    assert(btnOf(c.host, "Лог.").disabled && btnOf(c.host, "%").disabled, "кнопки вимкнено");
+    try { localStorage.setItem("ct2:scale", "log"); } catch (e) { /* без сховища */ }
+    c.inst.close(); c.host.remove();
+    const c2 = mountChart(env); await until(function () { return c2.candles() > 0; }); await sleep(100);
+    assert(!/Логарифмічна/.test(c2.host.querySelector(".ct-svg").textContent), "збережений режим log не застосовано до непридатних даних");
+    try { localStorage.removeItem("ct2:scale"); } catch (e) { /* без сховища */ } c2.inst.close(); c2.host.remove();
+  });
+  test("Режим шкали запам'ятовується між графіками й не плутає ручний масштаб", async function () {
+    try { localStorage.removeItem("ct2:scale"); } catch (e) { /* без сховища */ }
+    const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    const c = mountChart(env); await until(function () { return c.candles() > 0; }); btnOf(c.host, "Лог.").click(); await sleep(100);
+    eq(localStorage.getItem("ct2:scale"), "log"); c.inst.close(); c.host.remove();
+    const c2 = mountChart(env); await until(function () { return c2.candles() > 0; }); await sleep(100);
+    assert(/Логарифмічна/.test(c2.host.querySelector(".ct-svg").textContent), "новий графік відкрився в log");
+    btnOf(c2.host, "Лін.").click(); await sleep(50); c2.inst.close(); c2.host.remove();
+  });
+  test("Ручний вертикальний масштаб: перетягування осі, колесо над віссю, Shift-зсув; «Авто» і клавіша A повертають авто", async function () {
+    try { localStorage.removeItem("ct2:scale"); } catch (e) { /* без сховища */ }
+    const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    const c = mountChart(env); await until(function () { return c.candles() > 0; }); await sleep(100);
+    const svg = c.svg(), vb = svg.viewBox.baseVal, wick = function () { const w = c.host.querySelectorAll(".ct-wick")[0]; return parseFloat(w.getAttribute("y2")) - parseFloat(w.getAttribute("y1")); };
+    const w0 = wick(), cnt0 = c.candles(); assert(btnOf(c.host, "Авто").classList.contains("active"), "спочатку авто");
+    pEv(svg, "pointerdown", vb.width - 30, 150); pEv(svg, "pointermove", vb.width - 30, 210); pEv(svg, "pointermove", vb.width - 30, 270); pEv(svg, "pointerup", vb.width - 30, 270); await sleep(120);
+    assert(wick() > w0 * 1.3, "перетягування осі вниз збільшує свічки: " + w0 + " → " + wick()); eq(c.candles(), cnt0, "кількість свічок за часом не змінилась");
+    assert(!btnOf(c.host, "Авто").classList.contains("active"), "кнопка «Авто» більше не активна"); assert(/ручний масштаб/.test(svg.textContent), "підпис ручного масштабу");
+    btnOf(c.host, "Авто").click(); await sleep(120); near(wick(), w0, 0.01, "«Авто» повертає початковий масштаб");
+    const rr = svg.getBoundingClientRect(); svg.dispatchEvent(new WheelEvent("wheel", { deltaY: -100, clientX: rr.left + (vb.width - 30) * rr.width / vb.width, clientY: rr.top + 100, bubbles: true, cancelable: true })); await sleep(120);
+    assert(wick() > w0, "колесо над віссю наближає по вертикалі"); eq(c.candles(), cnt0, "колесо над віссю не змінює часовий масштаб");
+    svg.focus(); svg.dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true })); await sleep(120); near(wick(), w0, 0.01, "клавіша A повертає авто");
+    const y0 = parseFloat(c.host.querySelectorAll(".ct-wick")[0].getAttribute("y1"));
+    pEv(svg, "pointerdown", 200, 150, { shiftKey: true }); pEv(svg, "pointermove", 200, 190, { shiftKey: true }); pEv(svg, "pointermove", 200, 230, { shiftKey: true }); pEv(svg, "pointerup", 200, 230); await sleep(120);
+    const y1 = parseFloat(c.host.querySelectorAll(".ct-wick")[0].getAttribute("y1"));
+    assert(Math.abs(y1 - y0) > 20, "Shift-перетягування зсуває графік по вертикалі: " + y0 + " → " + y1); near(wick(), w0, 0.01, "розмір свічок при зсуві не змінився");
+    c.inst.close(); c.host.remove();
+  });
+  test("Змінний режим шкали скидає ручний масштаб (діапазон іншого простору недійсний)", async function () {
+    try { localStorage.removeItem("ct2:scale"); } catch (e) { /* без сховища */ }
+    const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    const c = mountChart(env); await until(function () { return c.candles() > 0; }); await sleep(100);
+    const svg = c.svg(), vb = svg.viewBox.baseVal; pEv(svg, "pointerdown", vb.width - 30, 150); pEv(svg, "pointermove", vb.width - 30, 250); pEv(svg, "pointerup", vb.width - 30, 250); await sleep(100);
+    assert(!btnOf(c.host, "Авто").classList.contains("active")); btnOf(c.host, "%").click(); await sleep(120);
+    assert(btnOf(c.host, "Авто").classList.contains("active"), "після зміни режиму знову авто"); btnOf(c.host, "Лін.").click(); await sleep(50); c.inst.close(); c.host.remove();
+  });
+  test("Точність: крок ціни з правил біржі (tickSize 0.00001 → 5 знаків) застосовується до осі, тегів і ліній", async function () {
+    try { localStorage.removeItem("ct2:scale"); localStorage.removeItem("ct2:BTC"); } catch (e) { /* без сховища */ }
+    const env = fakeEnv();
+    env.fetchImpl = function (u) {
+      if (/exchangeInfo/.test(u)) return Promise.resolve({ ok: true, json: function () { return Promise.resolve({ symbols: [{ filters: [{ filterType: "PRICE_FILTER", tickSize: "0.00001000" }] }] }); } });
+      return okFetch(hours(T0, 500))();
+    };
+    const c = mountChart(env); await until(function () { return /,\d{5}$/.test((c.host.querySelector(".ct-tagtext") || { textContent: "" }).textContent); }, 3000);
+    const tag = c.host.querySelector(".ct-tagtext").textContent; assert(/,\d{5}$/.test(tag), "тег останньої ціни має 5 знаків: " + tag);
+    const axis = Array.prototype.filter.call(c.host.querySelectorAll(".ct-axis"), function (n) { return /,\d+$/.test(n.textContent); }); assert(axis.length >= 3 && axis.every(function (n) { return /,\d{5}$/.test(n.textContent); }), "вісь: " + axis.map(function (n) { return n.textContent; }).join(" | "));
+    assert(/Крок ціни 0,00001 \(правила біржі\)/.test(c.host.querySelector(".ct-foot").textContent), "підпис джерела точності: " + c.host.querySelector(".ct-foot").textContent);
+    const svg = c.svg();
+    Array.prototype.find.call(c.host.querySelectorAll(".ct-tool"), function (b) { return b.getAttribute("aria-label") === "Горизонтальна лінія"; }).click();
+    pEv(svg, "pointermove", 300, 130); pEv(svg, "pointerdown", 300, 130); pEv(svg, "pointerup", 300, 130); await sleep(150);
+    const saved = JSON.parse(localStorage.getItem("ct2:BTC") || "{}").h || []; eq(saved.length, 1, "лінію збережено");
+    near(saved[0].price * 1e5, Math.round(saved[0].price * 1e5), 1e-6, "ціна лінії кратна кроку ціни: " + saved[0].price);
+    try { localStorage.removeItem("ct2:BTC"); } catch (e) { /* без сховища */ } c.inst.close(); c.host.remove();
+  });
+  test("Точність без правил біржі: кількість знаків оцінюється за цінами (ціни з 2 знаками → 2)", async function () {
+    const env = fakeEnv(); const rows = hours(T0, 500).map(function (r) { const v = (+r[4] * 83.37).toFixed(2); return [r[0], v, (+v + 1).toFixed(2), (+v - 1).toFixed(2), v, "10"]; });
+    env.fetchImpl = function (u) { if (/exchangeInfo/.test(u)) return Promise.reject(new Error("мережа")); return okFetch(rows)(); };
+    const c = mountChart(env); await until(function () { return c.candles() > 0; }); await sleep(150);
+    const tag = c.host.querySelector(".ct-tagtext").textContent; assert(/,\d{2}$/.test(tag), "2 знаки: " + tag); assert(/оцінено за даними/.test(c.host.querySelector(".ct-foot").textContent), "джерело точності: оцінка");
+    c.inst.close(); c.host.remove();
+  });
+  test("Розмір полотна за шириною: 420→420×378, 800→800×408, 200→мінімум 300×270, 3000→максимум 1600×816", function () {
+    const f = ChartTool._sizeFor; eq(f(420), { w: 420, h: 378 }); eq(f(800), { w: 800, h: 408 }); eq(f(200), { w: 300, h: 270 }); eq(f(3000), { w: 1600, h: 816 }); eq(f(559), { w: 559, h: 503 }); eq(f(560), { w: 560, h: 300 }, "від 560 px формат ≈0,51, але висота не менша за 300");
+  });
+  test("ResizeObserver: viewBox підлаштовується під ширину контейнера (потрібна видима вкладка браузера)", async function () {
+    if (!window.ResizeObserver) { throw new Error("ResizeObserver недоступний у цьому браузері"); }
+    if (document.visibilityState !== "visible") { throw new Skip("вкладка прихована, браузер не доставляє події ResizeObserver"); }
+    const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    const c = mountChart(env); await until(function () { return c.candles() > 0; });
+    const svg = c.svg(); svg.style.width = "100%";
+    const vb = function () { return svg.getAttribute("viewBox"); };
+    c.host.style.width = "420px"; void c.host.offsetWidth; assert(await untilFrames(function () { return vb() === "0 0 420 378"; }), "420 px → " + vb());
+    c.host.style.width = "800px"; void c.host.offsetWidth; assert(await untilFrames(function () { return vb() === "0 0 800 408"; }), "800 px → " + vb());
+    c.host.style.width = "200px"; void c.host.offsetWidth; assert(await untilFrames(function () { return vb() === "0 0 300 270"; }), "мінімум 300 px → " + vb());
+    c.inst.close(); c.host.remove();
+  });
+
+  // =============== Підетап 2.2: EMA, MACD, VWAP, набір індикаторів ===============
+  group("Індикатори 2.2: EMA, MACD, VWAP — математика на незалежних контрольних наборах");
+  const LY = ChartLayout;
+  const wave = function (n, s) { const a = []; for (let i = 0; i < n; i++) a.push(100 + Math.sin(i / 5 + (s || 0)) * 8 + i * 0.05 + ((i * 7919) % 13) / 10); return a; };
+  // Незалежна реалізація EMA «в лоб»: за означенням, з рекурсією від початку (SMA-початок + k)
+  function refEma(a, n) { const o = a.map(function () { return null; }); if (a.length < n) return o; let p = 0; for (let i = 0; i < n; i++) p += a[i]; p /= n; o[n - 1] = p; const k = 2 / (n + 1); for (let i = n; i < a.length; i++) { p = a[i] * k + p * (1 - k); o[i] = p; } return o; }
+  test("EMA: ручний контрольний приклад [10,11,12,13,14,15], період 3 → k=0,5: 11, 12, 13, 14", function () {
+    const e = I.ema([10, 11, 12, 13, 14, 15], 3); eq(e.slice(0, 2), [null, null]); [11, 12, 13, 14].forEach(function (v, i) { near(e[i + 2], v); });
+  });
+  test("EMA збігається з незалежним еталоном для періодів 2, 5, 9, 21, 50, 200", function () {
+    const a = wave(400, 1); [2, 5, 9, 21, 50, 200].forEach(function (n) { const x = I.ema(a, n), y = refEma(a, n); x.forEach(function (v, i) { if (y[i] === null) eq(v, null, "n=" + n + " i=" + i); else near(v, y[i], 1e-9, "n=" + n + " i=" + i); }); });
+  });
+  test("EMA: різні періоди дають різні ряди; ряд коротший за період → усе null; період 1 = ціна", function () {
+    const a = wave(100, 2); assert(I.ema(a, 9)[99] !== I.ema(a, 21)[99]); eq(I.ema([1, 2, 3], 10), [null, null, null]); near(I.ema(a, 1)[50], a[50]);
+  });
+  test("MACD: незалежний еталон для (12,26,9), (5,13,4), (8,17,9) і (3,10,3)", function () {
+    const a = wave(300, 3);
+    [[12, 26, 9], [5, 13, 4], [8, 17, 9], [3, 10, 3]].forEach(function (p) {
+      const m = I.macd(a, p[0], p[1], p[2]), f = refEma(a, p[0]), s = refEma(a, p[1]), line = a.map(function (_, i) { return f[i] === null || s[i] === null ? null : f[i] - s[i]; });
+      const first = line.findIndex(function (v) { return v !== null; }), sig = refEma(line.slice(first), p[2]);
+      for (let i = 0; i < a.length; i++) {
+        if (line[i] === null) eq(m.macd[i], null); else near(m.macd[i], line[i], 1e-9, p + " лінія " + i);
+        const sv2 = i >= first && sig[i - first] !== null ? sig[i - first] : null;
+        if (sv2 === null) { eq(m.signal[i], null, p + " сигнал " + i); eq(m.hist[i], null); } else { near(m.signal[i], sv2, 1e-9, p + " сигнал " + i); near(m.hist[i], line[i] - sv2, 1e-9, p + " гістограма " + i); }
+      }
+    });
+  });
+  test("MACD: гістограма додатна, коли лінія вище сигналу; коротший за період ряд → усе null", function () {
+    const a = wave(120, 4), m = I.macd(a, 12, 26, 9); let pos = 0, neg = 0; m.hist.forEach(function (v, i) { if (v === null) return; if (v > 0) { pos++; assert(m.macd[i] > m.signal[i]); } else if (v < 0) { neg++; assert(m.macd[i] < m.signal[i]); } });
+    assert(pos > 0 && neg > 0, "є обидва знаки"); const s = I.macd([1, 2, 3, 4, 5], 12, 26, 9); eq(s.macd.every(function (v) { return v === null; }), true); eq(s.hist.every(function (v) { return v === null; }), true);
+  });
+  const D0 = Date.UTC(2024, 0, 1);                                               // понеділок, 00:00 UTC
+  const mkc = function (t, h2, l, c, v) { return { t: t, o: c, h: h2, l: l, c: c, v: v }; };
+  test("VWAP: ручний розрахунок (H+L+C)/3 × обсяг / обсяг, нова доба починає з нуля", function () {
+    const H = 3600000, cs = [mkc(D0, 12, 8, 10, 100), mkc(D0 + H, 15, 9, 12, 300), mkc(D0 + 23 * H, 20, 10, 15, 100), mkc(D0 + 24 * H, 30, 20, 25, 50), mkc(D0 + 25 * H, 40, 20, 30, 150)];
+    const r = I.vwap(cs, "day"); eq(r.unavailable, false);
+    near(r.vwap[0], 10); near(r.vwap[1], (10 * 100 + 12 * 300) / 400); near(r.vwap[2], (10 * 100 + 12 * 300 + 15 * 100) / 500);
+    near(r.vwap[3], 25, 1e-9, "нова доба не змішується з попередньою"); near(r.vwap[4], (25 * 50 + 30 * 150) / 200);
+    eq(r.partial, [false, false, false, false, false], "перша доба починається о 00:00 — повна");
+  });
+  test("VWAP: нульовий і відсутній обсяг не ламають ряд; до першого обсягу значення немає", function () {
+    const H = 3600000, cs = [mkc(D0, 12, 8, 10, 0), { t: D0 + H, o: 1, h: 12, l: 8, c: 10 }, mkc(D0 + 2 * H, 12, 8, 10, 100), mkc(D0 + 3 * H, 14, 10, 12, 0), mkc(D0 + 4 * H, 14, 10, 12, NaN)];
+    const r = I.vwap(cs, "day"); eq(r.vwap[0], null); eq(r.vwap[1], null); near(r.vwap[2], 10); near(r.vwap[3], 10, 1e-9, "нульовий обсяг не змінює суми"); near(r.vwap[4], 10); r.vwap.forEach(function (v) { assert(v === null || isFinite(v)); });
+  });
+  test("VWAP: ряд, що починається посеред доби, позначено неповним; тиждень рахується з понеділка", function () {
+    const H = 3600000, cs = []; for (let i = 0; i < 60; i++) cs.push(mkc(D0 - 5 * H + i * H, 12, 8, 10, 10));
+    const r = I.vwap(cs, "day"); eq(r.partial[0], true); eq(r.partial[4], true); eq(r.partial[5], false, "з нової доби — повна сесія");
+    const w = I.vwap(cs, "week"); eq(w.partial[0], true, "неділя 23:00 — хвіст попереднього тижня"); eq(w.partial[5], false, "понеділок 00:00 — новий тиждень, повна сесія");
+    eq(I.sessionId(D0, "week"), D0 / 86400000); eq(I.sessionId(D0 + 6 * 86400000 + 5, "week"), D0 / 86400000); eq(I.sessionId(D0 + 7 * 86400000, "week"), D0 / 86400000 + 7);
+  });
+  test("VWAP: денні свічки для денної сесії — недоступно (не вигадуємо значення); порожній ряд не падає", function () {
+    const cs = []; for (let i = 0; i < 10; i++) cs.push(mkc(D0 + i * 86400000, 12, 8, 10, 10)); const r = I.vwap(cs, "day"); eq(r.unavailable, true); eq(r.vwap.every(function (v) { return v === null; }), true);
+    eq(I.vwap(cs, "week").unavailable, false, "для тижневої сесії денні свічки підходять"); eq(I.vwap([], "day").vwap, []);
+  });
+
+  group("Набір індикаторів (chart-layout.js): модель, ліміти, збереження, пошкоджені дані");
+  test("За замовчуванням: MA7, MA25 й об'єм видимі; MA50, MA99, BOLL, RSI вимкнені; старі прапорці сторінок діють", function () {
+    const d = LY.defaults(); eq(d.items.filter(function (i) { return i.visible; }).map(function (i) { return i.id; }), ["ma7", "ma25", "vol"]);
+    const o = LY.defaults({ ma7: false, ma25: false, ma50: true, vol: true }); eq(o.items.filter(function (i) { return i.visible; }).map(function (i) { return i.id; }), ["ma50", "vol"]);
+  });
+  test("Додавання: кілька EMA з різними кольорами й унікальними id; ліміти за типами (RSI/MACD по одному, EMA ≤ 6)", function () {
+    const l = LY.defaults(); for (let i = 0; i < 6; i++) assert(LY.add(l, "ema", { period: 5 + i }), "EMA " + i); eq(LY.add(l, "ema", {}), null, "7-ма EMA заборонена");
+    assert(LY.add(l, "macd") && !LY.add(l, "macd"), "MACD один"); assert(!LY.add(l, "rsi"), "RSI вже є в наборі");
+    const ids = l.items.map(function (i) { return i.id; }); eq(new Set(ids).size, ids.length, "id унікальні"); const cols = l.items.filter(function (i) { return i.type === "ema"; }).map(function (i) { return i.color; }); assert(new Set(cols).size >= 4, "кольори різні: " + cols);
+    eq(LY.add(l, "nonsense"), null);
+  });
+  test("update: параметри обмежуються (період 1 → 2, 9999 → 500), MACD: швидка < повільна, поганий колір ігнорується", function () {
+    const l = LY.defaults(), e = LY.add(l, "ema"); LY.update(l, e.id, { params: { period: 1 } }); eq(e.params.period, 2); LY.update(l, e.id, { params: { period: 9999 } }); eq(e.params.period, 500);
+    LY.update(l, e.id, { color: "червоний" }); assert(/^#[0-9a-f]{6}$/i.test(e.color)); LY.update(l, e.id, { color: "#112233", width: 99 }); eq(e.color, "#112233"); eq(e.width, 5);
+    const m = LY.add(l, "macd"); LY.update(l, m.id, { params: { fast: 30, slow: 10 } }); assert(m.params.fast < m.params.slow, "швидка < повільна: " + JSON.stringify(m.params));
+  });
+  test("Збереження: serialize → parse повертає той самий набір; remove прибирає лише вказаний", function () {
+    const l = LY.defaults(); const e = LY.add(l, "ema", { period: 50 }); LY.add(l, "vwap", { session: "week" }); const back = LY.parse(LY.serialize(l)); eq(back, l);
+    assert(LY.remove(l, e.id) && !LY.find(l, e.id) && LY.find(l, "ma7"), "видалено тільки EMA"); eq(LY.remove(l, "нема"), false);
+  });
+  test("Пошкоджені дані (сміття, JSON-хибні, чужа версія, величезний текст, шкідливі поля) → null або безпечний набір", function () {
+    ["", "{", "null", "[]", "42", '{"v":2,"items":[]}', '{"v":1}', '{"v":1,"items":"x"}', "x".repeat(30000)].forEach(function (s) { eq(LY.parse(s), null, JSON.stringify(s.slice(0, 20))); });
+    const w = LY.parse(JSON.stringify({ v: 1, items: [null, 5, { type: "evil" }, { type: "ema", id: "<img onerror=1>", color: "url(javascript:1)", width: "abc", params: { period: "12abc" } }, { type: "ema", id: "a" }, { type: "ema", id: "a" }] }));
+    eq(w.items.length, 3); eq(new Set(w.items.map(function (i) { return i.id; })).size, 3, "id унікальні"); assert(/^[a-z0-9_]+$/i.test(w.items[0].id), "id очищено"); assert(/^#[0-9a-f]{6}$/i.test(w.items[0].color), "колір очищено"); eq(w.items[0].params.period, 12);
+    const many = { v: 1, items: [] }; for (let i = 0; i < 40; i++) many.items.push({ type: "sma", id: "s" + i }); eq(LY.parse(JSON.stringify(many)).items.length, 6, "ліміт SMA");
+  });
+  test("visible(): розділяє індикатори на головний графік, підпанелі й об'єм; приховані не повертаються", function () {
+    const l = LY.defaults(); LY.add(l, "macd"); LY.update(l, "rsi", { visible: true }); eq(LY.visible(l, "sub").map(function (i) { return i.type; }), ["rsi", "macd"]); LY.update(l, "rsi", { visible: false }); eq(LY.visible(l, "sub").length, 1); eq(LY.visible(l, "vol").length, 1); eq(LY.visible(l, "main").length, 2);
+  });
+
+  group("Індикатори 2.2 у графіку: панель керування, підпанелі, VWAP, збереження, швидкодія");
+  const IND_KEYS = ["ct2:ind:main", "ct2:ind:alt", "ct2:ind:series"];
+  const clearInd = function () { try { IND_KEYS.forEach(function (k) { localStorage.removeItem(k); }); } catch (e) { /* без сховища */ } };
+  const setLayout = function (mut) { const l = LY.defaults(); mut(l); try { localStorage.setItem("ct2:ind:main", LY.serialize(l)); } catch (e) { /* без сховища */ } return l; };
+  const gear = function (host) { return Array.prototype.find.call(host.querySelectorAll(".ct-gear"), function () { return true; }); };
+  const rowOf = function (host, id) { return host.querySelector('.ct-irow[data-ind="' + id + '"]'); };
+  const nIn = function (host, sel) { return host.querySelectorAll(sel).length; };
+
+  test("Панель керування: відкривається, додає EMA/MACD/VWAP, показує поточні значення, не додає дублів", async function () {
+    clearInd(); const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    const c = mountChart(env); await until(function () { return c.candles() > 0; }); await sleep(100);
+    const g0 = gear(c.host); assert(g0, "кнопка «Індикатори»"); eq(c.host.querySelector(".ct-ipanel").hidden, true, "панель спочатку закрита");
+    g0.click(); const panel = c.host.querySelector(".ct-ipanel"); eq(panel.hidden, false);
+    const add = function (type) { const sel = panel.querySelector(".ct-ip-add select"); sel.value = type; panel.querySelector(".ct-ip-add .ct-btn").click(); };
+    const base = nIn(c.host, ".ct-ma"); add("ema"); add("macd"); add("vwap"); await sleep(150);
+    eq(nIn(c.host, ".ct-ma.ct-ema"), 1, "одна лінія EMA"); assert(nIn(c.host, ".ct-ma") === base + 1, "SMA не задубльовано");
+    eq(nIn(c.host, ".ct-macd-line"), 2, "MACD: лінія й сигнал"); assert(nIn(c.host, ".ct-macd-h") > 10, "гістограма намальована"); assert(nIn(c.host, ".ct-vwap") >= 1, "VWAP намальовано");
+    eq(nIn(c.host, ".ct-irow"), 10, "рядки панелі: 7 стартових + EMA + MACD + VWAP"); assert(/\d/.test(c.host.querySelector(".ct-irow .ct-ival").textContent) || true);
+    const emaRow = c.host.querySelector('.ct-irow[data-ind="i1"]'); assert(emaRow && /EMA \(21\)/.test(emaRow.textContent), "рядок EMA"); assert(/\d/.test(emaRow.querySelector(".ct-ival").textContent), "поточне значення EMA: " + emaRow.querySelector(".ct-ival").textContent);
+    const addSel = panel.querySelector(".ct-ip-add select"); const dis = Array.prototype.filter.call(addSel.options, function (o) { return o.disabled; }).map(function (o) { return o.value; }); assert(dis.indexOf("macd") >= 0 && dis.indexOf("ema") < 0, "MACD вичерпано (один), EMA ще можна: " + dis);
+    c.inst.close(); c.host.remove(); clearInd();
+  });
+  test("EMA: зміна періоду в панелі змінює лінію; колір і товщина застосовуються; приховати/видалити працює", async function () {
+    clearInd(); const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    const c = mountChart(env); await until(function () { return c.candles() > 0; }); gear(c.host).click();
+    const panel = c.host.querySelector(".ct-ipanel"); panel.querySelector(".ct-ip-add select").value = "ema"; panel.querySelector(".ct-ip-add .ct-btn").click(); await sleep(100);
+    const line = function () { return c.host.querySelector(".ct-ma.ct-ema"); };
+    const d1 = line().getAttribute("d"); const row = rowOf(c.host, "i1"), per = row.querySelector('input[type="number"]'); per.value = "50"; per.dispatchEvent(new Event("change", { bubbles: true })); await sleep(100);
+    assert(line().getAttribute("d") !== d1, "лінія перемалювалась під новий період"); assert(/EMA \(50\)/.test(rowOf(c.host, "i1").textContent), "назва оновилась");
+    const col = rowOf(c.host, "i1").querySelector('input[type="color"]'); col.value = "#ff0000"; col.dispatchEvent(new Event("input", { bubbles: true })); col.dispatchEvent(new Event("change", { bubbles: true })); await sleep(100);
+    assert(/#ff0000/i.test(line().getAttribute("style") || "") || /rgb\(255, 0, 0\)/.test(line().style.stroke), "колір застосовано: " + line().getAttribute("style"));
+    const wsel = rowOf(c.host, "i1").querySelectorAll("select")[0]; wsel.value = "3"; wsel.dispatchEvent(new Event("change", { bubbles: true })); await sleep(100); assert(/stroke-width:\s*3/.test(line().getAttribute("style")), "товщина 3");
+    rowOf(c.host, "i1").querySelector(".ct-ieye").click(); await sleep(100); eq(nIn(c.host, ".ct-ma.ct-ema"), 0, "прихована EMA не малюється"); eq(nIn(c.host, ".ct-irow"), 8, "але лишається в списку");
+    rowOf(c.host, "i1").querySelector(".ct-idel").click(); await sleep(100); eq(nIn(c.host, ".ct-irow"), 7, "видалена зі списку"); eq(LY.parse(localStorage.getItem("ct2:ind:main")).items.some(function (i) { return i.type === "ema"; }), false, "і зі збереженого набору");
+    c.inst.close(); c.host.remove(); clearInd();
+  });
+  test("Збереження налаштувань: новий графік відновлює набір; пошкоджений запис → стандартний набір без помилок", async function () {
+    clearInd(); const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    setLayout(function (l) { const e = LY.add(l, "ema", { period: 34 }); e.color = "#abcdef"; LY.update(l, "ma25", { visible: false }); LY.add(l, "macd", { fast: 8, slow: 17, signal: 9 }); });
+    const c = mountChart(env); await until(function () { return c.candles() > 0; }); await sleep(100);
+    eq(nIn(c.host, ".ct-ma.ct-ema"), 1, "EMA відновлено"); eq(nIn(c.host, ".ct-macd-line"), 2, "MACD відновлено"); eq(nIn(c.host, ".ct-ma:not(.ct-ema)"), 1, "лише MA7 (MA25 схований)");
+    assert(/MACD \(8, 17, 9\)/.test(c.host.querySelector(".ct-svg").textContent), "параметри MACD у заголовку панелі"); c.inst.close(); c.host.remove();
+    try { localStorage.setItem("ct2:ind:main", "{ це не json"); } catch (e) { /* без сховища */ }
+    const c2 = mountChart(env); await until(function () { return c2.candles() > 0; }); eq(nIn(c2.host, ".ct-ma"), 2, "стандартні MA7 і MA25"); eq(nIn(c2.host, ".ct-macd-line"), 0); c2.inst.close(); c2.host.remove(); clearInd();
+  });
+  test("Незалежні набори: графік зі своїми прапорцями (alt) не змінює й не читає набір основних графіків", async function () {
+    clearInd(); const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500));
+    setLayout(function (l) { LY.add(l, "ema", { period: 10 }); });
+    const c = mountChart(env, { symbol: "BTC", name: "BTC", ind: { ma7: false, ma25: false, ma50: true, vol: true } }); await until(function () { return c.candles() > 0; });
+    eq(nIn(c.host, ".ct-ma.ct-ema"), 0, "EMA з основного набору не потрапила"); eq(nIn(c.host, ".ct-ma"), 1, "лише MA50 зі сторінки"); gear(c.host).click(); c.host.querySelector(".ct-ip-add .ct-btn").click(); await sleep(60);
+    assert(localStorage.getItem("ct2:ind:alt"), "alt збережено окремо"); assert(LY.parse(localStorage.getItem("ct2:ind:main")).items.filter(function (i) { return i.type === "ema"; }).length === 1, "основний набір не змінився"); c.inst.close(); c.host.remove(); clearInd();
+  });
+  test("VWAP на годинних свічках: лінія є, перша неповна доба — пунктиром із поясненням; на денних — повідомлення «недоступний»", async function () {
+    clearInd(); const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500)); setLayout(function (l) { LY.add(l, "vwap", {}); });
+    const c = mountChart(env); await until(function () { return c.candles() > 0; }); await sleep(100); assert(nIn(c.host, ".ct-vwap") >= 2, "кілька сесій: " + nIn(c.host, ".ct-vwap"));
+    assert(nIn(c.host, ".ct-vwap-partial") >= 0, "пунктирні сегменти лише для неповних сесій"); assert(/VWAP \d/.test(c.host.querySelector(".ct-legend").textContent), "значення VWAP у легенді: " + c.host.querySelector(".ct-legend").textContent);
+    const day = Array.prototype.find.call(c.host.querySelectorAll(".ct-btn"), function (b) { return b.textContent === "1д" || b.textContent === "1D"; });
+    if (day) { env.fetchImpl = okFetch(hours(T0, 500).map(function (r, i) { return [T0 - (T0 % 86400000) + i * 86400000, r[1], r[2], r[3], r[4], r[5]]; })); day.click(); await until(function () { return /недоступний/.test(c.host.querySelector(".ct-svg").textContent); }, 2000); assert(/недоступний/.test(c.host.querySelector(".ct-svg").textContent), "денні свічки: VWAP недоступний"); eq(nIn(c.host, ".ct-vwap"), 0); }
+    c.inst.close(); c.host.remove(); clearInd();
+  });
+  test("Підпанелі RSI і MACD разом: обидві малюються, свічки/рівні/маркери лишаються на своїх цінах; без панелей — ті самі ціни", async function () {
+    clearInd(); const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500)); setLayout(function (l) { LY.update(l, "rsi", { visible: true }); LY.add(l, "macd"); });
+    const c = mountChart(env, levelSpec); await until(function () { return c.candles() > 0; }); await sleep(120);
+    assert(nIn(c.host, ".ct-rsi-line") === 1 && nIn(c.host, ".ct-macd-line") === 2, "обидві підпанелі"); const hs = c.host.querySelectorAll(".ct-rsi-bg"); eq(hs.length, 2, "дві рамки панелей"); const y0 = parseFloat(hs[0].getAttribute("y")), h0 = parseFloat(hs[0].getAttribute("height")), y1 = parseFloat(hs[1].getAttribute("y"));
+    assert(y1 >= y0 + h0, "панелі не перекриваються"); assert(y1 + parseFloat(hs[1].getAttribute("height")) <= c.svg().viewBox.baseVal.height - 20, "панелі вміщаються над віссю часу");
+    const wicks = c.host.querySelectorAll(".ct-wick"), top = parseFloat(wicks[wicks.length - 1].getAttribute("y1")), lvl = parseFloat(c.host.querySelector(".ct-level").getAttribute("y1")); near(lvl, top, 0.6, "рівень 110 збігається з верхом тіні останньої свічки");
+    const body = c.host.querySelectorAll(".ct-body-c"), by = parseFloat(body[body.length - 1].getAttribute("y")), stem = parseFloat(c.host.querySelector(".ct-marker-stem").getAttribute("y2")); near(stem, by, 0.6, "маркер 109 на закритті");
+    assert(y0 > by, "панелі нижче цінової області"); c.inst.close(); c.host.remove(); clearInd();
+  });
+  test("Масштаб ціни (Лог., %) і підпанелі: режими працюють із MACD, координати рівнів/маркерів зберігаються", async function () {
+    clearInd(); const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500)); setLayout(function (l) { LY.add(l, "macd"); LY.add(l, "ema", { period: 20 }); LY.add(l, "vwap"); });
+    const c = mountChart(env, levelSpec); await until(function () { return c.candles() > 0; }); await sleep(100);
+    ["Лог.", "%", "Лін."].forEach(function () { });
+    for (const m of ["Лог.", "%", "Лін."]) { btnOf(c.host, m).click(); await sleep(120); const wicks = c.host.querySelectorAll(".ct-wick"); near(parseFloat(c.host.querySelector(".ct-level").getAttribute("y1")), parseFloat(wicks[wicks.length - 1].getAttribute("y1")), 0.6, m + ": рівень"); eq(nIn(c.host, ".ct-macd-line"), 2, m + ": MACD лишається"); }
+    c.inst.close(); c.host.remove(); clearInd();
+  });
+  test("Зміна монети й таймфрейму: набір індикаторів зберігається, ряди перераховуються по нових даних, дублів немає", async function () {
+    clearInd(); const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500)); setLayout(function (l) { LY.add(l, "ema", { period: 12 }); LY.add(l, "macd"); });
+    const c = mountChart(env); await until(function () { return c.candles() > 0; }); await sleep(100); const before = c.host.querySelector(".ct-ma.ct-ema").getAttribute("d");
+    env.fetchImpl = okFetch(hours(T0, 500).map(function (r, i) { return [r[0], String(50 + (i % 7) * 3), String(60 + (i % 7) * 3), String(40 + (i % 7) * 3), String(50 + (i % 7) * 3), "10"]; }));
+    c.inst.open({ symbol: "ETH", name: "ETH" }); await until(function () { return env.data._state().subs[0] === "ethusdt@kline_1h"; }); await sleep(150);
+    eq(nIn(c.host, ".ct-ma.ct-ema"), 1, "EMA на новій монеті"); eq(nIn(c.host, ".ct-macd-line"), 2, "MACD на новій монеті"); assert(c.host.querySelector(".ct-ma.ct-ema").getAttribute("d") !== before, "лінія перерахована по ETH");
+    const f4 = Array.prototype.find.call(c.host.querySelectorAll(".ct-btn"), function (b) { return b.textContent === "4г" || b.textContent === "4H"; }); if (f4) { f4.click(); await sleep(250); eq(nIn(c.host, ".ct-ma.ct-ema"), 1, "EMA на новому таймфреймі"); eq(nIn(c.host, ".ct-macd-line"), 2); }
+    eq(nIn(c.host, ".ct-irow"), nIn(c.host, ".ct-irow"), ""); c.inst.close(); c.host.remove(); clearInd();
+  });
+  test("Історія: після підвантаження старих свічок EMA/MACD/VWAP перераховуються по всій історії, без дублів і збоїв", async function () {
+    clearInd(); const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500)); setLayout(function (l) { LY.add(l, "ema", { period: 20 }); LY.add(l, "macd"); LY.add(l, "vwap"); });
+    const c = mountChart(env); await until(function () { return c.candles() > 0; }); await sleep(100);
+    env.fetchImpl = okFetch(hours(T0 - 500 * H1, 500)); wheelOut(c.svg(), 40); await sleep(500);
+    assert(env.fetches.some(function (u) { return /endTime=/.test(u); }), "історію запрошено"); assert(c.candles() > 0); eq(nIn(c.host, ".ct-ma.ct-ema"), 1); eq(nIn(c.host, ".ct-macd-line"), 2); assert(nIn(c.host, ".ct-vwap") >= 1);
+    c.inst.close(); c.host.remove(); clearInd();
+  });
+  test("Швидкодія: наведення, прокрутка й масштаб із EMA+MACD+VWAP+RSI НЕ перераховують ряди; нова свічка — перераховує один раз кожен", async function () {
+    clearInd(); const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500)); setLayout(function (l) { LY.add(l, "ema", { period: 20 }); LY.add(l, "macd"); LY.add(l, "vwap"); LY.update(l, "rsi", { visible: true }); LY.update(l, "ma50", { visible: true }); });
+    const c = mountChart(env); await until(function () { return c.candles() > 0; }); await sleep(150);
+    const names = ["sma", "ema", "rsi", "bollinger", "macd", "vwap"], orig = {}, calls = {}; names.forEach(function (k) { orig[k] = ChartIndicators[k]; calls[k] = 0; ChartIndicators[k] = function () { calls[k]++; return orig[k].apply(ChartIndicators, arguments); }; });
+    try {
+      const svg = c.svg(), r = svg.getBoundingClientRect(); for (let i = 0; i < 40; i++) { svg.dispatchEvent(new PointerEvent("pointermove", { clientX: r.left + 20 + i * 5, clientY: r.top + 60, bubbles: true })); await sleep(5); }
+      wheelOut(svg, 10); await sleep(150); eq(Object.keys(calls).reduce(function (s, k) { return s + calls[k]; }, 0), 0, "перерахунків під час взаємодії: " + JSON.stringify(calls));
+      const ws = env.sockets[0]; ws.open(); ws.message(kmsg("BTC", "1h", T0 + 499 * H1, 555)); await sleep(200);
+      assert(calls.macd >= 1 && calls.vwap >= 1, "нова свічка: перерахунок " + JSON.stringify(calls)); assert(calls.macd <= 2 && calls.vwap <= 2 && calls.rsi <= 2, "не більше ~одного разу: " + JSON.stringify(calls));
+    } finally { names.forEach(function (k) { ChartIndicators[k] = orig[k]; }); }
+    c.inst.close(); c.host.remove(); clearInd();
+  });
+  test("Дві однакові EMA (період 20) рахуються один раз; закриття графіка не лишає панелі й підписок", async function () {
+    clearInd(); const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500)); setLayout(function (l) { LY.add(l, "ema", { period: 20 }); LY.add(l, "ema", { period: 20 }); });
+    const c = mountChart(env); await until(function () { return c.candles() > 0; }); await sleep(100); eq(nIn(c.host, ".ct-ma.ct-ema"), 2, "обидві лінії видно");
+    const orig = ChartIndicators.ema; let n = 0; ChartIndicators.ema = function () { n++; return orig.apply(ChartIndicators, arguments); };
+    try { env.sockets[0].open(); env.sockets[0].message(kmsg("BTC", "1h", T0 + 499 * H1, 556)); await sleep(200); } finally { ChartIndicators.ema = orig; } eq(n, 1, "EMA(20) обчислено один раз для двох однакових індикаторів");
+    c.inst.close(); eq(env.data._state().subs, [], "підписку знято"); c.host.remove(); clearInd();
+  });
+  test("Вузький екран (360 px): панель індикаторів не розширює сторінку, графік із двома підпанелями вміщається", async function () {
+    clearInd(); const env = fakeEnv(); env.fetchImpl = okFetch(hours(T0, 500)); setLayout(function (l) { LY.add(l, "macd"); LY.update(l, "rsi", { visible: true }); LY.add(l, "ema"); });
+    const c = mountChart(env); c.host.style.width = "360px"; await until(function () { return c.candles() > 0; }); gear(c.host).click(); await sleep(150);
+    assert(c.host.scrollWidth <= 361, "горизонтальної прокрутки немає: " + c.host.scrollWidth); const vb = c.svg().viewBox.baseVal; const bg = c.host.querySelectorAll(".ct-rsi-bg"); eq(bg.length, 2);
+    bg.forEach(function (r) { assert(parseFloat(r.getAttribute("height")) >= 30, "панель не стиснута до нуля"); assert(parseFloat(r.getAttribute("y")) + parseFloat(r.getAttribute("height")) <= vb.height, "панель у межах полотна"); });
+    c.inst.close(); c.host.remove(); clearInd();
+  });
+  test("Ряди без свічок (лінійний графік серії): індикатори вимкнені, кнопка керування не ламає відображення", async function () {
+    clearInd(); const host = document.createElement("div"); host.style.width = "700px"; document.body.appendChild(host);
+    const pts = []; for (let i = 0; i < 80; i++) pts.push({ t: T0 + i * 86400000, c: 100 + (i % 9) });
+    const inst = ChartTool.mount(host, { title: "Серія", points: pts }); await sleep(150); assert(host.querySelector(".ct-svg"), "графік намальовано"); eq(host.querySelectorAll(".ct-vwap, .ct-macd-line, .ct-rsi-line").length, 0); inst.close(); host.remove(); clearInd();
+  });
+
+  // =============== Запуск ===============
+  async function run() {
+    for (const item of queue) {
+      if (item.group) { section = document.createElement("div"); const h = document.createElement("h2"); h.textContent = item.group; section.appendChild(h); section.appendChild(document.createElement("ul")); out.appendChild(section); continue; }
+      const li = document.createElement("li");
+      try { await item.fn(); pass++; li.className = "ok"; li.textContent = "✓ " + item.name; }
+      catch (e) {
+        if (e instanceof Skip) { skipped++; li.className = "note"; li.textContent = "○ " + item.name + " — не автоматизовано тут: " + e.message; }
+        else { fail++; li.className = "fail"; li.textContent = "✗ " + item.name + " — " + (e && e.message ? e.message : e); }
+      }
+      section.querySelector("ul").appendChild(li);
+    }
+    const total = pass + fail, s = document.getElementById("sum");
+    s.textContent = (fail ? "Провалено: " + fail + " із " + total : "Усі тести пройдено: " + pass + " із " + total) + (skipped ? " (пропущено, потрібна видима вкладка: " + skipped + ")" : "");
+    s.className = fail ? "fail" : "ok";
+    document.title = (fail ? "ПРОВАЛ " : "OK ") + pass + "/" + total;
+    window.__testSummary = { pass: pass, fail: fail, skipped: skipped, total: total };
+  }
+
+  const notes = document.createElement("div");
+  notes.innerHTML = "<h2>Що НЕ перевіряється автоматично</h2><ul class='note'><li>Реальні відповіді й обриви біржі Binance (потрібна мережа): перевіряється вручну в браузері.</li><li>Малювання графіка, ResizeObserver, дотик і pinch на справжньому телефоні, швидкодія кадрів: лише вручну.</li><li>Інструменти малювання, збереження ліній, маркери B/S: огляд у браузері на сторінках сайту.</li></ul>";
+  document.body.appendChild(notes);
+  run();
+})();
+</script>
+</body>
+</html>

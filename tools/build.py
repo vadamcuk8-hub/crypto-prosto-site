@@ -102,8 +102,16 @@ def render_header(page):
     return tpl.replace("{{nav}}", "\n".join(links))
 
 
+# Залежності модулів: де підключено ключовий скрипт, його допоміжні файли ставляться безпосередньо перед ним
+SCRIPT_DEPS = {"chart-tool.js": ["chart-indicators.js", "chart-scale.js", "chart-layout.js", "chart-data.js"]}
+
+
 def render_scripts(page):
     names = list(PAGE_SCRIPTS.get(page, DEFAULT_SCRIPTS))
+    for main, deps in SCRIPT_DEPS.items():
+        if main in names:
+            i = names.index(main)
+            names[i:i] = [d for d in deps if d not in names]
     names.insert(1, "help.js")            # підказки-помічник потрібні кожній сторінці (одразу після core.js)
     return "\n".join('  <script src="%s"></script>' % n for n in names)
 

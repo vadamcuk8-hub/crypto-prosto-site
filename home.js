@@ -14,12 +14,13 @@
 
   function fmt(v) { return v.toLocaleString("uk-UA", { maximumFractionDigits: v >= 100 ? 2 : v >= 1 ? 4 : 6 }); }
 
-  function pick(sym) {
+  // reopen = false: графік уже відкрито цією монетою (початкове завантаження), лише підсвічуємо вкладку: так не буде другого запиту свічок
+  function pick(sym, reopen) {
     selected = sym;
     try { localStorage.setItem(STORE, sym); } catch (e) { /* не критично */ }
     Object.keys(ticks).forEach(function (k) { ticks[k].btn.setAttribute("aria-selected", k === sym ? "true" : "false"); });
     const c = COINS.filter(function (x) { return x[0] === sym; })[0];
-    if (chart) chart.open({ symbol: sym, name: c[1] });
+    if (chart && reopen !== false) chart.open({ symbol: sym, name: c[1] });
   }
 
   if (ticker && chartBox) {
@@ -35,7 +36,7 @@
       ticks[c[0]] = { btn: b, px: px, ch: ch };
     });
     chart = ChartTool.embed(chartBox, { symbol: selected, name: COINS.filter(function (x) { return x[0] === selected; })[0][1] });
-    pick(selected);
+    pick(selected, false);
 
     // Ціни тікера: WebSocket Binance, оновлення щосекунди; зміна рахується від ціни відкриття за 24 години
     let socket = null, delay = 5000;

@@ -54,7 +54,7 @@ def fast_rules(series, sim_kb, kb, fee, rnd):
     """Швидкі правила (годинні й 15-хвилинні) на всій доступній історії цих свічок: результат, «просто тримати», проти випадковості, угоди."""
     res = []
     for rule in sim_kb["strategies"]:
-        if rule["tf"] == "1d" or rule["kind"] == "random":
+        if rule["tf"] == "1d" or rule["kind"] in ("random", "setup"):
             continue
         rows = []
         for sym in kb["coins"]:

@@ -10,7 +10,7 @@ const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
 function savedTheme() { try { const v = localStorage.getItem("theme"); return v === "dark" || v === "light" ? v : null; } catch (e) { return null; } }
 
 function applyTheme() {
-  const theme = savedTheme() || (darkQuery.matches ? "dark" : "light");
+  const theme = savedTheme() || "dark";   // за замовчуванням темна «біржова» тема; вибір кнопкою біля «Головна» має перевагу
   root.setAttribute("data-theme", theme);
   const btn = document.getElementById("themeToggle");
   if (btn) { btn.setAttribute("aria-pressed", theme === "dark" ? "true" : "false"); btn.title = theme === "dark" ? "Увімкнути світлу тему" : "Увімкнути темну тему"; }

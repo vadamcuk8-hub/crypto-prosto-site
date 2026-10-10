@@ -1933,3 +1933,220 @@ details.sig-more { margin: 4px 0 0; padding: 0; border: 0; background: none; box
 .theme-toggle .ico-sun { display: none; }
 :root[data-theme="dark"] .theme-toggle .ico-sun { display: block; }
 :root[data-theme="dark"] .theme-toggle .ico-moon { display: none; }
+/* Розбір угод: картки та підсумок */
+.tr-an { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; }
+.tr-an-t { display: flex; flex-direction: column; gap: 1px; padding: 6px 10px; border-radius: 8px; background: var(--card); border-left: 4px solid var(--line); }
+.tr-an-t b { font-size: 1.1rem; } .tr-an-t .small { color: var(--muted); font-size: .72rem; }
+.tr-an-t.good { border-left-color: var(--up); } .tr-an-t.bad { border-left-color: var(--down); } .tr-an-t.warn { border-left-color: #c28a3a; }
+.tr-tip { margin: 2px 0; padding: 6px 10px; border-radius: 8px; background: var(--card); border-left: 4px solid #c28a3a; }
+.tr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+.tr-card { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 10px; background: var(--card); border: 1px solid var(--line); border-top: 4px solid var(--line); }
+.tr-card.good { border-top-color: var(--up); } .tr-card.bad { border-top-color: var(--down); } .tr-card.warn { border-top-color: #c28a3a; } .tr-card.neutral { border-top-color: var(--accent); }
+.tr-card.wide { grid-column: 1 / -1; }
+.tr-card.new { animation: simNew 2.4s ease-out; }
+.tr-top { display: flex; flex-direction: column; gap: 2px; width: 100%; background: none; border: 0; padding: 0; text-align: left; font: inherit; color: var(--text); cursor: pointer; }
+.tr-l1 { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.tr-coin { font-size: 1.1rem; }
+.tr-tag { font-size: .68rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--muted); white-space: nowrap; }
+.tr-tag.good { color: var(--up); } .tr-tag.bad { color: var(--down); } .tr-tag.warn { color: #a06c1e; }
+.tr-res { margin-left: auto; font-weight: 700; }
+.tr-l2 { color: var(--muted); } .tr-meta { font-size: .72rem; }
+.tr-verdict { padding: 5px 8px; border-radius: 6px; background: var(--accent-soft); line-height: 1.35; }
+.tr-card.good .tr-verdict { border-left: 3px solid var(--up); } .tr-card.bad .tr-verdict { border-left: 3px solid var(--down); } .tr-card.warn .tr-verdict { border-left: 3px solid #c28a3a; }
+.tr-card .sim-feed-why { margin-top: 4px; }
+/* Угоди по монетах: компактні блоки та рядки */
+.tr-coin-sec { margin-top: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); overflow: hidden; }
+.tr-coin-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; width: 100%; padding: 7px 10px; background: var(--accent-soft); border: 0; font: inherit; color: var(--text); cursor: pointer; text-align: left; }
+.tr-coin-st { color: var(--muted); } .tr-coin-res { margin-left: auto; font-weight: 700; } .tr-chev { color: var(--muted); }
+.tr-empty { padding: 6px 10px; color: var(--muted); margin: 0; }
+.tr-row { padding: 5px 10px; border-top: 1px solid var(--line); border-left: 4px solid var(--line); }
+.tr-row.good { border-left-color: var(--up); } .tr-row.bad { border-left-color: var(--down); } .tr-row.warn { border-left-color: #c28a3a; } .tr-row.neutral { border-left-color: var(--accent); }
+.tr-row.new { animation: simNew 2.4s ease-out; }
+.tr-rtop { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; width: 100%; background: none; border: 0; padding: 0; font: inherit; color: var(--text); cursor: pointer; text-align: left; }
+.tr-when { color: var(--muted); }
+.tr-rv { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.tr-row .tr-verdict { margin: 4px 0; }
+.tr-ana { margin: 6px 0; } .tr-ana-g { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 6px; }
+/* Банер «замало даних», підключення, знімки по днях */
+.tr-gate { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-radius: 10px; margin: 6px 0; border-left: 5px solid #c28a3a; background: var(--card); }
+.tr-gate.ok { border-left-color: var(--up); } .tr-gate.low b { color: #a06c1e; }
+:root[data-theme="dark"] .tr-gate.low b { color: #e0b36a; }
+#dataGate { margin-top: 4px; }
+.tr-conn { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.tr-conn-row { padding: 6px 10px; border-radius: 8px; background: var(--card); border-left: 4px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
+.tr-conn-row.ok { border-left-color: var(--up); } .tr-conn-row.off { border-left-color: #c28a3a; }
+.tr-daily { margin-bottom: 12px; }
+.feed-chip { padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; font-size: .84rem; cursor: pointer; }
+.feed-chip:hover { background: var(--accent-soft); }
+.feed-chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.feed-chip.sort { margin-left: auto; }
+/* Вкладка «Аналітика гаманців» */
+#walletAnalytics { display: flex; flex-direction: column; gap: 6px; }
+#walletAnalytics[hidden] { display: none; }
+.an-head h4 { margin: 0; font-size: 1.1rem; } .an-head p { margin: 2px 0 0; }
+.an-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; }
+.an-card { padding: 10px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); border-top: 5px solid var(--accent); display: flex; flex-direction: column; gap: 4px; }
+.an-card-h { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.an-big { font-size: 1.4rem; font-weight: 700; }
+.an-spark { width: 100%; height: 34px; }
+.an-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; margin-top: 4px; }
+.an-cell { display: flex; flex-direction: column; } .an-cell .small { font-size: .7rem; }
+.an-chart { background: var(--card); border-radius: 10px; padding: 8px; border: 1px solid var(--line); }
+.an-legend { display: flex; gap: 14px; flex-wrap: wrap; font-weight: 600; }
+.an-heat td, .an-heat th { text-align: center; } .an-heat td:first-child, .an-heat th:first-child { text-align: left; }
+.an-heat tr[data-hrule] { cursor: pointer; } .an-avg { font-weight: 700; }
+.an-coins { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.an-coincol { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+.an-coinrow { display: grid; grid-template-columns: 46px 1fr 64px; gap: 6px; align-items: center; }
+.an-coinname { font-weight: 700; font-size: .85rem; }
+.an-coinbar { position: relative; height: 8px; border-radius: 4px; background: var(--accent-soft); }
+.an-coinbar i { position: absolute; top: 0; bottom: 0; border-radius: 4px; } .an-coinbar i.pos { background: var(--up); } .an-coinbar i.neg { background: var(--down); }
+.an-hist { display: flex; align-items: flex-end; gap: 6px; padding: 8px 10px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; min-height: 120px; }
+.an-hcol { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; text-align: center; }
+.an-hcol i { width: 70%; border-radius: 3px 3px 0 0; } .an-hcol i.pos { background: var(--up); } .an-hcol i.neg { background: var(--down); }
+.an-tips { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.an-bar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 4px; }
+.an-bw { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px; }
+.an-bw-card { padding: 10px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
+.an-bw-card.good { border-left-color: var(--up); } .an-bw-card.bad { border-left-color: var(--down); } .an-bw-card.warn { border-left-color: #c28a3a; }
+.an-bw-h { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: baseline; } .an-bw-pl { font-weight: 700; font-size: 1.1rem; }
+/* Сторінка «Аналітика гаманців»: той самий скрипт, але видно лише аналітику */
+.page-wallets #walletViews, .page-wallets .wallet-tabs, .page-wallets #paperTiles, .page-wallets #history, .page-wallets #testnet, .page-wallets #simAgent { display: none !important; }
+.page-wallets .wallet-pane:not(#walletAnalytics) { display: none !important; }
+.page-wallets #walletAnalytics { display: flex !important; }
+.page-wallets .wallet-details { border-top-width: 3px; }
+.wallets-lead { max-width: 760px; margin: 6px 0 0; }
+.wallet-view.link { text-decoration: none; color: var(--accent); border-color: var(--accent); }
+.lb { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; border-left: 6px solid var(--accent); }
+.lb-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.lb-t { display: flex; flex-direction: column; margin-right: auto; }
+.lb-log { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.lb-item { display: flex; flex-direction: column; padding: 4px 8px; border-radius: 6px; background: var(--accent-soft); border-left: 4px solid var(--line); }
+.lb-item.buy { border-left-color: var(--up); } .lb-item.sell { border-left-color: var(--down); }
+
+/* =====================================================================
+   ТЕМА «БІРЖА»: симбіоз Binance і Bybit, але спокійніший.
+   Графітові панелі, тонкі рамки, золотий акцент, зелений/червоний лише для чисел,
+   щільні таблиці з цифрами однакової ширини, плоскі вкладки з підкресленням.
+   Контраст тексту ≥ 4,5:1 в обох темах. Лежить в кінці файлу й перекриває попередні правила.
+   ===================================================================== */
+:root {
+  --bg: #f4f5f7;
+  --card: #ffffff;
+  --text: #1e2329;
+  --muted: #5a6472;
+  --line: #e3e6eb;
+  --accent: #8a6400;               /* темне золото: ≥5:1 на білому */
+  --accent-soft: #f7f1de;
+  --accent-dark: #6b4d00;
+  --up: #167a4f;
+  --down: #c0334a;
+  --on-accent: #ffffff;
+  --hero-text: #ffffff;
+  --shadow-card: none;
+  --radius: 8px;
+  --mono: "Cascadia Mono", "SF Mono", Consolas, "Roboto Mono", monospace;
+}
+:root[data-theme="dark"] {
+  --bg: #0b0e11;
+  --card: #161a1e;
+  --text: #eaecef;
+  --muted: #9aa4b2;
+  --line: #2b3139;
+  --accent: #f0b90b;               /* золото біржі */
+  --accent-soft: #1f2329;
+  --accent-dark: #d9a400;
+  --up: #2ebd85;
+  --down: #f6465d;
+  --on-accent: #14161a;
+  --hero-text: #14161a;
+}
+html { color-scheme: light dark; }
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+
+body { font-variant-numeric: tabular-nums; letter-spacing: 0; background: var(--bg); }
+h1 { font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.1rem); letter-spacing: -0.015em; }
+h2 { font-size: clamp(1.25rem, 1.05rem + .8vw, 1.55rem); }
+h3, .sub { font-size: 1.05rem; }
+.out-big, .an-big, .tr-res, .sim-feed-sum, .coin-price, .price b { font-variant-numeric: tabular-nums; }
+
+/* шапка й меню: плоска панель з тонкою золотою лінією зверху */
+header { border-radius: var(--radius); box-shadow: none; background: var(--card); border: 1px solid var(--line); -webkit-backdrop-filter: none; backdrop-filter: none; border-top: 2px solid var(--accent); }
+nav a { border-radius: 6px; font-weight: 500; }
+nav a:hover { background: var(--accent-soft); }
+nav a[aria-current="page"], nav a[aria-current="true"] { background: var(--accent-soft); color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.theme-toggle { border-radius: 6px; }
+
+/* картки та панелі: прямі кути, рамка замість тіней, без «стрибків» при наведенні */
+.card, .calc, .chart, .feed-item, details, .table-wrap, .ov-tile, .term, .agent-table, .an-card, .an-bw-card, .lb, .tr-coin-sec, .tr-gate, .sim-feed, .arena, .wallet-details, .arena-row, .an-coincol, .an-hist, .tc-box, .tc-gauge, .tc-target { border-radius: var(--radius); box-shadow: none; }
+.card:hover, .price:hover, .heat-tile.clickable:hover { transform: none; border-color: var(--accent); }
+.hero { border-radius: 12px; }
+.ov-tile, .card { background: var(--card); }
+
+/* вкладки: підкреслені, як на біржі */
+.subtabs { border-bottom: 1px solid var(--line); gap: 0; }
+.subtabs a, .page-title-sub .subtabs a { background: transparent !important; border: 0 !important; border-bottom: 2px solid transparent !important; border-radius: 0 !important; padding: 8px 14px; color: var(--muted); font-weight: 600; transform: none !important; text-decoration: none; }
+.subtabs a:hover { color: var(--text); background: var(--accent-soft) !important; }
+.subtabs a.on { color: var(--accent); border-bottom-color: var(--accent) !important; }
+.wallet-views { gap: 0; border-bottom: 1px solid var(--line); }
+.wallet-view { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); padding: 8px 14px; font-weight: 600; }
+.wallet-view:hover { color: var(--text); background: var(--accent-soft); }
+.wallet-view.on { background: transparent; color: var(--accent); border-bottom-color: var(--accent); }
+.wallet-view.link { color: var(--accent); margin-left: auto; border-bottom-color: transparent; }
+.wallet-tab { border-radius: var(--radius); }
+.wallet-tab.on { box-shadow: inset 0 -3px 0 var(--accent); background: var(--accent-soft); border-color: var(--line); }
+.feed-chip, .chip, .filter, .coin-tab, .period-tab, .currency-tab, .agent-tab, .pill, .ct-btn { border-radius: 6px; }
+.feed-chip.on, .wallet-view.on, .chip-main, .agent-tab[aria-selected="true"], .sim-periods .ct-btn.active { color: var(--on-accent); }
+.feed-chip.on { background: var(--accent); border-color: var(--accent); }
+.chip-main, .agent-tab[aria-selected="true"], .sim-periods .ct-btn.active { background: var(--accent); }
+.wallet-view.on { color: var(--accent); }
+.rank-tag, .tr-tag, .chip { border-radius: 4px; }
+
+/* кнопки, поля */
+button, select, input { font-family: inherit; }
+select, input[type="text"], input[type="number"], input[type="search"] { border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+.link-btn { color: var(--accent); }
+a { color: var(--accent); }
+a:hover { color: var(--accent-dark); }
+
+/* таблиці: щільні, з великими цифрами в одному стилі */
+.agent-table { border-radius: var(--radius); overflow: hidden; }
+.agent-table th { text-transform: uppercase; letter-spacing: .04em; font-size: .72rem; color: var(--muted); background: var(--accent-soft); }
+.agent-table td, .agent-table th { padding: 8px 12px; }
+.agent-table tbody tr:hover { background: var(--accent-soft); }
+.rank-strong td { box-shadow: inset 3px 0 0 var(--accent); }
+.board-sel td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+
+/* числа: зелений/червоний лише там, де це напрям руху */
+.tone-positive, .chg.up { color: var(--up); }
+.tone-negative, .chg.down { color: var(--down); }
+.tr-res, .an-big, .out-big { font-weight: 700; }
+
+/* лівий акцент у стрічці угод і картках — золото замість «синьо-сірого» */
+.sim-feed, .arena { background: var(--accent-soft); border-color: var(--line); }
+.sim-feed-row, .tr-row { background: var(--card); }
+.wallet-details { background: var(--card); border-top: 2px solid var(--accent); }
+.tc-plan { border-left-color: var(--accent); }
+.an-card { border-top-width: 3px; }
+.lb { border-left-color: var(--accent); }
+
+/* тіні, ефекти «скла» й заокруглення, що видавали шаблонність, прибрано */
+.ov-tile, .card, .price, .feed-item, details { box-shadow: none; }
+.nav-ico { opacity: .9; }
+@media (prefers-reduced-motion: no-preference) { body { animation: none; } }
+
+
+/* Графік угоди (ChartTool): позначки B/S, рівні, BOLL, RSI, Фібоначчі */
+.tc-ct { margin: 4px 0; }
+.tc-ct .ct { border: 1px solid var(--line); border-radius: 8px; background: var(--card); max-width: none; width: 100%; }
+.ct-marker-dot { stroke: var(--card); stroke-width: 2; } .ct-marker.ct-up .ct-marker-dot { fill: var(--b-up); } .ct-marker.ct-down .ct-marker-dot { fill: var(--b-down); }
+.ct-marker-stem { stroke-width: 1.2; stroke-dasharray: 2 2; } .ct-marker.ct-up .ct-marker-stem { stroke: var(--b-up); } .ct-marker.ct-down .ct-marker-stem { stroke: var(--b-down); }
+.ct-marker-t { fill: #fff; font-size: 10.5px; font-weight: 800; }
+.ct-level { stroke-width: 1.2; stroke-dasharray: 6 4; } .ct-level-t { font-size: 11px; font-weight: 700; paint-order: stroke; stroke: var(--card); stroke-width: 3px; }
+.ct-boll { fill: none; stroke: #4a9bf5; stroke-width: 1; opacity: .85; } .ct-boll-mid { stroke: #f0b90b; stroke-dasharray: 3 3; }
+.ct-boll-fill { fill: #4a9bf5; opacity: .08; }
+.ct-rsi-bg { fill: none; stroke: var(--b-grid); } .ct-rsi-ref { stroke: var(--b-grid); stroke-dasharray: 3 3; }
+.ct-rsi-line { fill: none; stroke: #cc7ee8; stroke-width: 1.4; } .ct-rsi-t { fill: var(--b-muted); font-size: 11px; }
+.ct-fib { stroke: #cc7ee8; stroke-width: 1; opacity: .8; } .ct-fib-edge { opacity: 1; stroke-width: 1.4; }
+.ct-fib-t { fill: #cc7ee8; font-size: 10.5px; font-weight: 700; paint-order: stroke; stroke: var(--card); stroke-width: 3px; }

@@ -29,7 +29,8 @@ PARTIALS = os.path.join(ROOT, "tools", "partials")
 # Які скрипти потрібні сторінці (порядок важливий: core.js завжди першим)
 PAGE_SCRIPTS = {
     "index.html": ["core.js", "agent-ui.js", "charts.js", "chart-tool.js", "widget-defs.js", "widgets.js", "home.js", "chartbg.js"],
-    "simulation.html": ["core.js", "agent-ui.js", "simulation.js"],
+    "simulation.html": ["core.js", "agent-ui.js", "chart-tool.js", "simulation.js"],
+    "wallets.html": ["core.js", "agent-ui.js", "chart-tool.js", "simulation.js"],
     "agents.html": ["core.js", "agent-ui.js", "charts.js", "chart-tool.js", "widget-defs.js", "widgets.js", "agents.js"],
     "learn.html": ["core.js", "learn.js"],
     "market.html": ["core.js", "agent-ui.js", "chart-tool.js", "market-live.js", "market-charts.js", "market-calc.js",
@@ -41,7 +42,7 @@ PAGE_SCRIPTS = {
 DEFAULT_SCRIPTS = ["core.js"]          # решта сторінок (news-*.html)
 
 # Підрозділ меню: сторінки новин підсвічують пункт «Новини»
-NAV = [("index.html", "Головна"), ("market.html", "Ринок"), ("news.html", "Новини"), ("analytics.html", "Аналітика"), ("simulation.html", "Симуляція"), ("agents.html", "Агенти"), ("learn.html", "Довідка")]
+NAV = [("index.html", "Головна"), ("market.html", "Ринок"), ("news.html", "Новини"), ("analytics.html", "Аналітика"), ("simulation.html", "Симуляція"), ("wallets.html", "Гаманці"), ("agents.html", "Агенти"), ("learn.html", "Довідка")]
 
 # Іконки пунктів меню (контури 24×24, колір береться з тексту посилання)
 ICONS = {
@@ -50,6 +51,7 @@ ICONS = {
     "news.html": "M5 5h11v14H7a2 2 0 0 1-2-2zM16 9h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5",
     "analytics.html": "M5 20V10M12 20V4M19 20v-7",
     "simulation.html": "M3 17l6-6 4 4 8-8M15 7h6v6",
+    "wallets.html": "M3 8a2 2 0 0 1 2-2h13v3M3 8v9a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2zM16 13.5h2",
     "agents.html": "M12 3v3M12 18v3M3 12h3M18 12h3M7 7l2 2M15 15l2 2M17 7l-2 2M9 15l-2 2M9 9h6v6H9z",
     "learn.html": "M4 5.5A1.5 1.5 0 0 1 5.5 4H12v15H5.5A1.5 1.5 0 0 0 4 20.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H12v15h6.5a1.5 1.5 0 0 1 1.5 1.5z",
 }
@@ -129,8 +131,25 @@ def build_page(page):
     return version_assets(text)
 
 
+def sync_wallets_page():
+    """wallets.html = та сама розмітка й той самий simulation.js, але показує лише «Аналітику гаманців»: так не доводиться дублювати код.
+    Сторінку створює збірка з simulation.html (правте розмітку там, а не в wallets.html)."""
+    src = read(os.path.join(ROOT, "simulation.html"))
+    t = src.replace("<title>Симуляція — Крипто простими словами</title>", "<title>Аналітика гаманців — Крипто простими словами</title>", 1)
+    t = t.replace("<body>", '<body class="page-wallets">', 1)
+    t = t.replace("<h1>Симуляція</h1>", "<h1>Аналітика гаманців</h1>", 1)
+    t = re.sub(r'<div class="subtabs".*?</div>', '<p class="small muted wallets-lead">Один бот у трьох гаманцях з різними монетами: порівняння, найвигідніша угода і чому, живий бот у браузері. <a href="simulation.html">← До симуляції</a></p>', t, count=1, flags=re.S)
+    t = t.replace('<div class="rep-bar" hidden>', '<div class="rep-bar">', 1)
+    path = os.path.join(ROOT, "wallets.html")
+    if not os.path.exists(path) or read(path) != t:
+        # зберігаємо вже підставлені шапку/підвал/скрипти: їх збірка оновить далі
+        write(path, t)
+
+
 def main():
     check = "--check" in sys.argv
+    if not check:
+        sync_wallets_page()
     stale, built = [], 0
     for name in sorted(os.listdir(ROOT)):
         if not name.endswith(".html"):

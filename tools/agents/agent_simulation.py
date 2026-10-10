@@ -20,6 +20,7 @@ SOURCE = "Binance"
 INTERVAL = 120
 RUNS_LAST = True        # після «Картини» і «Звіту», перед агентом тестової біржі, який читає його рішення
 WARMUP = 199            # перший день, для якого вже є середня за 200 днів
+STATE_V = 3             # версія розрахунку паперового рахунку: 3 = спільна стартова ціна, буфер і пауза, знімки по днях
 PAPER = "_paper"        # стан паперового рахунку (віртуальна торгівля вперед у часі)
 CURVE_DAYS = 400
 
@@ -86,6 +87,11 @@ def decide(rule, i, pos, score, s50, c, key=None):
         return (r < rule["p_enter"]) if not pos else (r >= rule["p_exit"])
     inv = rule.get("invert")
     if rule["kind"] == "sma50":
+        band = rule.get("band", 0) / 100.0
+        if band:                                            # буфер: вхід лише помітно за середньою, вихід лише помітно з іншого боку
+            if inv:
+                return (c[i] < s50[i] * (1 - band)) if not pos else (c[i] <= s50[i] * (1 + band))
+            return (c[i] > s50[i] * (1 + band)) if not pos else (c[i] >= s50[i] * (1 - band))
         return (c[i] < s50[i]) if inv else (c[i] > s50[i])
     sc = score[i]
     if inv:
@@ -171,6 +177,8 @@ def explain(rule, side, ind, score, why=None):
         move = num(abs(why[2]), 2)
         return ("Стоп-лос: ціна %s на %s%% нижча за ціну купівлі %s (поріг %s%%): виходимо, щоб обмежити збиток." % (num(ind["price"], 2 if ind["price"] >= 100 else 4), move, num(why[1], 2 if why[1] >= 100 else 4), rule["stop"])) \
             if why[0] == "stop" else ("Тейк-профіт: ціна %s на %s%% вища за ціну купівлі %s (поріг %s%%): фіксуємо прибуток." % (num(ind["price"], 2 if ind["price"] >= 100 else 4), move, num(why[1], 2 if why[1] >= 100 else 4), rule["take"]))
+    if why and why[0] == "setup":
+        return why[1]
     if rule["kind"] == "random":
         return "Випадкове рішення контрольного бота (без індикаторів): %s." % ("купує" if side == "BUY" else "виходить у готівку")
     p, s50 = num(ind["price"], 2 if ind["price"] >= 100 else 4), num(ind["sma50"], 2 if ind["sma50"] >= 100 else 4)
@@ -248,6 +256,126 @@ def paper_wallets(ptf, kb, now):
     return main
 
 
+def setup_entry(rule, P, i15, i1h, closes15):
+    """Чи зійшлися умови входу ПРЯМО ЗАРАЗ (за живою ціною P, без очікування закриття свічки). Повертає текст-причину або None."""
+    band = rule.get("band", 0.1) / 100.0
+    s15, s1h, rsi = i15["sma50"], i1h["sma50"], i1h["rsi"]
+    if rule.get("mode") == "dip":                                       # відкат у висхідному тренді: купуємо просідання
+        if not (P > s1h * 1.002):
+            return None
+        if not (P < s15 * (1 - rule.get("dip", 0.15) / 100.0)):
+            return None
+        if not (rule.get("rsi_min", 30) <= rsi <= rule.get("rsi_max", 55)):
+            return None
+        return ("Відкат у висхідному тренді: ціна %s вище середньої за 50 годин (%s), але нижче 15-хвилинної середньої (%s) на %s%%; RSI за годину %s. Умови зійшлися, входимо одразу."
+                % (num(P, 2 if P >= 100 else 4), num(s1h, 2 if s1h >= 100 else 4), num(s15, 2 if s15 >= 100 else 4), num((1 - P / s15) * 100, 2), num(rsi, 0)))
+    if not (P > s15 * (1 + band)):
+        return None
+    if not (P > s1h):
+        return None
+    if not (rule.get("rsi_min", 40) <= rsi <= rule.get("rsi_max", 68)):
+        return None
+    if len(closes15) < 5 or not (P > closes15[-5]):                      # зростання за останню годину
+        return None
+    return ("Умови зійшлися одразу: ціна %s вища за 15-хвилинну середню (%s) і годинну середню (%s), RSI за годину %s у «здоровому» діапазоні, за останню годину ціна росте. Входимо без очікування закриття свічки."
+            % (num(P, 2 if P >= 100 else 4), num(s15, 2 if s15 >= 100 else 4), num(s1h, 2 if s1h >= 100 else 4), num(rsi, 0)))
+
+
+def setup_exit(rule, co, P, s15):
+    """Умова виходу за ціною: повертає (причина, тип) або None. Перевіряється при кожному запуску й на кожній 15-хвилинній свічці між запусками."""
+    e = co["entry"]
+    chg = (P / e - 1) * 100
+    if rule.get("stop") and chg <= -rule["stop"]:
+        return ("Стоп-лос: ціна %s на %s%% нижча за ціну купівлі %s (поріг %s%%): виходимо одразу, щоб обмежити збиток." % (num(P, 2 if P >= 100 else 4), num(abs(chg), 2), num(e, 2 if e >= 100 else 4), rule["stop"]), "stop")
+    if rule.get("take") and chg >= rule["take"]:
+        return ("Тейк-профіт: ціна %s на %s%% вища за ціну купівлі %s (поріг %s%%): фіксуємо прибуток одразу." % (num(P, 2 if P >= 100 else 4), num(chg, 2), num(e, 2 if e >= 100 else 4), rule["take"]), "take")
+    pk = co.get("peak") or e
+    if rule.get("trail") and (pk / e - 1) * 100 >= rule.get("trail_start", 0.6) and (P / pk - 1) * 100 <= -rule["trail"]:
+        return ("Трейлінг-стоп: ціна %s відкотилась на %s%% від максимуму %s (поріг %s%%): фіксуємо накопичений прибуток." % (num(P, 2 if P >= 100 else 4), num(abs((P / pk - 1) * 100), 2), num(pk, 2 if pk >= 100 else 4), rule["trail"]), "trail")
+    if s15 and rule.get("mode") != "dip" and P < s15 * (1 - rule.get("band", 0.1) / 100.0):
+        return ("Тренд зламано: ціна %s опустилась нижче 15-хвилинної середньої (%s): виходимо одразу." % (num(P, 2 if P >= 100 else 4), num(s15, 2 if s15 >= 100 else 4)), "trend")
+    return None
+
+
+def setup_step(rule, sd, ptf, fee, ctx, events, now):
+    """Правило-«сканер умов»: не чекає закриття свічок за розкладом. При КОЖНОМУ запуску (≈10 хв) дивиться на живу ціну й закриті
+    15-хвилинні та годинні свічки: якщо умови входу зійшлися, купує одразу; вихід: стоп-лос, тейк-профіт, трейлінг-стоп чи злам тренду.
+    Між запусками виходи перевіряються і за закриттями 15-хвилинних свічок, що пройшли."""
+    s15, s1h = ptf.get(rule["tf"], {}), ptf.get(rule.get("confirm_tf", "1h"), {})
+    coins = [x for x in s15 if x in s1h]
+    if not coins:
+        return None
+    if "w" not in sd:
+        sd["w"] = {sym: 1.0 / len(coins) for sym in coins}
+    ts = now.isoformat(timespec="minutes")
+    now_ms = int(now.timestamp() * 1000)
+    for sym in coins:
+        c, t, scores, _s = s15[sym]
+        c1 = s1h[sym][0]
+        P = c[-1]
+        i15, i1h = indicators(c), indicators(c1)
+        w = sd["w"].get(sym, 1.0 / len(coins))
+        co = sd["coins"].get(sym)
+        if co is None:
+            why = setup_entry(rule, P, i15, i1h, c)
+            co = {"pos": bool(why), "eq": (1 - fee) if why else 1.0, "hold": 1 - fee, "px": P, "t": t[len(c) - 2], "entry": P if why else None, "peak": P if why else None, "cool": 0}
+            sd["trades"] += 1 if why else 0
+            if why:
+                ev0 = make_event(rule, sym, "BUY", c, len(c) - 1, scores, t, ctx, now, 1.0, initial=True, w=round(w, 4), why_info=("setup", why))
+                ev0["price"] = P
+                events.setdefault(rule["id"], []).append(ev0)
+        else:
+            # 1) закриті 15-хвилинні свічки від минулого запуску: оновлюємо рахунок і перевіряємо вихід за ціною свічки
+            for k in range(1, len(c) - 1):
+                if t[k] <= co["t"]:
+                    continue
+                r = c[k] / co["px"]
+                co["px"] = c[k]
+                if co["pos"]:
+                    co["eq"] *= r
+                    co["peak"] = max(co.get("peak") or c[k], c[k])
+                co["hold"] *= r
+                co["t"] = t[k]
+                if co["pos"]:
+                    ex = setup_exit(rule, co, c[k], None)
+                    if ex:
+                        eqb = co["eq"]
+                        co["eq"] *= 1 - fee
+                        co.update(pos=False, entry=None, peak=None, cool=now_ms + rule.get("cooldown_min", 30) * 60000)
+                        sd["trades"] += 1
+                        events.setdefault(rule["id"], []).append(make_event(rule, sym, "SELL", c, k, scores, t, ctx, now, co["eq"], w=round(w, 4), why_info=("setup", ex[0])))
+            # 2) жива ціна зараз: оцінюємо рахунок і, якщо умови зійшлись, діємо одразу
+            r = P / co["px"]
+            co["px"] = P
+            if co["pos"]:
+                co["eq"] *= r
+                co["peak"] = max(co.get("peak") or P, P)
+            co["hold"] *= r
+            if co["pos"]:
+                ex = setup_exit(rule, co, P, i15["sma50"])
+                if ex:
+                    co["eq"] *= 1 - fee
+                    co.update(pos=False, entry=None, peak=None, cool=now_ms + rule.get("cooldown_min", 30) * 60000)
+                    sd["trades"] += 1
+                    events.setdefault(rule["id"], []).append(make_event(rule, sym, "SELL", c, len(c) - 1, scores, t, ctx, now, co["eq"], w=round(w, 4), why_info=("setup", ex[0])))
+            elif now_ms >= co.get("cool", 0):
+                why = setup_entry(rule, P, i15, i1h, c)
+                if why:
+                    eqb = co["eq"]
+                    co["eq"] *= 1 - fee
+                    co.update(pos=True, entry=P, peak=P)
+                    sd["trades"] += 1
+                    events.setdefault(rule["id"], []).append(make_event(rule, sym, "BUY", c, len(c) - 1, scores, t, ctx, now, eqb, w=round(w, 4), why_info=("setup", why)))
+        sd["coins"][sym] = co
+    eq = round(sum(sd["w"].get(sym, 0) * sd["coins"][sym]["eq"] for sym in coins), 5)
+    hold = round(sum(sd["w"].get(sym, 0) * sd["coins"][sym]["hold"] for sym in coins), 5)
+    sd["last"] = [ts, eq, hold]
+    sd["curve"] = ([r for r in sd["curve"] if r[0] != ts] + [sd["last"]])
+    state = {sym: [1 if x["pos"] else 0, round(x["eq"], 5), round(x["hold"], 5), x["px"], round(sd["w"].get(sym, 0), 4)] for sym, x in sd["coins"].items() if sym in coins}
+    return {"curve": sd["curve"], "eq": eq, "hold": hold, "trades": sd["trades"], "state": state, "tf": rule["tf"],
+            "open": sorted(k for k, x in sd["coins"].items() if x["pos"]), "coins": len(sd["coins"])}
+
+
 def paper_update(ptf, kb, now, tag=""):
     """Цілодобова перевірка вперед у часі на віртуальних грошах.
     ptf: {масштаб свічок: {монета: (ціни, час відкриття, оцінки, SMA50)}}. Рішення ухвалюються за ЗАКРИТИМИ свічками масштабу правила,
@@ -258,6 +386,9 @@ def paper_update(ptf, kb, now, tag=""):
     fee = kb["fee"] + kb.get("slippage", 0.0)
     st = load(PAPER + tag) or {}
     ctx, events = outlook_context(), load(EVENTS + tag) or {}
+    if st and st.get("v") != STATE_V:                       # версія розрахунку змінилась: новий раунд зі спільною стартовою ціною для всіх правил
+        st, events = {"history": st.get("history", [])}, {}
+    st["v"] = STATE_V
     rd = st.get("round")
     if rd and now >= datetime.fromisoformat(rd["end"]):                      # раунд завершено: архівуємо
         st.setdefault("history", []).append({"start": rd["start"], "end": rd["end"], "capital": kb["accounts"],
@@ -273,13 +404,20 @@ def paper_update(ptf, kb, now, tag=""):
             if fixed_dt > now:
                 end = fixed_dt.astimezone(timezone.utc)
         rd = st["round"] = {"start": now.isoformat(timespec="minutes"), "end": end.isoformat(timespec="minutes")}
-        st["strategies"] = {}
+        st["strategies"], st["daily"] = {}, {}
     out = {}
     for rule in kb["strategies"]:
         series = ptf.get(rule["tf"], {})
         if not series:
             continue
         sd = st["strategies"].setdefault(rule["id"], {"coins": {}, "curve": [], "trades": 0, "last": None})
+        if rule["kind"] == "setup":                                 # сканер умов: рішення за живою ціною при кожному запуску
+            res = setup_step(rule, sd, ptf, fee, ctx, events, now)
+            if res:
+                sd["curve"] = sd["curve"][-kb["curve_points"]:]
+                res["curve"] = sd["curve"]
+                out[rule["id"]] = res
+            continue
         if "w" not in sd:                                       # ваги монет фіксуємо на старті раунду (інакше рахунок «стрибав» би)
             sd["w"] = volatility_weights(series) if rule.get("sizing") == "vol" else {sym: 1.0 / len(series) for sym in series}
         marks = []
@@ -289,19 +427,29 @@ def paper_update(ptf, kb, now, tag=""):
             co = sd["coins"].get(sym)
             if co is None:
                 pos = bool(decide(rule, closed, False, scores, s50, c, (sym, t[closed])))
-                co = {"pos": pos, "eq": (1 - fee) if pos else 1.0, "hold": 1 - fee, "t": t[closed], "entry": c[closed] if pos else None, "blocked": False}
+                sp = c[-1]                                    # фактична ціна на старті раунду: від неї рахуємо ВСІХ (і денні, і хвилинні правила)
+                co = {"pos": pos, "eq": (1 - fee) if pos else 1.0, "hold": 1 - fee, "t": t[closed], "entry": sp if pos else None, "blocked": False, "sp": sp, "cool": 0}
                 sd["trades"] += 1 if pos else 0
                 if pos:
-                    events.setdefault(rule["id"], []).append(make_event(rule, sym, "BUY", c, closed, scores, t, ctx, now, 1.0, initial=True, w=round(w, 4)))
+                    ev0 = make_event(rule, sym, "BUY", c, closed, scores, t, ctx, now, 1.0, initial=True, w=round(w, 4))
+                    ev0["price"] = sp
+                    events.setdefault(rule["id"], []).append(ev0)
             else:
+                first_sp = co.get("sp")
                 for k in range(1, closed + 1):
                     if t[k] <= co["t"]:
                         continue
-                    r = c[k] / c[k - 1]
+                    r = c[k] / (first_sp if first_sp else c[k - 1])
+                    first_sp = None
+                    co.pop("sp", None)
                     if co["pos"]:
                         co["eq"] *= r
                     co["hold"] *= r
-                    raw = bool(decide(rule, k, co["pos"], scores, s50, c, (sym, t[k])))
+                    if not co["pos"] and co.get("cool", 0) > 0:          # пауза після продажу: кілька свічок не входимо знову
+                        co["cool"] -= 1
+                        raw = False
+                    else:
+                        raw = bool(decide(rule, k, co["pos"], scores, s50, c, (sym, t[k])))
                     want, info = raw, None
                     if co.get("blocked"):                                # після стопу чи тейку чекаємо нового сигналу, а не купуємо одразу знову
                         if not raw:
@@ -318,12 +466,15 @@ def paper_update(ptf, kb, now, tag=""):
                         co["eq"] *= 1 - fee
                         co["pos"] = want
                         co["entry"] = c[k] if want else None
+                        if not want:
+                            co["cool"] = rule.get("cooldown", 0)
                         sd["trades"] += 1
                         events.setdefault(rule["id"], []).append(make_event(rule, sym, "BUY" if want else "SELL", c, k, scores, t, ctx, now,
                                                                             eq_before if want else co["eq"], w=round(w, 4), why_info=info))
                     co["t"] = t[k]
             sd["coins"][sym] = co
-            live = c[-1] / c[closed]                              # поточна ціна відносно останнього закриття: оцінка «на зараз»
+            base = co.get("sp") or c[closed]                       # до першої закритої свічки відлік іде від стартової ціни
+            live = c[-1] / base                                   # поточна ціна відносно останнього закриття: оцінка «на зараз»
             marks.append((w * co["eq"] * (live if co["pos"] else 1.0), co["hold"] * live / len(series)))
         if marks:
             eq = round(sum(m[0] for m in marks), 5)
@@ -331,14 +482,18 @@ def paper_update(ptf, kb, now, tag=""):
             ts = now.isoformat(timespec="minutes")
             sd["last"] = [ts, eq, hold]
             sd["curve"] = ([r for r in sd["curve"] if r[0] != ts] + [sd["last"]])[-kb["curve_points"]:]
-            state = {sym: [1 if x["pos"] else 0, round(x["eq"], 5), round(x["hold"], 5), series[sym][0][len(series[sym][0]) - 2], round(sd["w"].get(sym, 0), 4)]
+            state = {sym: [1 if x["pos"] else 0, round(x["eq"], 5), round(x["hold"], 5), x.get("sp") or series[sym][0][len(series[sym][0]) - 2], round(sd["w"].get(sym, 0), 4)]
                      for sym, x in sd["coins"].items() if sym in series}
             out[rule["id"]] = {"curve": sd["curve"], "eq": eq, "hold": hold, "trades": sd["trades"], "state": state, "tf": rule["tf"],
                                "open": sorted(k for k, x in sd["coins"].items() if x["pos"]), "coins": len(sd["coins"])}
+    day = now.date().isoformat()
+    st.setdefault("daily", {})[day] = {rid: [o["eq"], o["hold"], o["trades"]] for rid, o in out.items()}
+    for old_day in sorted(st["daily"])[:-21]:                 # зберігаємо не більше 21 дня
+        st["daily"].pop(old_day, None)
     write_json(PAPER + tag + ".json", st)
     write_json(EVENTS + tag + ".json",{k: v[-EVENTS_PER_RULE:] for k, v in events.items()})     # журнал рішень (самоочищується)
     return {"round": rd, "accounts": kb["accounts"], "coins": sorted({s for tf in ptf.values() for s in tf}), "fee": fee, "strategies": out,
-            "history": st.get("history", [])}
+            "history": st.get("history", []), "daily": st.get("daily", {})}
 
 
 def thin(arr, n):
@@ -368,7 +523,7 @@ def run():
     coins, series = {}, {}
     pcoins = list(kb["paper_coins"])
     daily_syms = sorted(set(syms) | set(pcoins))
-    tfs = sorted({r["tf"] for r in kb["strategies"]} - {"1d"})
+    tfs = sorted(({r["tf"] for r in kb["strategies"]} | {r["confirm_tf"] for r in kb["strategies"] if r.get("confirm_tf")}) - {"1d"})
     jobs = [(sym, "1d", kb["candles"]) for sym in daily_syms] + [(sym, tf, kb["paper_candles"]) for sym in pcoins for tf in tfs]
     with ThreadPoolExecutor(max_workers=6) as pool:                     # свічки качаємо паралельно
         fetched = dict(zip(jobs, pool.map(lambda j: fetch_tf(*j), jobs)))
@@ -417,7 +572,7 @@ def run():
         return result
     strategies = [{"id": r["id"], "title": r["title"], "help": r["help"], "tf": r["tf"], "invert": bool(r.get("invert")), "pair": r.get("pair"),
                    "kind": r["kind"], "enter": r.get("enter"), "exit": r.get("exit"),
-                   "stop": r.get("stop"), "take": r.get("take"), "sizing": r.get("sizing"), "p_exit": r.get("p_exit")}
+                   "stop": r.get("stop"), "take": r.get("take"), "sizing": r.get("sizing"), "p_exit": r.get("p_exit"), "band": r.get("band"), "cooldown": r.get("cooldown"), "trail": r.get("trail"), "mode": r.get("mode"), "confirm_tf": r.get("confirm_tf"), "rsi_min": r.get("rsi_min"), "rsi_max": r.get("rsi_max"), "trail_start": r.get("trail_start"), "cooldown_min": r.get("cooldown_min")}
                   for r in kb["strategies"]]
     computed = now_iso()
     # важка історична частина (≈150 КБ) лежить в окремому файлі й змінюється рідко: так репозиторій не розростається від кожного запуску

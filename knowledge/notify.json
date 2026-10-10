@@ -1,7 +1,17 @@
 {
   "_help": "База знань агента «Сповіщення Telegram». rules — рішення яких правил надсилати, sides — які дії (BUY купівля, SELL продаж), max_per_run — не більше стількох повідомлень за один запуск (щоб не засипати), include_testnet — надсилати ордери бота на тестовій біржі, round_summary — надсилати підсумок, коли завершується 7-денний раунд. Токен бота й номер чату беруться зі змінних середовища TELEGRAM_BOT_TOKEN і TELEGRAM_CHAT_ID (на GitHub це секрети Actions), у файли їх не пишіть. Повідомлення стосуються віртуальної симуляції й не є порадою.",
-  "rules": ["trend_1h", "trend_1h_sl", "trend_30m", "trend_2h", "score_1h"],
-  "sides": ["BUY", "SELL"],
+  "rules": [
+    "trend_1h",
+    "trend_1h_sl",
+    "trend_2h",
+    "score_1h",
+    "setup_live",
+    "setup_dip"
+  ],
+  "sides": [
+    "BUY",
+    "SELL"
+  ],
   "max_per_run": 6,
   "include_testnet": true,
   "round_summary": true

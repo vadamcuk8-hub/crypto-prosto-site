@@ -14,13 +14,18 @@ const ChartTool = (function () {
     { id: "1h", label: "1 год", note: "годинні", unit: "1 годину" }, { id: "4h", label: "4 год", note: "4-годинні", unit: "4 години" }, { id: "1d", label: "1 день", note: "денні", unit: "1 день" },
     { id: "1w", label: "1 тиждень", note: "тижневі", unit: "1 тиждень" },
   ];
-  const DEFAULT_FRAME = 3, LIMIT = 500, DEFAULT_BARS = 100;
+  FRAMES.splice(3, 0, { id: "30m", label: "30 хв", note: "30-хвилинні", unit: "30 хвилин" });     // 1m 5m 15m 30m 1h 2h 4h 1d 1w
+  FRAMES.splice(5, 0, { id: "2h", label: "2 год", note: "2-годинні", unit: "2 години" });
+  const DEFAULT_FRAME = FRAMES.findIndex(function (f) { return f.id === "1h"; }), LIMIT = 500, DEFAULT_BARS = 100;
+  let uid = 0;
   const HOSTS = ["https://data-api.binance.vision", "https://api.binance.com"];
-  const MAS = [{ id: "ma7", n: 7, color: "#f0b90b" }, { id: "ma25", n: 25, color: "#cc7ee8" }, { id: "ma99", n: 99, color: "#4a9bf5" }];
+  const MAS = [{ id: "ma7", n: 7, color: "#f0b90b" }, { id: "ma25", n: 25, color: "#cc7ee8" }, { id: "ma50", n: 50, color: "#a78bfa" }, { id: "ma99", n: 99, color: "#4a9bf5" }];
+  const FIB = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
   const TOOLS = [
     { id: "cursor", icon: "↖", label: "Курсор", hint: "Курсор: наведіть, щоб побачити ціну й час. Колесо миші — масштаб, перетягування — прокрутка, подвійний клік — скинути." },
     { id: "hline", icon: "―", label: "Горизонтальна лінія", hint: "Горизонтальна лінія: натисніть на графік, щоб поставити маркер на цій ціні." },
     { id: "trend", icon: "⟋", label: "Лінія тренду", hint: "Лінія тренду: натисніть першу точку, потім другу. Esc скасовує." },
+    { id: "fib", icon: "Fib", label: "Рівні Фібоначчі", hint: "Рівні Фібоначчі: натисніть початок руху, потім його кінець. Графік покаже рівні відкату 23,6 / 38,2 / 50 / 61,8 / 78,6 %." },
     { id: "ruler", icon: "↔", label: "Лінійка", hint: "Лінійка: натисніть першу точку, потім другу, щоб побачити різницю ціни, відсоток і час. Esc очищує вимір." },
   ];
   const MAX_LINES = 20;
@@ -28,6 +33,7 @@ const ChartTool = (function () {
   // Один екземпляр графіка: або вікно (dialog), або вбудований на сторінку (embed). Стан кожного окремий.
   function create(embed) {
   let dlg = null, S = null, ui = {}, raf = 0, drag = null, host = null, lastGood = null;
+  const CLIP = "ctclip" + (++uid);
   function isOpen() { return embed ? dlg.isConnected : dlg.open; }
 
   // ---------- Допоміжне ----------
@@ -67,10 +73,10 @@ const ChartTool = (function () {
   function loadLines() {
     try {
       const d = JSON.parse(localStorage.getItem(storeKey()) || "{}");
-      return { h: (d.h || []).filter(function (m) { return typeof m.price === "number"; }), l: (d.l || []).filter(function (x) { return x.a && x.b; }) };
-    } catch (e) { return { h: [], l: [] }; }
+      return { h: (d.h || []).filter(function (m) { return typeof m.price === "number"; }), l: (d.l || []).filter(function (x) { return x.a && x.b; }), f: (d.f || []).filter(function (x) { return x.a && x.b; }) };
+    } catch (e) { return { h: [], l: [], f: [] }; }
   }
-  function saveLines() { try { localStorage.setItem(storeKey(), JSON.stringify({ h: S.h, l: S.l })); } catch (e) { /* сховище недоступне: лінії живуть до закриття вікна */ } }
+  function saveLines() { try { localStorage.setItem(storeKey(), JSON.stringify({ h: S.h, l: S.l, f: S.f })); } catch (e) { /* сховище недоступне: лінії живуть до закриття вікна */ } }
 
   // ---------- Каркас вікна ----------
   function build() {
@@ -187,6 +193,8 @@ const ChartTool = (function () {
 
     ui.inds.replaceChildren();
     MAS.forEach(function (m) { btn(ui.inds, "MA" + m.n, { active: S.ind[m.id], pressed: S.ind[m.id], help: "Ковзна середня за " + m.n + " періодів: згладжує ціну й показує напрям тренду. Кольорова лінія на графіку", onClick: function () { S.ind[m.id] = !S.ind[m.id]; renderBar(); schedule(); } }).style.setProperty("--ma", m.color); });
+    btn(ui.inds, "BOLL", { active: S.ind.boll, pressed: S.ind.boll, help: "Смуги Боллінджера (20, 2): середня й коридор ±2 стандартні відхилення. Ціна поза коридором означає сильний рух; стиснення смуг передує різкому руху", onClick: function () { S.ind.boll = !S.ind.boll; renderBar(); schedule(); } });
+    btn(ui.inds, "RSI", { active: S.ind.rsi, pressed: S.ind.rsi, help: "RSI (14): індикатор перегріву від 0 до 100. Вище 70 — ринок перегрітий, нижче 30 — розпроданий. Панель під графіком", onClick: function () { S.ind.rsi = !S.ind.rsi; renderBar(); schedule(); } });
     if (hasVol()) btn(ui.inds, "Об'єм", { active: S.ind.vol, pressed: S.ind.vol, help: "Об'єм торгів за кожну свічку: стовпчики внизу. Високий об'єм означає більший інтерес", onClick: function () { S.ind.vol = !S.ind.vol; renderBar(); schedule(); } });
 
     ui.zoom.replaceChildren();
@@ -228,6 +236,12 @@ const ChartTool = (function () {
       S.all = rows.map(function (r) { return { t: r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[5] }; });
       S.error = null; lastGood = { symbol: S.spec.symbol, name: S.spec.name };
       S.n = Math.min(DEFAULT_BARS, S.all.length); S.off = 0;
+      if (S.spec.focusT) {                                    // потрібний момент (угода) старший за завантажені свічки: беремо більший масштаб
+        if (S.all[0].t > S.spec.focusT && S.frame < FRAMES.length - 1) { S.frame++; return loadLive(); }
+        const gi = idxOf({ t: S.spec.focusT }), len = S.all.length, n = Math.min(len, DEFAULT_BARS);
+        const start = clamp(gi - Math.round(n * 0.3), 0, Math.max(0, len - n));
+        S.n = n; S.off = len - (start + n);
+      }
       connectWs(f.id, token);
     } catch (e) {
       if (S.spec.fallback && S.spec.fallback.length) {         // немає пари на біржі: показуємо ряд із віджета
@@ -294,7 +308,8 @@ const ChartTool = (function () {
   // ---------- Геометрія ----------
   function geo(pts) {
     const n = pts.length, plotW = W - ML - MR, plotH = H - MT - MB;
-    const vol = S.ind.vol && hasVol(), volH = vol ? Math.round(plotH * VOL_SHARE) : 0, priceH = plotH - volH - (vol ? 8 : 0);
+    const vol = S.ind.vol && hasVol(), volH = vol ? Math.round(plotH * VOL_SHARE) : 0;
+    const rsiOn = !!S.ind.rsi && S.all.length > 20, rsiH = rsiOn ? Math.round(plotH * 0.2) : 0, extra = (vol ? volH + 8 : 0) + (rsiOn ? rsiH + 8 : 0), priceH = plotH - extra;
     let lo = Infinity, hi = -Infinity, vmax = 0;
     pts.forEach(function (p) {
       const a = S.type === "candles" && p.l !== undefined ? p.l : p.c, b = S.type === "candles" && p.h !== undefined ? p.h : p.c;
@@ -306,7 +321,7 @@ const ChartTool = (function () {
     const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
     const step = plotW / n;
     return {
-      n: n, plotW: plotW, plotH: plotH, priceH: priceH, volH: volH, vol: vol, vmax: vmax, lo: lo, hi: hi, step: step,
+      n: n, plotW: plotW, plotH: plotH, priceH: priceH, volH: volH, vol: vol, rsiOn: rsiOn, rsiH: rsiH, extra: extra, vmax: vmax, lo: lo, hi: hi, step: step,
       x: function (i) { return ML + (i + 0.5) * step; },
       y: function (v) { return MT + (hi - v) / (hi - lo) * priceH; },
       idx: function (x) { return clamp(Math.floor((x - ML) / step), 0, n - 1); },
@@ -319,7 +334,7 @@ const ChartTool = (function () {
     const r = ui.svg.getBoundingClientRect();
     const x = (e.clientX - r.left) * W / r.width, y = (e.clientY - r.top) * H / r.height;
     const v = view(), g = geo(v.pts);
-    if (x < ML || x > W - MR || y < MT || y > MT + g.priceH + (g.vol ? g.volH + 8 : 0)) { S.hover = null; schedule(); return; }
+    if (x < ML || x > W - MR || y < MT || y > MT + g.priceH + g.extra) { S.hover = null; schedule(); return; }
     S.hover = { i: g.idx(x), price: clamp(g.val(Math.min(y, MT + g.priceH)), g.lo, g.hi) };
     schedule();
   }
@@ -354,6 +369,13 @@ const ChartTool = (function () {
         S.l.push({ a: { t: S.pend.t, gi: S.pend.gi, price: S.pend.price }, b: { t: pt.t, gi: pt.gi, price: pt.price } });
         S.pend = null; saveLines(); renderLines();
       }
+    } else if (S.tool === "fib") {
+      if (!S.pend) S.pend = pt;
+      else {
+        if (S.f.length >= MAX_LINES) S.f.shift();
+        S.f.push({ a: { t: S.pend.t, gi: S.pend.gi, price: S.pend.price }, b: { t: pt.t, gi: pt.gi, price: pt.price } });
+        S.pend = null; saveLines(); renderLines();
+      }
     } else if (S.tool === "ruler") {
       if (!S.mA || S.mB) { S.mA = pt; S.mB = null; } else { S.mB = pt; }
     }
@@ -386,10 +408,10 @@ const ChartTool = (function () {
     const vw = view(), pts = vw.pts, g = geo(pts), last = S.all[S.all.length - 1];
     const prev = S.all.length > 1 ? S.all[S.all.length - 2] : last;
     const upNow = last.o !== undefined ? last.c >= last.o : last.c >= prev.c;
-    const bottom = MT + g.priceH + (g.vol ? g.volH + 8 : 0);
+    const volBottom = MT + g.priceH + (g.vol ? g.volH + 8 : 0), bottom = MT + g.priceH + g.extra;
 
     const defs = sv("defs", {}, svg);
-    const clip = sv("clipPath", { id: "ctclip" }, defs);
+    const clip = sv("clipPath", { id: CLIP }, defs);
     sv("rect", { x: ML, y: MT, width: g.plotW, height: bottom - MT }, clip);
 
     // сітка й вісь цін
@@ -405,12 +427,12 @@ const ChartTool = (function () {
       sv("text", { x: x, y: H - 7, "text-anchor": k === 0 ? "start" : k === 5 ? "end" : "middle", class: "ct-axis" }, svg).textContent = fmtAxis(t);
     }
 
-    const body = sv("g", { "clip-path": "url(#ctclip)" }, svg);
+    const body = sv("g", { "clip-path": "url(#" + CLIP + ")" }, svg);
     // об'єм
     if (g.vol && g.vmax > 0) {
       pts.forEach(function (p, i) {
         const h = Math.max(1, p.v / g.vmax * g.volH), up = p.o !== undefined ? p.c >= p.o : true;
-        sv("rect", { x: g.x(i) - Math.max(1, g.step * 0.35), y: bottom - h, width: Math.max(1, g.step * 0.7), height: h, class: "ct-vol " + (up ? "ct-up" : "ct-down") }, body);
+        sv("rect", { x: g.x(i) - Math.max(1, g.step * 0.35), y: volBottom - h, width: Math.max(1, g.step * 0.7), height: h, class: "ct-vol " + (up ? "ct-up" : "ct-down") }, body);
       });
     }
     // ціна
@@ -435,6 +457,23 @@ const ChartTool = (function () {
       arr.forEach(function (v, i) { if (v !== null) d += (d ? "L" : "M") + g.x(i).toFixed(1) + " " + g.y(v).toFixed(1); });
       if (d) sv("path", { d: d, class: "ct-ma", style: "stroke:" + m.color }, body);
     });
+    // смуги Боллінджера
+    if (S.ind.boll && closes.length >= 20) {
+      const mid = sma(closes, 20), up = [], dn = [];
+      for (let i = 0; i < closes.length; i++) {
+        if (mid[i] === null) { up.push(null); dn.push(null); continue; }
+        let q = 0; for (let k = i - 19; k <= i; k++) q += (closes[k] - mid[i]) * (closes[k] - mid[i]);
+        const sd = Math.sqrt(q / 20); up.push(mid[i] + 2 * sd); dn.push(mid[i] - 2 * sd);
+      }
+      const U = up.slice(vw.start, vw.end), D = dn.slice(vw.start, vw.end), Mm = mid.slice(vw.start, vw.end);
+      const path = function (arr) { let d = ""; arr.forEach(function (v, i) { if (v !== null) d += (d ? "L" : "M") + g.x(i).toFixed(1) + " " + g.y(v).toFixed(1); }); return d; };
+      const ok = U.map(function (v, i) { return v !== null && D[i] !== null; });
+      const poly = []; U.forEach(function (v, i) { if (ok[i]) poly.push(g.x(i).toFixed(1) + "," + g.y(v).toFixed(1)); });
+      for (let i = D.length - 1; i >= 0; i--) if (ok[i]) poly.push(g.x(i).toFixed(1) + "," + g.y(D[i]).toFixed(1));
+      if (poly.length > 3) sv("polygon", { points: poly.join(" "), class: "ct-boll-fill" }, body);
+      [U, D].forEach(function (a) { const d = path(a); if (d) sv("path", { d: d, class: "ct-boll" }, body); });
+      const dm = path(Mm); if (dm) sv("path", { d: dm, class: "ct-boll ct-boll-mid" }, body);
+    }
     // горизонтальні лінії (маркери)
     S.h.forEach(function (m) {
       if (m.price < g.lo || m.price > g.hi) return;
@@ -442,6 +481,17 @@ const ChartTool = (function () {
       sv("line", { x1: ML, x2: W - MR, y1: y, y2: y, class: "ct-hline" }, body);
       sv("rect", { x: W - MR + 1, y: y - 9, width: MR - 2, height: 18, rx: 3, class: "ct-hline-tag" }, svg);
       sv("text", { x: W - MR + 6, y: y + 4, class: "ct-hline-text" }, svg).textContent = FP(m.price);
+    });
+    // рівні Фібоначчі
+    S.f.forEach(function (fb) {
+      const a = idxOf(fb.a) - vw.start, b = idxOf(fb.b) - vw.start, x0 = Math.min(g.x(a), g.x(b)), dP = fb.b.price - fb.a.price;
+      FIB.forEach(function (lv) {
+        const price = fb.b.price - dP * lv, y = g.y(price);
+        if (price < g.lo || price > g.hi) return;
+        sv("line", { x1: x0, x2: W - MR, y1: y, y2: y, class: "ct-fib" + (lv === 0 || lv === 1 ? " ct-fib-edge" : "") }, body);
+        sv("text", { x: x0 + 4, y: y - 3, class: "ct-fib-t" }, body).textContent = (lv * 100).toLocaleString("uk-UA", { maximumFractionDigits: 1 }) + "% · " + FP(price);
+      });
+      sv("line", { x1: g.x(a), y1: g.y(fb.a.price), x2: g.x(b), y2: g.y(fb.b.price), class: "ct-trend ct-dash" }, body);
     });
     // лінії тренду
     S.l.forEach(function (ln) {
@@ -460,6 +510,38 @@ const ChartTool = (function () {
     if (S.mA && B) ruler(svg, body, g, vw, S.mA, B);
     else if (S.mA) sv("circle", { cx: g.x(S.mA.gi - vw.start), cy: g.y(S.mA.price), r: 5, class: "ct-ruler-dot" }, body);
 
+    // панель RSI під графіком
+    if (g.rsiOn) {
+      const arr = (function () { const out = new Array(closes.length).fill(null); if (closes.length < 16) return out; let gn = 0, ls = 0; for (let i = 1; i <= 14; i++) { const d = closes[i] - closes[i - 1]; if (d >= 0) gn += d; else ls -= d; } gn /= 14; ls /= 14; out[14] = ls === 0 ? 100 : 100 - 100 / (1 + gn / ls); for (let i = 15; i < closes.length; i++) { const d = closes[i] - closes[i - 1]; gn = (gn * 13 + Math.max(d, 0)) / 14; ls = (ls * 13 + Math.max(-d, 0)) / 14; out[i] = ls === 0 ? 100 : 100 - 100 / (1 + gn / ls); } return out; })();
+      const top = volBottom + 8, hh = g.rsiH, Y = function (v) { return top + (100 - v) / 100 * hh; }, R = arr.slice(vw.start, vw.end);
+      sv("rect", { x: ML, y: top, width: g.plotW, height: hh, class: "ct-rsi-bg" }, svg);
+      [30, 70].forEach(function (v) { sv("line", { x1: ML, x2: W - MR, y1: Y(v), y2: Y(v), class: "ct-rsi-ref" }, svg); sv("text", { x: W - MR + 6, y: Y(v) + 4, class: "ct-axis" }, svg).textContent = String(v); });
+      let d = ""; R.forEach(function (v, i) { if (v !== null) d += (d ? "L" : "M") + g.x(i).toFixed(1) + " " + Y(v).toFixed(1); });
+      if (d) sv("path", { d: d, class: "ct-rsi-line", "clip-path": "url(#" + CLIP + ")" }, svg);
+      const lv = R[R.length - 1];
+      sv("text", { x: ML + 6, y: top + 13, class: "ct-rsi-t" }, svg).textContent = "RSI 14" + (lv !== null && lv !== undefined ? "  " + lv.toLocaleString("uk-UA", { maximumFractionDigits: 1 }) : "");
+    }
+    // позначки угод (B — купівля, S — продаж) і рівні, передані сторінкою
+    (S.spec.levels || []).forEach(function (lv) {
+      if (lv.price < g.lo || lv.price > g.hi) return;
+      const y = g.y(lv.price);
+      sv("line", { x1: ML, x2: W - MR, y1: y, y2: y, class: "ct-level", style: "stroke:" + lv.color }, body);
+      sv("rect", { x: W - MR + 1, y: y - 9, width: MR - 2, height: 18, rx: 3, style: "fill:" + lv.color }, svg);
+      sv("text", { x: W - MR + 6, y: y + 4, class: "ct-hline-text" }, svg).textContent = FP(lv.price);
+      if (lv.label) sv("text", { x: ML + 6, y: y - 4, class: "ct-level-t", style: "fill:" + lv.color }, body).textContent = lv.label;
+    });
+    (S.spec.markers || []).forEach(function (m) {
+      if (!S.all.length || S.all[0].t > m.t + 1) return;
+      const gi = idxOf({ t: m.t }), vi = gi - vw.start;
+      if (vi < 0 || vi >= pts.length) return;
+      const cd = S.all[gi], buy = m.side === "BUY", x = g.x(vi);
+      const yb = buy ? g.y(cd.l !== undefined ? cd.l : cd.c) + 17 : g.y(cd.h !== undefined ? cd.h : cd.c) - 17, ye = g.y(m.price);
+      const gm = sv("g", { class: "ct-marker " + (buy ? "ct-up" : "ct-down") }, body);
+      sv("line", { x1: x, x2: x, y1: yb, y2: ye, class: "ct-marker-stem" }, gm);
+      sv("circle", { cx: x, cy: yb, r: 9, class: "ct-marker-dot" }, gm);
+      sv("text", { x: x, y: yb + 3.8, "text-anchor": "middle", class: "ct-marker-t" }, gm).textContent = buy ? "B" : "S";
+      sv("title", {}, gm).textContent = m.label || (buy ? "Купівля" : "Продаж");
+    });
     // остання ціна
     const yl = clamp(g.y(last.c), MT, MT + g.priceH);
     sv("line", { x1: ML, x2: W - MR, y1: yl, y2: yl, class: "ct-last" }, svg);
@@ -546,7 +628,7 @@ const ChartTool = (function () {
 
   // ---------- Список ліній ----------
   function renderLines(quiet) {
-    const sig = S.h.length + "/" + S.l.length;
+    const sig = S.h.length + "/" + S.l.length + "/" + S.f.length;
     if (quiet && ui.list.dataset.n === sig && S.all.length) {
       const last = S.all[S.all.length - 1].c;
       ui.list.querySelectorAll("[data-price]").forEach(function (n) {
@@ -558,7 +640,7 @@ const ChartTool = (function () {
     }
     ui.list.dataset.n = sig;
     ui.list.replaceChildren();
-    if (!S.h.length && !S.l.length) return;
+    if (!S.h.length && !S.l.length && !S.f.length) return;
     ui.list.appendChild(el("h3", "ct-list-title", "Ваші лінії"));
     const ul = el("ul", "ct-mlist");
     S.h.forEach(function (m, idx) {
@@ -578,11 +660,17 @@ const ChartTool = (function () {
       li.appendChild(del("лінію тренду", function () { S.l.splice(idx, 1); saveLines(); renderLines(); schedule(); }));
       ul.appendChild(li);
     });
+    S.f.forEach(function (fb, idx) {
+      const li = el("li");
+      li.appendChild(el("b", "", "Фібоначчі " + FP(fb.a.price) + " → " + FP(fb.b.price)));
+      li.appendChild(del("рівні Фібоначчі", function () { S.f.splice(idx, 1); saveLines(); renderLines(); schedule(); }));
+      ul.appendChild(li);
+    });
     ui.list.appendChild(ul);
     const clear = el("button", "ct-btn", "Очистити всі");
     clear.type = "button";
     clear.setAttribute("data-help", "Видалити всі горизонтальні лінії й лінії тренду для цієї монети");
-    clear.addEventListener("click", function () { S.h = []; S.l = []; saveLines(); renderLines(); schedule(); });
+    clear.addEventListener("click", function () { S.h = []; S.l = []; S.f = []; saveLines(); renderLines(); schedule(); });
     ui.list.appendChild(clear);
     if (S.all.length) renderLines(true);
   }
@@ -601,10 +689,11 @@ const ChartTool = (function () {
   function open(spec) {
     if (!dlg) build();
     teardown();
-    S = { spec: spec, all: [], n: DEFAULT_BARS, off: 0, type: "candles", frame: DEFAULT_FRAME, tool: "cursor", h: [], l: [],
-          ind: { ma7: true, ma25: true, ma99: false, vol: true }, hover: null, mA: null, mB: null, pend: null, token: 0, ws: null,
+    const fi = spec.interval ? FRAMES.findIndex(function (f) { return f.id === spec.interval; }) : -1;
+    S = { spec: spec, all: [], n: DEFAULT_BARS, off: 0, type: "candles", frame: fi >= 0 ? fi : DEFAULT_FRAME, tool: "cursor", h: [], l: [], f: [],
+          ind: Object.assign({ ma7: true, ma25: true, ma50: false, ma99: false, vol: true, boll: false, rsi: false }, spec.ind || {}), hover: null, mA: null, mB: null, pend: null, token: 0, ws: null,
           error: null, intraday: true, exchangeTime: 0, fallbackMode: false };
-    const saved = loadLines(); S.h = saved.h; S.l = saved.l;
+    const saved = loadLines(); S.h = saved.h; S.l = saved.l; S.f = saved.f;
     ui.title.textContent = spec.symbol ? spec.symbol + "/USDT" : spec.title;
     ui.sub.textContent = spec.symbol ? spec.name : (spec.subtitle || "");
     ui.list.dataset.n = "";
@@ -613,7 +702,7 @@ const ChartTool = (function () {
       S.type = "line"; S.intraday = false;
       S.all = spec.points.map(function (p, i) { return { t: p.t === undefined ? null : p.t, c: p.c }; });
       S.n = S.all.length;
-      S.ind.ma7 = S.ind.ma25 = false; S.ind.vol = false;
+      S.ind.ma7 = S.ind.ma25 = false; S.ind.vol = false; S.ind.boll = S.ind.rsi = false;
       renderBar();
     }
     if (!embed && !dlg.open) dlg.showModal();
@@ -622,7 +711,7 @@ const ChartTool = (function () {
     if (!embed) ui.svg.focus({ preventScroll: true });
   }
 
-  return { open: open, mount: function (h) { host = h; }, close: teardown };
+  return { open: open, mount: function (h) { host = h; }, close: teardown, update: function (patch) { if (S) { Object.assign(S.spec, patch); schedule(); } } };
   }
 
   // Вікно (спільне для всіх клікабельних графіків) і необов'язковий вбудований графік на сторінці
@@ -640,6 +729,14 @@ const ChartTool = (function () {
       return;
     }
     openDialog(spec);
+  }
+  // Окремий вбудований графік (не заміщує головний): для пояснення угод на сторінці «Симуляція»
+  function mount(host, spec) {
+    const inst = create(true);
+    inst.mount(host);
+    inst.host = host;
+    inst.open(spec);
+    return inst;
   }
   function embed(host, spec) {
     const inst = create(true);
@@ -662,5 +759,5 @@ const ChartTool = (function () {
     return node;
   }
 
-  return { open: open, bind: bind, embed: embed };
+  return { open: open, bind: bind, embed: embed, mount: mount };
 })();

@@ -103,7 +103,7 @@
 
   // Жива стрічка угод під рахунком у стилі гаманця: нумерація, фільтри, сортування, пояснення кожної угоди простими словами.
   // Результат відкритих позицій рахується за живою ціною. Усе віртуально, це не порада.
-  const seenFeed = {}, feedOpen = {}, feedCfg = { side: "", coin: "", sort: "new", limit: 20 };
+  const coinOpen = {}, seenFeed = {}, feedOpen = {}, feedCfg = { side: "", coin: "", sort: "new", limit: 1000 };
   let feedFirst = true, feedBar = null, activeCap = null;
   const walletTabs = el("div", "wallet-tabs");
   walletTabs.setAttribute("role", "tablist");
@@ -172,23 +172,46 @@
     window.print();
   }
 
+  // Оновлює наявні вузли на місці, а не замінює їх: так клік не «втрачається», коли дані оновились у момент натискання
+  function morph(o, n) {
+    if (o.nodeType !== n.nodeType || o.nodeName !== n.nodeName) return false;
+    if (o.nodeType === 3 || o.nodeType === 8) { if (o.nodeValue !== n.nodeValue) o.nodeValue = n.nodeValue; return true; }
+    Array.prototype.slice.call(o.attributes).forEach(function (a) { if (!n.hasAttribute(a.name)) o.removeAttribute(a.name); });
+    Array.prototype.slice.call(n.attributes).forEach(function (a) { if (o.getAttribute(a.name) !== a.value) o.setAttribute(a.name, a.value); });
+    if (!o.hasAttribute("data-keep")) morphKids(o, n);                       // вбудований графік живе власним життям: не перебудовуємо його вміст
+    return true;
+  }
+  function morphKids(o, n) {
+    const oc = Array.prototype.slice.call(o.childNodes), nc = Array.prototype.slice.call(n.childNodes), m = Math.min(oc.length, nc.length);
+    for (let i = 0; i < m; i++) if (!morph(oc[i], nc[i])) o.replaceChild(nc[i], oc[i]);
+    for (let i = m; i < nc.length; i++) o.appendChild(nc[i]);
+    for (let i = oc.length - 1; i >= m; i--) o.removeChild(oc[i]);
+  }
+  function mountFeed(box) {
+    const wf = document.getElementById("walletFeed");
+    if (feedBar.parentNode !== wf) wf.insertBefore(feedBar, wf.firstChild);
+    let fb = document.getElementById("feedBody");
+    if (!fb) { fb = el("div", ""); fb.id = "feedBody"; wf.appendChild(fb); }
+    const tmp = document.createElement("div"); tmp.appendChild(box); morphKids(fb, tmp);
+  }
+
   function feedToolbar() {
     if (feedBar) return;
     feedBar = el("div", "sim-feed-bar");
-    function sel(key, items) {
-      const s = document.createElement("select");
-      items.forEach(function (x) { const o = el("option", "", x[1]); o.value = x[0]; s.appendChild(o); });
-      s.value = feedCfg[key];
-      s.addEventListener("change", function () { feedCfg[key] = key === "limit" ? parseInt(s.value, 10) : s.value; renderPaper(false); });
-      s.setAttribute("aria-label", "Стрічка угод: " + key);
-      feedBar.appendChild(s);
-      return s;
-    }
-    feedBar.appendChild(el("b", "", "Стрічка угод:"));
-    sel("side", [["", "усі угоди"], ["open", "відкриті"], ["closed", "закриті (пари)"]]);
-    feedBar.coinSel = sel("coin", [["", "усі монети"]]);
-    sel("sort", [["new", "спочатку нові"], ["old", "спочатку старі"], ["sum", "за сумою"], ["pl", "за результатом"]]);
-    sel("limit", [["10", "показати 10"], ["20", "показати 20"], ["60", "показати 60"]]);
+    const chips = [];
+    [["", "Усі"], ["open", "Відкриті"], ["closed", "Закриті"], ["win", "Прибуткові"], ["loss", "Збиткові"], ["flap", "«Смикання»"]].forEach(function (x) {
+      const b = el("button", "feed-chip" + (feedCfg.side === x[0] ? " on" : ""), x[1]); b.type = "button"; b.setAttribute("aria-pressed", feedCfg.side === x[0] ? "true" : "false");
+      b.title = { "": "Усі угоди", open: "Угоди, що ще відкриті", closed: "Завершені угоди (купівля й продаж)", win: "Закриті з прибутком після витрат", loss: "Закриті зі збитком", flap: "Повторний вхід майже одразу після продажу" }[x[0]];
+      b.addEventListener("click", function () {
+        feedCfg.side = x[0];
+        chips.forEach(function (c) { const on = c === b; c.classList.toggle("on", on); c.setAttribute("aria-pressed", on ? "true" : "false"); });
+        renderPaper(false);
+      });
+      chips.push(b); feedBar.appendChild(b);
+    });
+    const so = el("button", "feed-chip sort", feedCfg.sort === "new" ? "Спочатку нові ↓" : "Спочатку старі ↑"); so.type = "button"; so.title = "Порядок угод у кожній монеті";
+    so.addEventListener("click", function () { feedCfg.sort = feedCfg.sort === "new" ? "old" : "new"; so.textContent = feedCfg.sort === "new" ? "Спочатку нові ↓" : "Спочатку старі ↑"; renderPaper(false); });
+    feedBar.appendChild(so);
     const pb = el("button", "link-btn", "Звіт PDF"); pb.type = "button";
     pb.title = "Відкриє друк: оберіть «Зберегти як PDF»";
     pb.addEventListener("click", printReport);
@@ -200,11 +223,13 @@
   }
 
   // Розділи гаманця й сторінки: показується один за раз, щоб усе було компактно в одному місці
+  const WALLETS_PAGE = document.body.classList.contains("page-wallets");
   const VIEWS = [["feed", "Угоди й рішення"], ["pos", "Позиції"], ["stats", "Статистика"],["chart", "Графік"], ["arena", "Арена ботів"], ["rounds", "Раунди"]];
   let activeView = "feed";
   function showView(v) {
     activeView = v;
     document.querySelectorAll(".wallet-pane").forEach(function (p) { p.hidden = p.getAttribute("data-view") !== v; });
+    if (v === "analytics" && typeof renderAnalytics === "function" && sim) renderAnalytics();
     const bar = document.getElementById("walletViews");
     bar.replaceChildren();
     VIEWS.forEach(function (x) {
@@ -213,6 +238,7 @@
       b.addEventListener("click", function () { showView(x[0]); });
       bar.appendChild(b);
     });
+    const lk = el("a", "wallet-view link", "Аналітика гаманців →"); lk.href = "wallets.html"; lk.title = "Окрема сторінка: порівняння гаманців, найвигідніша угода, живий бот"; bar.appendChild(lk);
   }
   function showSection(id) {
     const ids = ["paper", "history", "testnet", "simAgent"];
@@ -224,25 +250,28 @@
   document.querySelectorAll(".subtabs a").forEach(function (a) {
     a.addEventListener("click", function (e) { e.preventDefault(); const id = a.getAttribute("href").slice(1); showSection(id); try { history.replaceState(null, "", "#" + id); } catch (x) { /* не критично */ } });
   });
-  showView("feed");
+  showView(WALLETS_PAGE ? "analytics" : "feed");
   showSection((location.hash || "#paper").slice(1));
 
   // Угоди для стрічки: старт раунду згорнуто в один запис, купівля + продаж однієї монети — одна «пара» з підсумком, решта — відкриті позиції
-  function buildTrades(id, cap) {
-    const all = ((typeof evts !== "undefined" && evts[id]) || []).slice().sort(function (a, b) { return a.candle - b.candle; });
+  function buildTrades(id, cap, PW, EV) {
+    const P = PW || sim.paper, E = EV || evts;
+    const all = ((E && E[id]) || []).slice().sort(function (a, b) { return a.candle - b.candle; });
     pairEvents(all);
-    const fee = sim.paper.fee || 0, out = [], start = [];
-    function qOf(e) { return cap * (e.w || 1 / Math.max(1, sim.paper.coins.length)) * e.eq * (1 - fee) / e.price; }
+    const fee = P.fee || 0, out = [], start = [];
+    function qOf(e) { return cap * (e.w || 1 / Math.max(1, P.coins.length)) * e.eq * (1 - fee) / e.price; }
+    const lastSell = {}, costPct = (1 - (1 - fee) * (1 - fee)) * 100;
     all.forEach(function (e) {
-      if (e.side !== "BUY") return;
+      if (e.side !== "BUY") { lastSell[e.coin] = e.candle; return; }
       const q = qOf(e), isStart = String(e.reason || "").indexOf("Початкова позиція") === 0;
-      const px = live[e.coin];
+      const flapMs = !isStart && lastSell[e.coin] !== undefined && e.candle - lastSell[e.coin] <= 3600000 ? e.candle - lastSell[e.coin] : null;
+      const sst = P.strategies[id] && P.strategies[id].state[e.coin], px = live[e.coin] || (sst ? sst[3] : null);   // запасна ціна: остання закрита свічка, поки не прийшла жива
       if (e.__sell) {
-        const s = e.__sell, w = e.w || 1 / Math.max(1, sim.paper.coins.length), usdPl = cap * w * (s.eq - e.eq);
+        const s = e.__sell, w = e.w || 1 / Math.max(1, P.coins.length), usdPl = cap * w * (s.eq - e.eq);
         out.push({ rid: id, kind: "pair", coin: e.coin, buy: e, sell: s, q: q, ts: s.candle, sum: q * e.price, pl: (s.eq / (e.eq * (1 - fee)) - 1) * 100, usd: usdPl,
-          costs: q * e.price * fee + q * s.price * fee, held: s.candle - e.candle });
+          costs: q * e.price * fee + q * s.price * fee, held: s.candle - e.candle, costPct: costPct, flapMs: flapMs });
       } else {
-        out.push({ rid: id, kind: "open", isStart: isStart, coin: e.coin, buy: e, q: q, ts: e.candle, sum: q * e.price, pl: px ? (px / e.price - 1) * 100 : null, usd: px ? q * (px - e.price) : null, costs: q * e.price * fee });
+        out.push({ rid: id, kind: "open", isStart: isStart, coin: e.coin, buy: e, q: q, ts: e.candle, sum: q * e.price, pl: px ? (px / e.price - 1) * 100 : null, usd: px ? q * (px - e.price) : null, costs: q * e.price * fee, costPct: costPct, flapMs: flapMs });
       }
     });
     if (start.length) {
@@ -262,13 +291,16 @@
   // Умови виходу правила простими словами: коли й за яких цін бот планує продати (рішення лише за закритою свічкою)
   function planOf(id, t) {
     const d = ruleDef(id) || {}, e = t.buy, tf = TF_SHORT[e.tf] || e.tf, ind = e.ind || {}, out = [];
-    if (d.kind === "random") out.push("випадково: на кожній закритій свічці є ≈" + Math.round((d.p_exit || 0.1) * 100) + "% шанс вийти (це контрольний бот без індикаторів)");
+    if (d.kind === "setup") {
+      if (d.mode === "dip") out.push("одразу, коли ціна зростає на " + (d.take || 0) + "% (тейк-профіт) або падає на " + (d.stop || 0) + "% (стоп-лос) від купівлі");
+      else out.push("одразу, коли спрацює один із виходів: стоп-лос −" + (d.stop || 0) + "%, тейк-профіт +" + (d.take || 0) + "%" + (d.trail ? ", трейлінг-стоп " + d.trail + "% від максимуму" : "") + " або ціна опуститься нижче 15-хвилинної середньої");
+    } else if (d.kind === "random") out.push("випадково: на кожній закритій свічці є ≈" + Math.round((d.p_exit || 0.1) * 100) + "% шанс вийти (це контрольний бот без індикаторів)");
     else if (d.kind === "sma50") out.push(d.invert ? "коли ціна закриття " + tf + "-свічки підніметься вище середньої за 50 свічок" + (ind.sma50 ? " (при купівлі середня була " + pxfmt(ind.sma50) + ")" : "")
       : "коли ціна закриття " + tf + "-свічки опуститься нижче середньої за 50 свічок" + (ind.sma50 ? " (при купівлі середня була " + pxfmt(ind.sma50) + ")" : ""));
     else if (typeof d.exit === "number") out.push(d.invert ? "коли оцінка сигналу підніметься вище " + (-d.exit) + " (при купівлі: " + Math.round(ind.score || 0) + ")" : "коли оцінка сигналу впаде нижче " + d.exit + " (при купівлі: " + Math.round(ind.score || 0) + ")");
-    if (d.stop) out.push("стоп-лос: якщо ціна впаде до " + pxfmt(e.price * (1 - d.stop / 100)) + " (−" + d.stop + "%)");
-    if (d.take) out.push("тейк-профіт: якщо ціна зросте до " + pxfmt(e.price * (1 + d.take / 100)) + " (+" + d.take + "%)");
-    return { text: out, check: TF_CHECK[e.tf] || e.tf };
+    if (d.stop && d.kind !== "setup") out.push("стоп-лос: якщо ціна впаде до " + pxfmt(e.price * (1 - d.stop / 100)) + " (−" + d.stop + "%)");
+    if (d.take && d.kind !== "setup") out.push("тейк-профіт: якщо ціна зросте до " + pxfmt(e.price * (1 + d.take / 100)) + " (+" + d.take + "%)");
+    return { text: out, check: d.kind === "setup" ? "при кожному запуску бота (≈ кожні 10 хв), без очікування закриття свічки" : (TF_CHECK[e.tf] || e.tf) };
   }
 
   function dur(ms) {
@@ -279,7 +311,7 @@
 
   // ---------- Розгорнута угода: анімований графік ціни наживо, цілі виходу й результат ----------
   const klCache = {};                                        // свічки Binance для пояснення: {"BNB|1h": {at, data}}
-  const tcDrawn = {}, tcHover = {};                          // для яких угод анімацію появи вже показано; стан курсора між оновленнями
+  const tcDrawn = {}, tcHover = {}, tcCharts = {};                          // для яких угод анімацію появи вже показано; стан курсора між оновленнями
   function loadCandles(coin, tf) {
     const key = coin + "|" + tf, c = klCache[key];
     if (c && Date.now() - c.at < 60000) return c.data;
@@ -346,92 +378,22 @@
       g.pn = g.reached ? 1 : Math.min(1, 2 * (1 - normCdf(dl / (sd * Math.sqrt(FUT)))));
     });
     box.tcInfo = { last: last, targets: targets, span: spanLabel(e.tf, FUT) };
-    const padY = (hi - lo) * 0.06; lo -= padY; hi += padY;
-    const X = function (i) { return ML + i / (nTot - 1) * plotW; }, Y = function (v) { return MT + (hi - v) / (hi - lo) * (H - MT - MB); };
-    const svg = sv("svg", { viewBox: "0 0 " + W + " " + H, class: "tc-svg" + (firstDraw ? " tc-first" : ""), role: "img", "aria-label": "Ціна " + t.coin + ": де куплено, цілі виходу й типовий діапазон" }), pxs = pxfmt;
-    const gid = "tcg" + String(key).replace(/[^a-z0-9]/gi, "");
-    const defs = sv("defs", {}, svg), grad = sv("linearGradient", { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
-    sv("stop", { offset: "0%", "stop-color": "var(--tc-price)", "stop-opacity": 0.28 }, grad); sv("stop", { offset: "100%", "stop-color": "var(--tc-price)", "stop-opacity": 0 }, grad);
-    const num2 = function (v) { return pxs(v).replace(" $", ""); }, halo = { "paint-order": "stroke", stroke: "var(--card)", "stroke-width": 3, "stroke-linejoin": "round" };
-    const tags = [], lefts = [];                                                  // підписи на правій осі та зліва: розставляємо без накладання
-    if (def.kind === "sma50") {                                                    // зона виходу за середньою: там правило закрило б угоду
-      const pts = sma.map(function (v, i) { return v === null ? null : [X(i), Y(v)]; }).filter(Boolean);
-      if (pts.length > 1) {
-        const edge = def.invert ? MT : H - MB;
-        sv("polygon", { class: "tc-zone", points: pts.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ") + " " + pts[pts.length - 1][0].toFixed(1) + "," + edge + " " + pts[0][0].toFixed(1) + "," + edge, fill: "var(--down)", opacity: 0.08 }, svg);
-      }
-    }
-    for (let k = 0; k <= 4; k++) { const v = lo + (hi - lo) * k / 4; sv("line", { x1: ML, x2: W - MR, y1: Y(v), y2: Y(v), stroke: "var(--line)", "stroke-dasharray": "1 4" }, svg); sv("text", { x: W - MR + 6, y: Y(v) + 3.5, "font-size": 10, fill: "var(--muted)" }, svg).textContent = num2(v); }
-    const cone = function (m, f) { const up = [], dn = []; for (let k = 0; k <= FUT; k++) { const x = X(view.length - 1 + k); up.push(x.toFixed(1) + "," + Y(last * Math.exp(m * sd * Math.sqrt(k))).toFixed(1)); dn.unshift(x.toFixed(1) + "," + Y(last * Math.exp(-m * sd * Math.sqrt(k))).toFixed(1)); } sv("polygon", { class: "tc-cone", points: up.concat(dn).join(" "), fill: "var(--tc-price)", opacity: f }, svg); };
-    cone(2, 0.07); cone(1, 0.13);
-    sv("line", { x1: X(view.length - 1), x2: X(view.length - 1), y1: MT, y2: H - MB, stroke: "var(--muted)", "stroke-dasharray": "2 3", opacity: 0.6 }, svg);
-    sv("text", Object.assign({ x: X(view.length - 1) + 6, y: MT + 8, "font-size": 10, fill: "var(--muted)" }, halo), svg).textContent = "типовий діапазон →";
-    // цілі виходу: рівні на графіку, підписи окремо
-    targets.forEach(function (g) {
-      const col = g.key === "sma" ? "var(--tc-ma)" : g.color;
-      if (g.key !== "sma") sv("line", { class: "tc-level", x1: ML, x2: W - MR, y1: Y(g.price), y2: Y(g.price), stroke: col, "stroke-width": 1.2, "stroke-dasharray": "6 4" }, svg);
-      tags.push({ y: Y(g.price), text: num2(g.price), fill: col });
-      lefts.push({ y: Y(g.price), text: (g.key === "be" ? "беззбитковість " : g.key === "take" ? "тейк-профіт " : g.key === "stop" ? "стоп-лос " : "вихід за правилом ") + pc(g.pct), fill: col });
-    });
-    // ціна (з градієнтною заливкою) та середня
-    const pp = view.map(function (x, i) { return X(i).toFixed(1) + "," + Y(x.c).toFixed(1); });
-    sv("polygon", { class: "tc-area", points: pp.join(" ") + " " + X(view.length - 1).toFixed(1) + "," + (H - MB) + " " + X(0).toFixed(1) + "," + (H - MB), fill: "url(#" + gid + ")" }, svg);
-    sv("polyline", { class: "tc-price", pathLength: 1, points: pp.join(" "), fill: "none", stroke: "var(--tc-price)", "stroke-width": 1.8, "stroke-linejoin": "round" }, svg);
-    const sp = sma.map(function (v, i) { return v === null ? null : X(i).toFixed(1) + "," + Y(v).toFixed(1); }).filter(Boolean);
-    if (sp.length > 1) sv("polyline", { class: "tc-sma", pathLength: 1, points: sp.join(" "), fill: "none", stroke: "var(--tc-ma)", "stroke-width": 1.4 }, svg);
-    // позначки купівлі/продажу у стилі біржі: круглий значок B / S
-    function badge(i, price, color, letter, text) {
-      const x = X(i), y0 = Y(price), g = sv("g", { class: "tc-pop" }, svg);
-      const near = t.kind === "open" && Math.abs(x - X(view.length - 1)) < 20 && Math.abs(y0 - Y(last)) < 20, y = near ? y0 - 24 : y0;   // якщо збігається з живою точкою, значок піднімаємо над нею
-      if (near) sv("line", { x1: x, x2: x, y1: y + 9, y2: y0, stroke: color, "stroke-width": 1.5 }, g);
-      sv("circle", { cx: x, cy: y, r: 9, fill: color, stroke: "var(--card)", "stroke-width": 2 }, g);
-      sv("text", { x: x, y: y + 3.6, "text-anchor": "middle", "font-size": 10.5, "font-weight": 800, fill: "#fff" }, g).textContent = letter;
-      sv("text", Object.assign({ x: Math.min(W - MR - 4, Math.max(ML + 4, x)), y: near ? y - 14 : y + 25, "text-anchor": x > W * 0.7 ? "end" : x < 80 ? "start" : "middle", "font-size": 10.5, "font-weight": 700, fill: color }, halo), g).textContent = text;
-    }
-    badge(Math.max(0, entryIdx - i0), e.price, "var(--up)", "B", (left ? "← " : "") + "купівля");
-    tags.push({ y: Y(e.price), text: num2(e.price), fill: "var(--up)" });
-    if (t.kind === "pair") { badge(Math.max(0, exitIdx - i0), t.sell.price, "var(--down)", "S", "продаж"); tags.push({ y: Y(t.sell.price), text: num2(t.sell.price), fill: "var(--down)" }); }
+    // інтерактивний графік біржового типу: свічки, об'єм, MA, BOLL, RSI, лінії, тренд, Фібоначчі, лінійка; B/S — купівля й продаж
+    const levels = [{ price: e.price, color: "#2ebd85", label: "ціна купівлі" }];
+    targets.forEach(function (g) { if (g.key !== "sma") levels.push({ price: g.price, color: g.key === "take" ? "#2ebd85" : g.key === "stop" ? "#f6465d" : "#848e9c", label: g.key === "be" ? "беззбитковість" : g.key === "take" ? "тейк-профіт" : "стоп-лос" }); });
+    if (t.kind === "pair") levels.push({ price: t.sell.price, color: "#f6465d", label: "ціна продажу" });
+    const markers = [{ t: e.candle, price: e.price, side: "BUY", label: "Купівля " + pxfmt(e.price) }];
+    if (t.kind === "pair") markers.push({ t: t.sell.candle, price: t.sell.price, side: "SELL", label: "Продаж " + pxfmt(t.sell.price) });
+    const host = el("div", "tc-ct"); host.setAttribute("data-keep", "1");
+    const spec = { symbol: t.coin, name: t.coin, interval: e.tf, focusT: e.candle, markers: markers, levels: levels, ind: { ma7: false, ma25: false, ma50: true, vol: true } };
+    const reg = tcCharts[key];
+    if (reg && reg.host.isConnected) reg.inst.update({ levels: levels, markers: markers });
     else {
-      sv("line", { x1: ML, x2: W - MR, y1: Y(last), y2: Y(last), stroke: "var(--accent)", "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0.8 }, svg);
-      sv("circle", { class: "tc-ring", cx: X(view.length - 1), cy: Y(last), r: 5, fill: "var(--accent)" }, svg);
-      sv("circle", { cx: X(view.length - 1), cy: Y(last), r: 4.5, fill: "var(--accent)", stroke: "var(--card)", "stroke-width": 2 }, svg);
-      tags.push({ y: Y(last), text: num2(last), fill: "var(--accent)", dark: true, strong: true });
+      if (reg) { try { reg.inst.close(); } catch (x) { /* вже закрито */ } }
+      tcCharts[key] = { host: host, inst: ChartTool.mount(host, spec) };
     }
-    // розсуваємо підписи, щоб не накладались
-    function spread(list, gap, minY, maxY) {
-      list.sort(function (a, b) { return a.y - b.y; });
-      list.forEach(function (it, i) { it.py = i && it.y < list[i - 1].py + gap ? list[i - 1].py + gap : it.y; });
-      for (let i = list.length - 1; i >= 0; i--) { if (list[i].py > maxY) list[i].py = maxY; if (i < list.length - 1 && list[i].py > list[i + 1].py - gap) list[i].py = list[i + 1].py - gap; if (list[i].py < minY) list[i].py = minY; }
-    }
-    spread(tags, 16, MT + 6, H - MB - 6);
-    tags.forEach(function (tg) {
-      sv("rect", { x: W - MR + 2, y: tg.py - 8, width: MR - 4, height: 16, rx: 3, fill: tg.fill }, svg);
-      sv("text", { x: W - MR + 2 + (MR - 4) / 2, y: tg.py + 3.5, "text-anchor": "middle", "font-size": 10, "font-weight": 700, fill: tg.dark ? "#14161a" : "#fff" }, svg).textContent = tg.text;
-    });
-    spread(lefts, 15, MT + 8, H - MB - 6);
-    lefts.forEach(function (lf) { sv("text", Object.assign({ x: ML + 6, y: lf.py - 4, "font-size": 10.5, "font-weight": 700, fill: lf.fill }, halo), svg).textContent = lf.text; });
-    [0, Math.floor(view.length / 2), view.length - 1].forEach(function (i, k) { sv("text", { x: X(i), y: H - 6, "text-anchor": k === 0 ? "start" : k === 2 ? "end" : "middle", "font-size": 10, fill: "var(--muted)" }, svg).textContent = new Date(view[i].t).toLocaleString("uk-UA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); });
-    // перехрестя у стилі біржі: вертикаль + горизонталь і ціна на осі
-    const cross = sv("line", { y1: MT, y2: H - MB, stroke: "var(--muted)", "stroke-dasharray": "3 3", visibility: "hidden" }, svg), crossH = sv("line", { x1: ML, x2: W - MR, stroke: "var(--muted)", "stroke-dasharray": "3 3", visibility: "hidden" }, svg);
-    const crossTag = sv("g", { visibility: "hidden" }, svg); sv("rect", { x: W - MR + 2, width: MR - 4, height: 16, rx: 3, fill: "var(--muted)" }, crossTag); const crossTxt = sv("text", { x: W - MR + 2 + (MR - 4) / 2, "text-anchor": "middle", "font-size": 10, "font-weight": 700, fill: "#14161a" }, crossTag);
-    const ro = el("p", "small tc-readout", tcHover[key] || "Наведіть курсор на графік: час і ціна.");
-    svg.addEventListener("pointermove", function (ev) {
-      const b = svg.getBoundingClientRect(), x = (ev.clientX - b.left) / b.width * W, i = Math.round((x - ML) / plotW * (nTot - 1));
-      if (i < 0 || i >= view.length) { [cross, crossH, crossTag].forEach(function (n) { n.setAttribute("visibility", "hidden"); }); return; }
-      const yy = Y(view[i].c);
-      cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i)); crossH.setAttribute("y1", yy); crossH.setAttribute("y2", yy);
-      crossTag.firstChild.setAttribute("y", yy - 8); crossTxt.setAttribute("y", yy + 3.5); crossTxt.textContent = num2(view[i].c);
-      [cross, crossH, crossTag].forEach(function (n) { n.setAttribute("visibility", "visible"); });
-      const ch = (view[i].c / e.price - 1) * 100;
-      ro.textContent = tcHover[key] = new Date(view[i].t).toLocaleString("uk-UA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) + ": " + pxs(view[i].c) + " · проти ціни купівлі " + pc(ch) + (sma[i] ? " · середня " + pxs(sma[i]) : "");
-    });
-    svg.addEventListener("pointerleave", function () { [cross, crossH, crossTag].forEach(function (n) { n.setAttribute("visibility", "hidden"); }); });
-    box.appendChild(svg);
-    box.appendChild(ro);
-    if (firstDraw) { tcDrawn[key] = 1; setTimeout(function () { document.querySelectorAll(".tc-first").forEach(function (n) { n.classList.remove("tc-first"); }); }, 2200); }
-    const lg = el("div", "tc-legend small");
-    [["— ціна наживо", "var(--tc-price)"], ["— середня за 50 свічок", "var(--tc-ma)"], ["Ⓑ купівля", "var(--up)"], ["Ⓢ продаж", "var(--down)"], ["▒ діапазон, куди ціна зазвичай рухається", "var(--tc-price)"]].forEach(function (x) { const s = el("span", "", x[0]); s.style.color = x[1]; lg.appendChild(s); });
-    box.appendChild(lg);
+    box.appendChild(host);
+    box.appendChild(el("p", "small muted tc-note", "Графік інтерактивний: колесо миші — масштаб, перетягування — прокрутка, подвійний клік — скинути. Зверху можна змінити масштаб часу (1 хв … 1 тиждень), увімкнути MA, BOLL, RSI й об'єм; ліворуч — горизонтальні лінії, тренд, рівні Фібоначчі та лінійка. Свої лінії зберігаються в цьому браузері."));
     box.appendChild(exitPanel(t, last, targets, box.tcInfo));
     const chips = el("div", "tc-chips"), r1 = (Math.exp(sd * Math.sqrt(FUT)) - 1) * 100, r2 = (Math.exp(2 * sd * Math.sqrt(FUT)) - 1) * 100;
     function chip(a, b, c2) { const s = el("div", "tc-chip " + (c2 || "")); s.appendChild(el("span", "small", a)); s.appendChild(el("b", "", b)); chips.appendChild(s); }
@@ -485,14 +447,53 @@
     return g;
   }
 
+  // Аналіз угоди за свічками: найкраща й найгірша точка, що віддали, що було після виходу
+  function tradeAnalysis(t, d) {
+    const box = el("div", "tr-ana"), e = t.buy, fee = sim.paper.fee || 0;
+    box.appendChild(el("h5", "sim-feed-h5", "Аналіз угоди"));
+    if (!d || !d.length) { box.appendChild(el("p", "small muted", d ? "Свічки зараз недоступні." : "Рахуємо за свічками Binance…")); return box; }
+    const f = function (v) { return Math.abs(v).toLocaleString("uk-UA", { maximumFractionDigits: 2 }); };
+    const i0 = d.findIndex(function (x) { return x.t >= e.candle; });
+    if (i0 < 0) { box.appendChild(el("p", "small muted", "Свічки за цей період ще не завантажені.")); return box; }
+    const iEnd = t.kind === "pair" ? Math.max(i0, d.findIndex(function (x) { return x.t >= t.sell.candle; })) : d.length - 1, endIdx = iEnd < 0 ? d.length - 1 : iEnd;
+    const seg = d.slice(i0, endIdx + 1).map(function (x) { return x.c; }); if (live[t.coin] && t.kind !== "pair") seg.push(live[t.coin]);
+    const mx = Math.max.apply(null, seg), mn = Math.min.apply(null, seg), up = (mx / e.price - 1) * 100, dn = (mn / e.price - 1) * 100;
+    const tMax = d[i0 + seg.indexOf(mx)] ? d[i0 + seg.indexOf(mx)].t - e.candle : 0;
+    const cells = [];
+    function cell(label, value, sub, tone) { cells.push([label, value, sub, tone || ""]); }
+    cell("Найкраща точка", pxfmt(mx), (up >= 0 ? "+" : "−") + f(up) + "% від купівлі, через " + dur(Math.max(0, tMax)), up > 0 ? "good" : "");
+    cell("Найгірша точка", pxfmt(mn), (dn >= 0 ? "+" : "−") + f(dn) + "% від купівлі", dn < -1 ? "bad" : "");
+    let conclusion;
+    if (t.kind === "pair") {
+      const sell = t.sell.price, gave = (mx / sell - 1) * 100, after = d.slice(endIdx + 1).map(function (x) { return x.c; }).concat(live[t.coin] ? [live[t.coin]] : []);
+      cell("Вихід", pxfmt(sell), gave > 0.05 ? "віддали " + f(gave) + "% відносно найкращої точки" : "вийшли біля найкращої точки", gave > 0.8 ? "warn" : "good");
+      if (after.length) {
+        const aUp = (Math.max.apply(null, after) / sell - 1) * 100, aDn = (Math.min.apply(null, after) / sell - 1) * 100;
+        cell("Після продажу", aUp > Math.abs(aDn) ? "ціна ще зросла" : "ціна впала", "найвище +" + f(aUp) + "%, найнижче −" + f(aDn) + "% від ціни продажу", aUp > 1.5 ? "warn" : aDn < -1.5 ? "good" : "");
+        conclusion = aUp > 1.5 ? "Вийшли зарано: ціна після продажу ще зросла на " + f(aUp) + "%." : aDn < -1.5 ? "Вихід був вчасний: після нього ціна впала на " + f(aDn) + "%." : "Після виходу ціна суттєво не змінилась: вихід нейтральний.";
+      }
+      if (gave > 1.5 && t.pl <= 0) conclusion = "Угода була в плюсі (до +" + f(up) + "%), але не зафіксувалась: правило виходить лише за закритою свічкою. Тейк-профіт міг би це врятувати. " + (conclusion || "");
+    } else {
+      const now = seg[seg.length - 1], fromTop = (now / mx - 1) * 100;
+      cell("Зараз", pxfmt(now), "від найкращої точки " + (fromTop >= 0 ? "+" : "−") + f(fromTop) + "% · в позиції " + dur(Date.now() - e.candle), fromTop < -1 ? "warn" : "");
+      conclusion = up > 1 && t.pl !== null && t.pl < up / 2 ? "Угода вже була в плюсі до +" + f(up) + "%, зараз прибуток частково повернувся. Тейк-профіт міг би зафіксувати частину." : "Угода відкрита: результат залежить від того, коли закриється свічка біля лінії виходу.";
+    }
+    const g = el("div", "tr-ana-g");
+    cells.forEach(function (c) { const x = el("div", "tr-an-t " + c[3]); x.appendChild(el("span", "small", c[0])); x.appendChild(el("b", "", c[1])); x.appendChild(el("span", "small", c[2])); g.appendChild(x); });
+    box.appendChild(g);
+    if (conclusion) box.appendChild(el("p", "tr-tip small", conclusion));
+    return box;
+  }
+
   function tradeDetails(t) {
     const ex = el("div", "sim-feed-why tc"), e = t.buy, ind = e.ind || {}, def = ruleDef(t.rid) || {};
-    ex.appendChild(el("div", "sim-feed-where", "Куплено на " + (TF_FULL[e.tf] || e.tf) + " · правило: " + ruleTitle(t.rid)));
+    ex.appendChild(el("div", "sim-feed-where", (def.kind === "setup" ? "Куплено одразу за умовами (15-хвилинний графік + підтвердження годинним) · правило: " : "Куплено на " + (TF_FULL[e.tf] || e.tf) + " · правило: ") + ruleTitle(t.rid)));
     const sumRow = el("div", "tc-sum small");
     [["Кількість", qfmt(t.q) + " " + t.coin], ["Сума входу", usd(t.sum)], ["Витрати", "≈" + usd(t.costs)]].concat(t.kind === "pair" ? [["Утримання", dur(t.held)], ["Результат", pc(t.pl) + " (" + money(t.usd) + ")"]] : []).forEach(function (x) { const s = el("span", ""); s.appendChild(document.createTextNode(x[0] + ": ")); s.appendChild(el("b", "", x[1])); sumRow.appendChild(s); });
     ex.appendChild(sumRow);
     const chartBox = tradeChart(t, loadCandles(t.coin, e.tf), live[t.coin]);
     ex.appendChild(chartBox);
+    ex.appendChild(tradeAnalysis(t, loadCandles(t.coin, e.tf)));
     const gs = el("div", "tc-gauges");
     const nw = "у момент купівлі";
     if (ind.price && ind.sma50) {
@@ -515,7 +516,7 @@
     ex.appendChild(gs);
     const plan = planOf(t.rid, t);
     const pw = el("div", "tc-plan"); pw.appendChild(el("b", "", t.kind === "pair" ? "Чому продали: " : "Коли планує продати: "));
-    pw.appendChild(document.createTextNode(t.kind === "pair" ? (t.sell.reason || "") : plan.text.join("; або ") + ". Перевірка " + plan.check + ", лише за закритою свічкою."));
+    pw.appendChild(document.createTextNode(t.kind === "pair" ? (t.sell.reason || "") : plan.text.join("; або ") + ". Перевірка " + plan.check + (def.kind === "setup" ? "." : ", лише за закритою свічкою.")));
     if (t.kind === "open") {
       const nowP = live[t.coin] || (chartBox.tcInfo && chartBox.tcInfo.last), info = chartBox.tcInfo, main = info ? info.targets.filter(function (g) { return g.key !== "be"; }) : [];
       const live2 = el("div", "tc-now");
@@ -533,62 +534,443 @@
     return ex;
   }
 
+  // Розбір однієї угоди простими словами: чому вийшов прибуток чи збиток
+  function tradeVerdict(t) {
+    const cp = t.costPct || 0, f1 = function (v) { return Math.abs(v).toLocaleString("uk-UA", { maximumFractionDigits: 2 }); };
+    let tone, tag, text;
+    if (t.kind === "pair") {
+      const gross = t.pl + cp;
+      if (t.pl > 0) { tone = "good"; tag = "прибуток"; text = "Ціна зросла на " + f1(gross) + "%, після витрат (≈" + f1(cp) + "%) лишилось " + f1(t.pl) + "%."; }
+      else if (gross > 0) { tone = "warn"; tag = "з'їли комісії"; text = "Ціна зросла лише на " + f1(gross) + "%, а витрати ≈" + f1(cp) + "% забрали весь прибуток."; }
+      else { tone = "bad"; tag = "сигнал помилився"; text = "Після купівлі ціна впала на " + f1(gross) + "% за " + dur(t.held) + ": сигнал виявився хибним." + (t.held <= 3600000 * 1.01 ? " Утримання менше години — схоже на шум." : ""); }
+      if (t.flapMs !== null) text += " Купівля була через " + Math.max(1, Math.round(t.flapMs / 60000)) + " хв після попереднього продажу цієї монети: правило «смикається» біля середньої.";
+    } else {
+      tag = t.isStart ? "старт раунду" : "відкрито";
+      if (t.pl === null) { tone = "neutral"; text = "Чекаємо живу ціну."; }
+      else if (t.pl >= cp) { tone = "good"; text = "Зараз у плюсі навіть після витрат на вихід (≈" + f1(cp) + "%)."; }
+      else if (t.pl > 0) { tone = "warn"; text = "Ціна вже вища за купівлю, але менше за витрати: щоб вийти в плюс, треба ще +" + f1(cp - t.pl) + "%."; }
+      else { tone = "bad"; text = "Поки в мінусі: " + pc(t.pl) + "; з витратами на вихід (≈" + f1(cp) + "%) відновлення потребує ≈+" + f1(cp - t.pl) + "%."; }
+      if (t.flapMs !== null) text += " Купівля через " + Math.max(1, Math.round(t.flapMs / 60000)) + " хв після попереднього продажу цієї монети.";
+    }
+    return { tone: tone, tag: tag, text: text };
+  }
+
   function feedBox(id, cap) {
     feedToolbar();
-    const cs = feedBar.coinSel;
-    if (cs.options.length - 1 !== sim.paper.coins.length) {
-      cs.replaceChildren(); [["", "усі монети"]].concat(sim.paper.coins.map(function (c) { return [c, c]; })).forEach(function (x) { const o = el("option", "", x[1]); o.value = x[0]; cs.appendChild(o); });
-      cs.value = feedCfg.coin;
-    }
     const trades = buildTrades(id, cap);
-    const box = el("div", "sim-feed"), head = el("div", "sim-feed-h");
-    head.appendChild(el("b", "", "Гаманець: угоди бота"));
-    head.appendChild(el("span", "sim-feed-live", "● наживо"));
-    box.appendChild(head);
+    trades.forEach(function (t) { t.v = tradeVerdict(t); });
+    const box = el("div", "sim-feed");
     if (!trades.length) { box.appendChild(el("p", "sim-feed-empty", "Угод ще не було: правило чекає свого сигналу. Тут з'являтиметься кожна угода з поясненням.")); return box; }
 
-    const closed = trades.filter(function (t) { return t.kind === "pair"; }), wins = closed.filter(function (t) { return t.pl > 0; }).length;
-    const realized = closed.reduce(function (a, t) { return a + t.usd; }, 0), costs = trades.reduce(function (a, t) { return a + t.costs; }, 0);
-    const sumLine = el("div", "sim-feed-sum-line small");
-    [["Угод закритих", String(closed.length)], ["прибуткових", closed.length ? wins + " з " + closed.length : "—"], ["зафіксовано", closed.length ? money(realized) : "—"], ["витрати (комісія + ковзання)", "≈" + usd(costs)]].forEach(function (x) {
-      const s = el("span", ""); s.appendChild(document.createTextNode(x[0] + ": ")); s.appendChild(el("b", x[0] === "зафіксовано" && closed.length ? cls(realized) : "", x[1])); sumLine.appendChild(s);
-    });
-    box.appendChild(sumLine);
-
     let items = trades.filter(function (t) {
-      return (!feedCfg.coin || t.kind === "start" || t.coin === feedCfg.coin) && (!feedCfg.side || (feedCfg.side === "closed" ? t.kind === "pair" : t.kind !== "pair"));
+      const f = feedCfg.side;
+      return (!feedCfg.coin || t.coin === feedCfg.coin) && (!f || (f === "closed" ? t.kind === "pair" : f === "open" ? t.kind !== "pair" : f === "win" ? t.kind === "pair" && t.pl > 0 : f === "loss" ? t.kind === "pair" && t.pl <= 0 : f === "flap" ? t.flapMs !== null : true));
     });
     items.sort(function (a, b) {
       const pa = a.pl === null ? -1e9 : a.pl, pb = b.pl === null ? -1e9 : b.pl;
       return feedCfg.sort === "old" ? a.ts - b.ts : feedCfg.sort === "sum" ? b.sum - a.sum : feedCfg.sort === "pl" ? pb - pa : b.ts - a.ts;
     });
-    box.appendChild(el("p", "sim-feed-count small", "Показано " + Math.min(items.length, feedCfg.limit) + " із " + items.length + " угод"));
+    box.appendChild(el("p", "sim-feed-count small", "Угод за фільтром: " + items.length + " · натисніть на угоду, щоб побачити графік і деталі"));
     if (!items.length) box.appendChild(el("p", "sim-feed-empty", "За цим фільтром угод немає."));
-    items.slice(0, feedCfg.limit).forEach(function (t) {
-      const key = id + "|" + cap + "|" + t.kind + "|" + t.coin + "|" + t.ts, row = el("div", "sim-feed-row " + (t.kind === "pair" ? (t.pl >= 0 ? "buy" : "sell") : t.kind === "open" ? "buy" : "start"));
-      if (!feedFirst && !seenFeed[key]) row.classList.add("new");
-      seenFeed[key] = 1;
-      const top = el("button", "sim-feed-top"); top.type = "button"; top.setAttribute("aria-expanded", feedOpen[key] ? "true" : "false");
-      top.appendChild(el("span", "sim-feed-n", "№" + t.n));
-      top.appendChild(el("span", "sim-feed-side", t.kind === "pair" ? "ЗАКРИТО" : t.isStart ? "КУПЛЕНО НА СТАРТІ" : "КУПЛЕНО"));
-      top.appendChild(el("b", "", t.coin));
-      top.appendChild(el("span", "sim-feed-tf", "графік " + (TF_SHORT[(t.buy || {}).tf] || "")));
-      top.appendChild(el("span", "small sim-feed-times", t.kind === "start" ? when(t.ts) : t.kind === "pair" ? when(t.buy.candle) + " → " + when(t.sell.candle) + " · " + dur(t.held) : when(t.buy.candle) + " → в позиції"));
-      if (t.pl !== null) top.appendChild(el("span", "sim-feed-pl " + cls(t.pl), pc(t.pl) + (t.usd !== null ? " (" + money(t.usd) + ")" : "")));
-      top.appendChild(el("span", "sim-feed-sum", usd(t.sum)));
-      top.addEventListener("click", function () { feedOpen[key] = !feedOpen[key]; renderPaper(false); });
-      row.appendChild(top);
-      t.fkey = key;
-      if (feedOpen[key]) row.appendChild(tradeDetails(t));
-      else {
-        const plan = t.kind === "open" ? planOf(id, t) : null;
-        const why = t.kind === "pair" ? t.sell.reason || "" : plan ? "Планує продати " + plan.text.join("; або ") + ". Перевірка " + plan.check + "." : "";
-        row.appendChild(el("span", "small sim-feed-hint", "▸ " + String(why).slice(0, 190) + (why.length > 190 ? "…" : "")));
+    // Кожна монета: окремий компактний блок зі своїм підсумком і своїми угодами
+    const byCoin = {};
+    items.forEach(function (t) { (byCoin[t.coin] = byCoin[t.coin] || []).push(t); });
+    sim.paper.coins.filter(function (c) { return !feedCfg.coin || c === feedCfg.coin; }).forEach(function (coin) {
+      const all = trades.filter(function (t) { return t.coin === coin; }), cl = all.filter(function (t) { return t.kind === "pair"; }), op = all.filter(function (t) { return t.kind !== "pair"; })[0];
+      const rz = cl.reduce(function (a2, t) { return a2 + t.usd; }, 0), wn = cl.filter(function (t) { return t.pl > 0; }).length;
+      const list = byCoin[coin] || [], sec = el("div", "tr-coin-sec"), opened = coinOpen[coin] !== false;
+      const hd = el("button", "tr-coin-h"); hd.type = "button"; hd.setAttribute("aria-expanded", opened ? "true" : "false");
+      hd.appendChild(el("b", "tr-coin", coin));
+      hd.appendChild(el("span", "tr-tag " + (op ? "good" : ""), op ? "в позиції" : "готівка"));
+      hd.appendChild(el("span", "small", live[coin] ? pxfmt(live[coin]) : ""));
+      hd.appendChild(el("span", "small tr-coin-st", all.length ? "угод закритих " + cl.length + (cl.length ? " · прибуткових " + wn : "") : "угод ще не було"));
+      hd.appendChild(el("span", "tr-coin-res " + (cl.length ? cls(rz) : ""), cl.length ? money(rz) : ""));
+      hd.appendChild(el("span", "tr-chev", opened ? "▾" : "▸"));
+      hd.setAttribute("data-coinh", coin);
+      sec.appendChild(hd);
+      if (opened) {
+        if (!list.length) sec.appendChild(el("p", "small tr-empty", all.length ? "За цим фільтром угод немає." : "Бот ще не купував цю монету: сигналу не було."));
+        list.slice(0, feedCfg.limit).forEach(function (t) {
+          const key = id + "|" + cap + "|" + t.kind + "|" + t.coin + "|" + t.ts, v = t.v, open = !!feedOpen[key];
+          const row = el("div", "tr-row " + v.tone + (open ? " open" : ""));
+          if (!feedFirst && !seenFeed[key]) row.classList.add("new");
+          seenFeed[key] = 1; t.fkey = key;
+          const top = el("button", "tr-rtop"); top.type = "button"; top.setAttribute("aria-expanded", open ? "true" : "false");
+          top.appendChild(el("span", "sim-feed-n", "№" + t.n));
+          top.appendChild(el("span", "tr-tag " + v.tone, v.tag));
+          top.appendChild(el("span", "small tr-when", t.kind === "pair" ? when(t.buy.candle) + " → " + when(t.sell.candle) + " · " + dur(t.held) : when(t.buy.candle) + " → в позиції"));
+          top.appendChild(el("span", "tr-res " + (t.pl === null ? "" : cls(t.pl)), t.pl === null ? "—" : pc(t.pl) + (t.usd !== null ? " · " + money(t.usd) : "")));
+          top.setAttribute("data-fk", key);
+          row.appendChild(top);
+          if (!open) row.appendChild(el("div", "small tr-rv", v.text));
+          else { row.appendChild(el("div", "tr-verdict small", v.text)); row.appendChild(tradeDetails(t)); }
+          sec.appendChild(row);
+        });
       }
-      box.appendChild(row);
+      box.appendChild(sec);
     });
     return box;
   }
+
+  // ---------- Вкладка «Аналітика»: порівняння всіх гаманців для вибраного бота ----------
+  const anCfg = { period: 0 };                                                        // 0 = увесь раунд, інакше кількість годин
+  const AN_PERIODS = [["1 година", 1], ["6 годин", 6], ["24 години", 24], ["3 дні", 72], ["Увесь раунд", 0]];
+  function anSince() { return anCfg.period ? Date.now() - anCfg.period * 3600000 : 0; }
+  const WCOL = { "100": "#44707f", "1000": "#c28a3a", "10000": "#8a6fa8" };
+  const f2 = function (v) { return v.toLocaleString("uk-UA", { maximumFractionDigits: 2 }); };
+
+  function wAnalyze(id, cap) {
+    const P = walletData(cap), E = evtsAll[cap] || {}, st = P.strategies[id];
+    if (!st) return null;
+    const since = anSince();
+    const trades = buildTrades(id, cap, P, E).filter(function (t) { return t.kind !== "pair" || t.ts >= since; });      // закриті угоди лише за вибраний період, відкриті — завжди
+    trades.forEach(function (t) { t.v = tradeVerdict(t); t.wcap = cap; });
+    const closed = trades.filter(function (t) { return t.kind === "pair"; }), wins = closed.filter(function (t) { return t.pl > 0; }), losses = closed.filter(function (t) { return t.pl <= 0; });
+    const avg = function (arr) { return arr.length ? arr.reduce(function (a, t) { return a + t.pl; }, 0) / arr.length : 0; };
+    const cvAll = st.curve || [];
+    const cv = since ? cvAll.filter(function (r) { return Date.parse(r[0]) >= since; }) : cvAll;
+    const base = cv.length ? cv[0] : [0, 1, 1];                                        // початок періоду: від нього рахуємо результат
+    let peak = 0, mdd = 0; cv.forEach(function (r) { peak = Math.max(peak, r[1]); if (peak) mdd = Math.max(mdd, (peak - r[1]) / peak * 100); });
+    const m = liveMarks(id, P), perCoin = {};
+    const eq0 = since && cv.length ? cv[0][1] : 1, hold0 = since && cv.length ? cv[0][2] : 1;
+    trades.forEach(function (t) { if (t.usd !== null) perCoin[t.coin] = (perCoin[t.coin] || 0) + t.usd; else perCoin[t.coin] = perCoin[t.coin] || 0; });
+    P.coins.forEach(function (c) { if (perCoin[c] === undefined) perCoin[c] = 0; });
+    return { cap: cap, P: P, st: st, trades: trades, closed: closed, wins: wins, losses: losses, avgWin: avg(wins), avgLoss: avg(losses), avgAll: avg(closed),
+      realized: closed.reduce(function (a, t) { return a + t.usd; }, 0), costs: trades.reduce(function (a, t) { return a + t.costs; }, 0), mdd: mdd, ret: (m.eq / eq0 - 1) * 100, hold: (m.hold / hold0 - 1) * 100, curve: cv, eq0: eq0,
+      eaten: closed.filter(function (t) { return t.v.tag === "з'їли комісії"; }).length, wrong: closed.filter(function (t) { return t.v.tag === "сигнал помилився"; }).length,
+      flaps: trades.filter(function (t) { return t.flapMs !== null; }).length, open: trades.filter(function (t) { return t.kind !== "pair"; }).length, perCoin: perCoin };
+  }
+
+  function spark(points, color) {
+    const svg = sv("svg", { viewBox: "0 0 120 32", class: "an-spark", "aria-hidden": "true" });
+    if (points.length < 2) return svg;
+    const lo = Math.min.apply(null, points.concat([1])), hi = Math.max.apply(null, points.concat([1])), r = hi - lo || 1;
+    sv("line", { x1: 0, x2: 120, y1: 32 - (1 - lo) / r * 28 - 2, y2: 32 - (1 - lo) / r * 28 - 2, stroke: "var(--line)", "stroke-dasharray": "2 3" }, svg);
+    sv("polyline", { points: points.map(function (v, i) { return (i / (points.length - 1) * 120).toFixed(1) + "," + (30 - (v - lo) / r * 28).toFixed(1); }).join(" "), fill: "none", stroke: color, "stroke-width": 1.8, "stroke-linejoin": "round" }, svg);
+    return svg;
+  }
+
+  function walletsChart(list, id) {
+    const box = el("div", "an-chart"), W = 760, H = 230, ML = 46, MR = 12, MT = 10, MB = 22;
+    const series = list.map(function (a) {
+      const pts = a.curve.map(function (p) { return [Date.parse(p[0]), (p[1] / a.eq0 - 1) * 100]; }); pts.push([Date.now(), a.ret]);
+      return { a: a, pts: pts };
+    }).filter(function (s) { return s.pts.length > 1; });
+    if (!series.length) { box.appendChild(el("p", "muted", "Крива з'явиться після кількох запусків агента.")); return box; }
+    let t0 = Infinity, t1 = -Infinity, lo = 0, hi = 0;
+    series.forEach(function (s) { s.pts.forEach(function (p) { t0 = Math.min(t0, p[0]); t1 = Math.max(t1, p[0]); lo = Math.min(lo, p[1]); hi = Math.max(hi, p[1]); }); });
+    if (hi - lo < 0.2) { hi += 0.1; lo -= 0.1; }
+    const pad = (hi - lo) * 0.1; hi += pad; lo -= pad;
+    const X = function (t) { return ML + (t1 === t0 ? 0 : (t - t0) / (t1 - t0)) * (W - ML - MR); }, Y = function (v) { return MT + (hi - v) / (hi - lo) * (H - MT - MB); };
+    const svg = sv("svg", { viewBox: "0 0 " + W + " " + H, class: "sim-svg", role: "img", "aria-label": "Результат гаманців у відсотках від старту" });
+    for (let k = 0; k <= 4; k++) { const v = lo + (hi - lo) * k / 4; sv("line", { x1: ML, x2: W - MR, y1: Y(v), y2: Y(v), stroke: "var(--line)" }, svg); sv("text", { x: ML - 6, y: Y(v) + 4, "text-anchor": "end", "font-size": 11, fill: "var(--muted)" }, svg).textContent = pc(v, 2); }
+    sv("line", { x1: ML, x2: W - MR, y1: Y(0), y2: Y(0), stroke: "var(--text)", "stroke-dasharray": "2 3", opacity: 0.6 }, svg);
+    [t0, (t0 + t1) / 2, t1].forEach(function (t, k) { sv("text", { x: X(t), y: H - 6, "text-anchor": k === 0 ? "start" : k === 2 ? "end" : "middle", "font-size": 11, fill: "var(--muted)" }, svg).textContent = new Date(t).toLocaleString("uk-UA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); });
+    series.forEach(function (s) {
+      const col = WCOL[s.a.cap] || "var(--accent)";
+      sv("polyline", { points: s.pts.map(function (p) { return X(p[0]).toFixed(1) + "," + Y(p[1]).toFixed(1); }).join(" "), fill: "none", stroke: col, "stroke-width": 2.2, "stroke-linejoin": "round" }, svg);
+      const lp = s.pts[s.pts.length - 1]; sv("circle", { cx: X(lp[0]), cy: Y(lp[1]), r: 3.5, fill: col }, svg);
+    });
+    const cross = sv("line", { y1: MT, y2: H - MB, stroke: "var(--muted)", "stroke-dasharray": "3 3", visibility: "hidden" }, svg), ro = el("p", "small sim-readout", "Наведіть курсор на графік: значення кожного гаманця.");
+    svg.addEventListener("pointermove", function (ev) {
+      const b = svg.getBoundingClientRect(), x = (ev.clientX - b.left) / b.width * W, t = t0 + Math.max(0, Math.min(1, (x - ML) / (W - ML - MR))) * (t1 - t0);
+      cross.setAttribute("x1", X(t)); cross.setAttribute("x2", X(t)); cross.setAttribute("visibility", "visible");
+      ro.textContent = new Date(t).toLocaleString("uk-UA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) + " → " + series.map(function (s) {
+        let best = s.pts[0]; s.pts.forEach(function (p) { if (Math.abs(p[0] - t) < Math.abs(best[0] - t)) best = p; }); return usd(s.a.cap) + ": " + pc(best[1], 3); }).join(" · ");
+    });
+    svg.addEventListener("pointerleave", function () { cross.setAttribute("visibility", "hidden"); });
+    box.appendChild(svg); box.appendChild(ro);
+    const lg = el("div", "an-legend small");
+    series.forEach(function (s) { const sp = el("span", "", "● гаманець " + usd(s.a.cap)); sp.style.color = WCOL[s.a.cap]; lg.appendChild(sp); });
+    box.appendChild(lg);
+    return box;
+  }
+
+  // Чому угода була вигідною (або невигідною): розбір простими словами за даними самої угоди
+  function whyTrade(t) {
+    const e = t.buy, ind = e.ind || {}, cp = t.costPct || 0, lines = [], good = t.pl > 0;
+    if (t.kind === "pair") {
+      const gross = t.pl + cp, r = String(t.sell.reason || "");
+      lines.push("Купили по " + pxfmt(e.price) + ", продали по " + pxfmt(t.sell.price) + ": ціна змінилась на " + pc(gross, 2) + ", витрати ≈" + f2(cp) + "%, чистий результат " + pc(t.pl, 2) + " (" + money(t.usd) + ").");
+      if (/^Тейк-профіт/.test(r)) lines.push("Вихід: спрацював тейк-профіт, тобто бот зафіксував прибуток на заздалегідь заданій цілі й не віддав його ринку.");
+      else if (/^Трейлінг/.test(r)) lines.push("Вихід: трейлінг-стоп. Ціна зросла, потім трохи відкотилась, і бот зафіксував накопичений прибуток.");
+      else if (/^Стоп-лос/.test(r)) lines.push("Вихід: спрацював стоп-лос, тобто бот обмежив збиток, щоб він не ріс далі.");
+      else lines.push("Вихід: " + (good ? "тренд зберігався, поки правило не вийшло за своєю умовою; " : "") + r.replace(/\.$/, "") + ".");
+      lines.push("Утримання " + dur(t.held) + (t.held <= 3600000 * 1.01 ? ": дуже коротка угода, результат більше схожий на випадковість." : good ? ": ціна встигла рухнути достатньо, щоб покрити витрати." : "."));
+    } else {
+      lines.push("Угода ще відкрита: купили по " + pxfmt(e.price) + ", зараз " + (t.pl === null ? "—" : pc(t.pl, 2)) + " до витрат на вихід (≈" + f2(cp) + "%).");
+    }
+    if (typeof ind.rsi === "number") lines.push("Момент входу: RSI " + Math.round(ind.rsi) + (ind.rsi >= 70 ? " — ринок був перегрітий, ризик відкату" : ind.rsi <= 35 ? " — після розпродажу, можливий відскок" : " — без крайнощів, тобто купували не на піку емоцій") + ".");
+    if (ind.price && ind.sma50) lines.push("Тренд при купівлі: ціна на " + f2(Math.abs((ind.price / ind.sma50 - 1) * 100)) + "% " + (ind.price >= ind.sma50 ? "вище" : "нижче") + " середньої за 50 свічок.");
+    if (t.flapMs !== null) lines.push("Увага: це повторний вхід через " + Math.max(1, Math.round(t.flapMs / 60000)) + " хв після попереднього продажу тієї ж монети.");
+    return lines;
+  }
+
+  function bestWorst(list) {
+    const all = list.reduce(function (a, x) { return a.concat(x.trades); }, []).filter(function (t) { return t.pl !== null; });
+    const box = el("div", "an-bw");
+    if (!all.length) { box.appendChild(el("p", "muted", "Угод за цей період ще немає.")); return box; }
+    all.sort(function (a, b) { return b.pl - a.pl; });
+    function card(t, kind, title) {
+      const c = el("div", "an-bw-card " + kind);
+      const h = el("div", "an-bw-h"); h.appendChild(el("b", "", title)); h.appendChild(el("span", "an-bw-pl " + cls(t.pl), pc(t.pl, 2) + " · " + money(t.usd)));
+      c.appendChild(h);
+      c.appendChild(el("div", "small muted", t.coin + " · гаманець " + usd(t.wcap) + " · " + when(t.buy.candle) + (t.kind === "pair" ? " → " + when(t.sell.candle) : " → в позиції") + " · сума " + usd(t.sum)));
+      const ul = el("ul", "an-tips"); whyTrade(t).forEach(function (x) { ul.appendChild(el("li", "small", x)); }); c.appendChild(ul);
+      return c;
+    }
+    const best = all[0], worst = all[all.length - 1];
+    box.appendChild(card(best, best.pl > 0 ? "good" : "warn", best.pl > 0 ? "Найвигідніша угода" : "Найкраща угода (поки без прибутку)"));
+    if (all.length > 1 && worst !== best) box.appendChild(card(worst, worst.pl < 0 ? "bad" : "warn", "Найневдаліша угода"));
+    return box;
+  }
+
+  // ---------- Живий бот у браузері: дивиться на ціну щосекунди й діє одразу, коли зійшлися умови (тимчасово, поки відкрита сторінка) ----------
+  const LB_KEY = "liveBotV1";
+  let liveBot = null;
+  function lbLoad() {
+    try { const v = JSON.parse(localStorage.getItem(LB_KEY) || "null"); if (v && v.coins) return v; } catch (e) { /* без збереження */ }
+    return null;
+  }
+  function lbSave() { try { localStorage.setItem(LB_KEY, JSON.stringify(liveBot)); } catch (e) { /* немає місця або заборонено: працюємо без збереження */ } }
+  function lbRule() { return (sim.strategies || []).filter(function (s) { return s.id === "setup_live"; })[0]; }
+  function lbReset(cap) {
+    const P = walletData(cap), n = Math.max(1, P.coins.length);
+    liveBot = { cap: cap, since: Date.now(), coins: {}, log: [], trades: 0, w: 1 / n };
+    P.coins.forEach(function (c) { liveBot.coins[c] = { pos: false, eq: 1, entry: null, peak: null, px: null, cool: 0 }; });
+    lbSave();
+  }
+  function smaLast(arr, n) { if (arr.length < n) return null; let s = 0; for (let i = arr.length - n; i < arr.length; i++) s += arr[i]; return s / n; }
+  function rsiLast(arr, n) {
+    n = n || 14; if (arr.length < n + 2) return null;
+    let g = 0, l = 0;
+    for (let i = 1; i <= n; i++) { const d = arr[i] - arr[i - 1]; if (d >= 0) g += d; else l -= d; }
+    g /= n; l /= n;
+    for (let i = n + 1; i < arr.length; i++) { const d = arr[i] - arr[i - 1]; g = (g * (n - 1) + Math.max(d, 0)) / n; l = (l * (n - 1) + Math.max(-d, 0)) / n; }
+    return l === 0 ? 100 : 100 - 100 / (1 + g / l);
+  }
+  function lbEntry(r, P, s15, s1h, rsi, c15) {
+    const band = (r.band === undefined || r.band === null ? 0.1 : r.band) / 100, lo = r.rsi_min === null || r.rsi_min === undefined ? 40 : r.rsi_min, hi = r.rsi_max === null || r.rsi_max === undefined ? 68 : r.rsi_max;
+    if (!(P > s15 * (1 + band)) || !(P > s1h) || rsi === null || rsi < lo || rsi > hi || c15.length < 6 || !(P > c15[c15.length - 5])) return null;
+    return "Умови зійшлися одразу: ціна " + pxfmt(P) + " вища за 15-хвилинну середню (" + pxfmt(s15) + ") і годинну (" + pxfmt(s1h) + "), RSI за годину " + Math.round(rsi) + ", за останню годину ціна росте.";
+  }
+  function lbExit(r, co, P, s15) {
+    const chg = (P / co.entry - 1) * 100, pk = co.peak || co.entry;
+    if (r.stop && chg <= -r.stop) return "Стоп-лос: ціна на " + f2(Math.abs(chg)) + "% нижча за купівлю (поріг " + r.stop + "%).";
+    if (r.take && chg >= r.take) return "Тейк-профіт: ціна на " + f2(chg) + "% вища за купівлю (поріг " + r.take + "%).";
+    if (r.trail && (pk / co.entry - 1) * 100 >= (r.trail_start || 0.6) && (P / pk - 1) * 100 <= -r.trail) return "Трейлінг-стоп: ціна відкотилась на " + f2(Math.abs((P / pk - 1) * 100)) + "% від максимуму.";
+    if (s15 && P < s15 * (1 - (r.band === undefined || r.band === null ? 0.1 : r.band) / 100)) return "Тренд зламано: ціна нижче 15-хвилинної середньої.";
+    return null;
+  }
+  function lbTick() {
+    if (!sim || !sim.paper || !liveBot) return;
+    const r = lbRule(), fee = sim.paper.fee || 0, now = Date.now();
+    if (!r) return;
+    Object.keys(liveBot.coins).forEach(function (sym) {
+      const co = liveBot.coins[sym], P = live[sym], d15 = loadCandles(sym, "15m"), d1h = loadCandles(sym, "1h");
+      if (!P || !d15 || !d1h || d15.length < 60 || d1h.length < 60) return;
+      if (co.px) { const k = P / co.px; if (co.pos) { co.eq *= k; co.peak = Math.max(co.peak || P, P); } }
+      co.px = P;
+      const c15 = d15.map(function (x) { return x.c; }), c1h = d1h.map(function (x) { return x.c; });
+      c15[c15.length - 1] = P; c1h[c1h.length - 1] = P;
+      const s15 = smaLast(c15, 50), s1h = smaLast(c1h, 50), rsi = rsiLast(c1h, 14);
+      if (co.pos) {
+        const why = lbExit(r, co, P, s15);
+        if (why) { co.eq *= 1 - fee; liveBot.log.unshift({ t: now, coin: sym, side: "SELL", price: P, why: why, pl: (P / co.entry - 1) * 100 - fee * 200 }); co.pos = false; co.entry = null; co.peak = null; co.cool = now + (r.cooldown_min || 30) * 60000; liveBot.trades++; lbSave(); }
+      } else if (now >= (co.cool || 0) && s15 && s1h) {
+        const why = lbEntry(r, P, s15, s1h, rsi, c15);
+        if (why) { co.eq *= 1 - fee; co.pos = true; co.entry = P; co.peak = P; liveBot.log.unshift({ t: now, coin: sym, side: "BUY", price: P, why: why }); liveBot.trades++; lbSave(); }
+      }
+    });
+    liveBot.log = liveBot.log.slice(0, 40);
+  }
+  function liveBotNode() {
+    const wrap = el("div", "lb");
+    wrap.appendChild(el("h4", "sub", "Живий бот у браузері: реагує щосекунди"));
+    const r = lbRule();
+    if (!r) { wrap.appendChild(el("p", "muted", "Правила сканера умов ще не завантажені.")); return wrap; }
+    const caps = sim.paper.accounts, cap = liveBot ? liveBot.cap : (caps[Math.min(1, caps.length - 1)]);
+    if (!liveBot) lbReset(cap);
+    const total = Object.keys(liveBot.coins).reduce(function (a, c) { return a + liveBot.w * liveBot.coins[c].eq; }, 0), ret = (total - 1) * 100;
+    wrap.appendChild(el("p", "small muted", "Використовує умови правила «" + r.title + "», але перевіряє їх при кожній зміні ціни, а не раз на 10 хвилин. Працює лише поки відкрита ця сторінка; стан зберігається в цьому браузері. Це додатковий експеримент, він не входить у рейтинг ботів."));
+    const row = el("div", "lb-row");
+    const t1 = el("div", "an-an-t lb-t"); t1.appendChild(el("span", "small muted", "Гаманець " + usd(liveBot.cap) + " · монети " + Object.keys(liveBot.coins).join(" ")));
+    t1.appendChild(el("b", "an-big " + cls(ret), pc(ret, 3) + " · " + money(liveBot.cap * ret / 100)));
+    t1.appendChild(el("span", "small muted", "угод: " + liveBot.trades + " · працює вже " + dur(Date.now() - liveBot.since) + " · у позиції: " + (Object.keys(liveBot.coins).filter(function (c) { return liveBot.coins[c].pos; }).join(", ") || "готівка")));
+    row.appendChild(t1);
+    const rb = el("button", "feed-chip", "Почати з нуля"); rb.type = "button"; rb.setAttribute("data-lbreset", liveBot.cap); row.appendChild(rb);
+    caps.forEach(function (c) { if (c !== liveBot.cap) { const b = el("button", "feed-chip", "Гаманець " + usd(c)); b.type = "button"; b.setAttribute("data-lbreset", c); row.appendChild(b); } });
+    wrap.appendChild(row);
+    const ready = Object.keys(liveBot.coins).filter(function (c) { const a = klCache[c + "|15m"], b = klCache[c + "|1h"]; return a && b && a.data && b.data; }).length;
+    if (ready < Object.keys(liveBot.coins).length) wrap.appendChild(el("p", "small muted", "Завантажуємо свічки Binance: " + ready + " із " + Object.keys(liveBot.coins).length + " монет…"));
+    const list = el("div", "lb-log");
+    if (!liveBot.log.length) list.appendChild(el("p", "small muted", "Угод ще не було: бот чекає, поки умови зійдуться."));
+    liveBot.log.slice(0, 12).forEach(function (x) {
+      const it = el("div", "lb-item " + (x.side === "BUY" ? "buy" : "sell"));
+      it.appendChild(el("b", "", (x.side === "BUY" ? "КУПЛЕНО " : "ПРОДАНО ") + x.coin));
+      it.appendChild(el("span", "small", new Date(x.t).toLocaleTimeString("uk-UA") + " · " + pxfmt(x.price) + (x.pl !== undefined ? " · " + pc(x.pl, 2) : "")));
+      it.appendChild(el("span", "small muted", x.why));
+      list.appendChild(it);
+    });
+    wrap.appendChild(list);
+    return wrap;
+  }
+  document.getElementById("walletAnalytics").addEventListener("click", function (e) {
+    const b = e.target.closest("[data-lbreset]");
+    if (b) { lbReset(parseInt(b.getAttribute("data-lbreset"), 10)); renderAnalytics(); }
+  });
+  liveBot = lbLoad();
+  setInterval(function () { if (!document.hidden && sim && sim.paper && !document.getElementById("walletAnalytics").hidden) { try { lbTick(); } catch (e) { /* не зупиняємо сторінку через помилку бота */ } } }, 1000);
+
+  function renderAnalytics() {
+    const root = document.getElementById("walletAnalytics");
+    if (!root || root.hidden || !sim || !sim.paper) return;
+    if (!document.getElementById("anBar")) {                                           // панель вибору періоду: створюється один раз і не перебудовується
+      const bar = el("div", "an-bar"); bar.id = "anBar";
+      bar.appendChild(el("b", "", "Період аналізу:"));
+      AN_PERIODS.forEach(function (x) {
+        const b = el("button", "feed-chip" + (anCfg.period === x[1] ? " on" : ""), x[0]); b.type = "button"; b.setAttribute("data-per", x[1]);
+        b.addEventListener("click", function () { anCfg.period = x[1]; bar.querySelectorAll(".feed-chip").forEach(function (c) { c.classList.toggle("on", c === b); }); renderAnalytics(); });
+        bar.appendChild(b);
+      });
+      const body = el("div", ""); body.id = "anBody"; root.appendChild(bar); root.appendChild(body);
+    }
+    const box = document.getElementById("anBody");
+    const id = pStrat.value || sim.strategies[0].id, list = sim.paper.accounts.map(function (cap) { return wAnalyze(id, cap); }).filter(Boolean);
+    const tmp = document.createElement("div");
+    const head = el("div", "an-head");
+    head.appendChild(el("h4", "", "Аналітика гаманців: " + ruleTitle(id)));
+    head.appendChild(el("p", "small muted", "Один і той самий бот у трьох гаманцях з різними монетами · період: " + (AN_PERIODS.filter(function (x) { return x[1] === anCfg.period; })[0] || [""])[0].toLowerCase() + ". Вибрати іншого бота: «Арена ботів» або таблиця нижче."));
+    tmp.appendChild(head);
+    tmp.appendChild(gateNode(id, "цього бота у всіх гаманцях"));
+    if (!list.length) { tmp.appendChild(el("p", "muted", "Для цього бота ще немає даних.")); morphKids(box, tmp); return; }
+
+    // 1. три гаманці поруч
+    const cards = el("div", "an-cards");
+    list.forEach(function (a) {
+      const c = el("div", "an-card"); c.style.borderTopColor = WCOL[a.cap] || "var(--accent)";
+      const top = el("div", "an-card-h"); top.appendChild(el("b", "", "Гаманець " + usd(a.cap))); top.appendChild(el("span", "small muted", a.P.coins.join(" · "))); c.appendChild(top);
+      const big = el("div", "an-big " + cls(a.ret), pc(a.ret, 2) + " · " + money(a.cap * a.ret / 100)); c.appendChild(big);
+      c.appendChild(el("div", "small " + cls(a.ret - a.hold), "проти «просто тримати» (" + pc(a.hold, 2) + "): " + pc(a.ret - a.hold, 2)));
+      c.appendChild(spark(a.curve.map(function (r) { return r[1] / a.eq0; }), WCOL[a.cap] || "var(--accent)"));
+      const g = el("div", "an-grid");
+      [["Закрито угод", String(a.closed.length)], ["Прибуткових", a.closed.length ? Math.round(100 * a.wins.length / a.closed.length) + "%" : "—"], ["Середня угода", a.closed.length ? pc(a.avgAll, 2) : "—"],
+       ["Середній виграш / програш", a.closed.length ? (a.wins.length ? pc(a.avgWin, 2) : "—") + " / " + (a.losses.length ? pc(a.avgLoss, 2) : "—") : "—"], ["Витрати (комісії)", "≈" + usd(a.costs)],
+       ["Просідання", a.curve.length > 1 ? "−" + f2(a.mdd) + "%" : "—"], ["Відкрито зараз", String(a.open)], ["«Смикання»", String(a.flaps)]].forEach(function (x) {
+        const cell = el("div", "an-cell"); cell.appendChild(el("span", "small muted", x[0])); cell.appendChild(el("b", "", x[1])); g.appendChild(cell);
+      });
+      c.appendChild(g); cards.appendChild(c);
+    });
+    tmp.appendChild(cards);
+
+    // найвигідніша й найневдаліша угода з поясненням
+    tmp.appendChild(el("h4", "sub", "Яка угода була найвигідніша і чому"));
+    tmp.appendChild(bestWorst(list));
+
+    tmp.appendChild(liveBotNode());
+
+    // 2. криві гаманців
+    tmp.appendChild(el("h4", "sub", "Результат гаманців у часі (% від старту раунду)"));
+    tmp.appendChild(walletsChart(list, id));
+
+    // 3. усі боти × гаманці
+    tmp.appendChild(el("h4", "sub", "Усі боти в усіх гаманцях (результат у %)"));
+    const rules = Object.keys(sim.paper.strategies).map(function (rid) {
+      const vals = sim.paper.accounts.map(function (cap) { const P = walletData(cap); return P.strategies[rid] ? liveMarks(rid, P) : null; });
+      const rets = vals.map(function (m) { return m ? (m.eq - 1) * 100 : null; }), ok = rets.filter(function (v) { return v !== null; });
+      return { rid: rid, rets: rets, avg: ok.length ? ok.reduce(function (a, b) { return a + b; }, 0) / ok.length : 0 };
+    }).sort(function (a, b) { return b.avg - a.avg; });
+    const mxAbs = Math.max(0.05, Math.max.apply(null, rules.map(function (r) { return Math.max.apply(null, r.rets.map(function (v) { return Math.abs(v || 0); })); })));
+    const ht = el("table", "agent-table an-heat"), hh = el("tr");
+    hh.appendChild(el("th", "", "Бот")); sim.paper.accounts.forEach(function (cap) { hh.appendChild(el("th", "", usd(cap))); }); hh.appendChild(el("th", "", "Середнє"));
+    ht.appendChild(el("thead")).appendChild(hh);
+    const hb = el("tbody");
+    rules.forEach(function (r) {
+      const tr = el("tr", r.rid === id ? "board-sel" : ""); tr.setAttribute("data-hrule", r.rid); tr.tabIndex = 0;
+      const nm = el("td", "", ruleTitle(r.rid)); botTags(ruleDef(r.rid)).slice(0, 2).forEach(function (t) { nm.appendChild(el("span", "rank-tag " + t[1], t[0])); }); tr.appendChild(nm);
+      r.rets.forEach(function (v) {
+        const td = el("td", v === null ? "" : cls(v), v === null ? "—" : pc(v, 2));
+        if (v !== null) td.style.background = (v >= 0 ? "rgba(80,150,100," : "rgba(180,80,80,") + (Math.min(1, Math.abs(v) / mxAbs) * 0.35).toFixed(2) + ")";
+        tr.appendChild(td);
+      });
+      tr.appendChild(el("td", "an-avg " + cls(r.avg), pc(r.avg, 2)));
+      hb.appendChild(tr);
+    });
+    ht.appendChild(hb);
+    const hw = el("div", "agent-table-wrap"); hw.appendChild(ht); tmp.appendChild(hw);
+
+    // 4. звідки прибуток і збиток по монетах
+    tmp.appendChild(el("h4", "sub", "Результат по монетах (закриті угоди + відкриті за живою ціною)"));
+    const coinsBox = el("div", "an-coins");
+    const maxC = Math.max(0.01, Math.max.apply(null, list.map(function (a) { return Math.max.apply(null, Object.keys(a.perCoin).map(function (c) { return Math.abs(a.perCoin[c]); })); })));
+    list.forEach(function (a) {
+      const col = el("div", "an-coincol"); col.appendChild(el("b", "small", "Гаманець " + usd(a.cap)));
+      Object.keys(a.perCoin).forEach(function (c) {
+        const v = a.perCoin[c], row = el("div", "an-coinrow"); row.appendChild(el("span", "an-coinname", c));
+        const tr = el("div", "an-coinbar"), fl = el("i", v >= 0 ? "pos" : "neg"); fl.style.width = (Math.abs(v) / maxC * 50) + "%"; fl.style[v >= 0 ? "left" : "right"] = "50%"; tr.appendChild(fl); row.appendChild(tr);
+        row.appendChild(el("span", "small " + cls(v), v === 0 ? "—" : money(v))); col.appendChild(row);
+      });
+      coinsBox.appendChild(col);
+    });
+    tmp.appendChild(coinsBox);
+
+    // 5. розподіл результатів угод і залежність від тривалості
+    const all = list.reduce(function (a, x) { return a.concat(x.closed); }, []);
+    tmp.appendChild(el("h4", "sub", "Розподіл результатів закритих угод (усі гаманці)"));
+    if (!all.length) tmp.appendChild(el("p", "muted", "Закритих угод ще немає: розподіл з'явиться, коли боти почнуть продавати."));
+    else {
+      const bins = [[-1e9, -1, "< −1%"], [-1, -0.5, "−1…−0,5"], [-0.5, -0.3, "−0,5…−0,3"], [-0.3, 0, "−0,3…0"], [0, 0.3, "0…0,3"], [0.3, 1, "0,3…1"], [1, 1e9, "> 1%"]];
+      const cnt = bins.map(function (b) { return all.filter(function (t) { return t.pl >= b[0] && t.pl < b[1]; }).length; }), mc = Math.max.apply(null, cnt) || 1;
+      const hist = el("div", "an-hist");
+      bins.forEach(function (b, i) { const col = el("div", "an-hcol"); col.appendChild(el("span", "small", String(cnt[i]))); const bar = el("i", b[0] >= 0 ? "pos" : "neg"); bar.style.height = Math.max(3, cnt[i] / mc * 70) + "px"; col.appendChild(bar); col.appendChild(el("span", "small muted", b[2])); hist.appendChild(col); });
+      tmp.appendChild(hist);
+      const buckets = [["до 1 години", function (t) { return t.held <= 3600000 * 1.01; }], ["1–4 години", function (t) { return t.held > 3600000 * 1.01 && t.held <= 14400000; }], ["понад 4 години", function (t) { return t.held > 14400000; }]];
+      const bt = el("table", "agent-table"), bh = el("tr"); ["Скільки тримали", "Угод", "Прибуткових", "Середній результат", "Разом"].forEach(function (x) { bh.appendChild(el("th", "", x)); });
+      bt.appendChild(el("thead")).appendChild(bh); const bb = el("tbody");
+      buckets.forEach(function (b) {
+        const ts = all.filter(function (t) { return b[1](t); }), tr = el("tr"), av = ts.length ? ts.reduce(function (a, t) { return a + t.pl; }, 0) / ts.length : 0, sm = ts.reduce(function (a, t) { return a + t.usd; }, 0);
+        tr.appendChild(el("td", "", b[0])); tr.appendChild(el("td", "", String(ts.length))); tr.appendChild(el("td", "", ts.length ? Math.round(100 * ts.filter(function (t) { return t.pl > 0; }).length / ts.length) + "%" : "—"));
+        tr.appendChild(el("td", ts.length ? cls(av) : "", ts.length ? pc(av, 2) : "—")); tr.appendChild(el("td", ts.length ? cls(sm) : "", ts.length ? money(sm) : "—")); bb.appendChild(tr);
+      });
+      bt.appendChild(bb); const bw = el("div", "agent-table-wrap"); bw.appendChild(bt); tmp.appendChild(bw);
+    }
+
+    // 6. висновки простими словами
+    const tips = [], best = list.slice().sort(function (a, b) { return b.ret - a.ret; }), worst = best[best.length - 1];
+    if (list.length > 1) tips.push("Найкращий гаманець для цього бота: " + usd(best[0].cap) + " (" + pc(best[0].ret, 2) + "), найгірший: " + usd(worst.cap) + " (" + pc(worst.ret, 2) + "). Різницю дають монети, а не сума: відсотки від суми не залежать.");
+    const totC = list.reduce(function (a, x) { return a + x.costs; }, 0), totR = list.reduce(function (a, x) { return a + x.realized; }, 0);
+    if (all.length) tips.push("Усього закрито " + all.length + " угод: зафіксовано " + money(totR) + ", витрати на комісії й ковзання ≈" + usd(totC) + (totC > Math.abs(totR) ? " — витрати більші за результат." : "."));
+    const shortAll = all.filter(function (t) { return t.held <= 3600000 * 1.01; });
+    if (shortAll.length >= 3) tips.push("Угод до 1 години: " + shortAll.length + " із " + all.length + ", прибуткових " + shortAll.filter(function (t) { return t.pl > 0; }).length + ". Дуже короткі угоди найчастіше програють витратам.");
+    const fl = list.reduce(function (a, x) { return a + x.flaps; }, 0);
+    if (fl) tips.push("«Смикань» (повторний вхід одразу після продажу): " + fl + ". Для порівняння є версії правил з буфером і паузою.");
+    if (!tips.length) tips.push("Угод ще замало для висновків: боти чекають своїх сигналів.");
+    tmp.appendChild(el("h4", "sub", "Висновки"));
+    const ul = el("ul", "an-tips"); tips.forEach(function (x) { ul.appendChild(el("li", "small", x)); }); tmp.appendChild(ul);
+    tmp.appendChild(el("p", "small muted", "Це експеримент на віртуальних грошах, а не порада. Даних поки мало, і результат окремого дня легко може бути везінням."));
+    morphKids(box, tmp);
+  }
+  document.getElementById("walletAnalytics").addEventListener("click", function (e) {
+    const r = e.target.closest("[data-hrule]");
+    if (r) { pStrat.value = r.getAttribute("data-hrule"); renderPaper(true); renderBoard(); renderDecisions(); }
+  });
+
+  document.getElementById("walletFeed").addEventListener("click", function (e) {
+    const fk = e.target.closest("[data-fk]");
+    if (fk) { feedOpen[fk.getAttribute("data-fk")] = !feedOpen[fk.getAttribute("data-fk")]; renderPaper(false); return; }
+    const ch = e.target.closest("[data-coinh]");
+    if (ch) { const c = ch.getAttribute("data-coinh"); coinOpen[c] = coinOpen[c] === false; renderPaper(false); }
+  });
+  walletTabs.addEventListener("click", function (e) {
+    const b = e.target.closest("[data-cap]");
+    if (!b) return;
+    activeCap = parseInt(b.getAttribute("data-cap"), 10); applyWallet(); renderPaper(true); renderBoard(); renderRounds(); renderDecisions();
+  });
+  document.getElementById("paperBoard").addEventListener("click", function (e) {
+    const d = e.target.closest("[data-adot]"), m = e.target.closest("[data-amain]");
+    if (d) { arenaHidden[d.getAttribute("data-adot")] = !arenaHidden[d.getAttribute("data-adot")]; renderBoard(); }
+    else if (m) { pStrat.value = m.getAttribute("data-amain"); renderPaper(true); renderDecisions(); renderBoard(); }
+  });
 
   function renderPaper(withChart) {
     if (!sim || !sim.paper) return;
@@ -596,9 +978,8 @@
     if (!st) return;
     const m = liveMarks(id), er = (m.eq - 1) * 100, hr = (m.hold - 1) * 100;
 
-    paperTiles.replaceChildren();
+    const tp = document.createElement("div"), wt = document.createElement("div");
     feedToolbar();
-    walletTabs.replaceChildren();
     sim.paper.accounts.forEach(function (cap) {
       const b = el("button", "wallet-tab" + (cap === activeCap ? " on" : ""));
       b.type = "button"; b.setAttribute("role", "tab"); b.setAttribute("aria-selected", cap === activeCap ? "true" : "false");
@@ -607,10 +988,15 @@
       b.appendChild(el("b", "", usd(cap * mm.eq)));
       b.appendChild(el("span", "small " + cls(e2), pc(e2)));
       b.appendChild(el("span", "small wallet-tab-coins", (P.coins || []).join(" · ")));
-      b.addEventListener("click", function () { activeCap = cap; applyWallet(); renderPaper(true); renderBoard(); renderRounds(); renderDecisions(); });
-      walletTabs.appendChild(b);
+      b.setAttribute("data-cap", cap);
+      wt.appendChild(b);
     });
+    morphKids(walletTabs, wt);
     paperTiles.classList.add("wallet-single");
+    const wv = document.getElementById("walletViews");
+    let gate = document.getElementById("dataGate");
+    if (!gate) { gate = el("div", ""); gate.id = "dataGate"; wv.parentNode.insertBefore(gate, wv); }
+    const tg = document.createElement("div"); tg.appendChild(gateNode(id, "цього бота")); morphKids(gate, tg);
     sim.paper.accounts.filter(function (cap) { return cap === activeCap; }).forEach(function (cap) {
       const t = el("div", "ov-tile");
       t.appendChild(el("h3", "ov-title", "Рахунок " + usd(cap)));
@@ -624,10 +1010,13 @@
       chip.tabIndex = 0;
       chip.setAttribute("data-help", st.open.length ? ("Відкриті віртуальні позиції: " + st.open.join(", ") + ". " + (small ? "На біржі мінімальний ордер близько 10 $: на такій сумі розділити гроші між усіма цими монетами не вийшло б. " : "") + "Угод у раунді: " + st.trades) : "Зараз усі гроші в готівці: сигнали не радять тримати жодної монети");
       t.appendChild(chip);
-      document.getElementById("walletFeed").replaceChildren(feedBar, feedBox(id, cap));
-      paperTiles.appendChild(t);
+      mountFeed(feedBox(id, cap));
+      tp.appendChild(t);
     });
+    morphKids(paperTiles, tp);
     feedFirst = false;
+    Object.keys(tcCharts).forEach(function (k) { if (!tcCharts[k].host.isConnected && !feedOpen[k]) { try { tcCharts[k].inst.close(); } catch (x) { /* вже закрито */ } delete tcCharts[k]; } });
+    renderAnalytics();
 
     if (withChart === false) return;                                  // щосекунди оновлюємо лише суми, графік рідше
     const curve = st.curve.slice();
@@ -644,7 +1033,8 @@
 
   function renderRounds() {
     const box = document.getElementById("paperHistory"), h = sim.paper.history || [];
-    if (!h.length) { box.replaceChildren(el("p", "muted", "Перший раунд іще триває.")); return; }
+    const daily = dailyTable();
+    if (!h.length) { box.replaceChildren(daily, el("p", "muted", "Перший раунд іще триває: підсумок з'явиться після завершення.")); return; }
     const t = el("table", "agent-table"), head = el("tr");
     ["Раунд", "Правило", "Результат правила", "«Просто тримати»", "Угод"].forEach(function (x) { head.appendChild(el("th", "", x)); });
     t.appendChild(el("thead")).appendChild(head);
@@ -663,7 +1053,50 @@
       });
     });
     t.appendChild(body);
-    box.replaceChildren(t);
+    box.replaceChildren(daily, el("h4", "sub", "Завершені раунди"), t);
+  }
+
+  // Знімок по днях: як змінювався результат кожного бота від старту раунду (остання точка кожного дня)
+  function dailyTable() {
+    const wrap = el("div", "tr-daily"), dd = sim.paper.daily || {}, days = Object.keys(dd).sort().slice(-14);
+    wrap.appendChild(el("h4", "sub", "Результат по днях (від старту раунду, у %)"));
+    if (days.length < 1) { wrap.appendChild(el("p", "muted", "Знімки по днях ще не зібрані: перший з'явиться після наступного запуску агента.")); return wrap; }
+    const last = dd[days[days.length - 1]], ids = Object.keys(last).sort(function (a, b) { return last[b][0] - last[a][0]; });
+    const t = el("table", "agent-table"), head = el("tr");
+    head.appendChild(el("th", "", "Бот"));
+    days.forEach(function (d) { head.appendChild(el("th", "", new Date(d + "T12:00:00Z").toLocaleDateString("uk-UA", { day: "numeric", month: "short" }))); });
+    t.appendChild(el("thead")).appendChild(head);
+    const body = el("tbody");
+    ids.forEach(function (rid, i) {
+      const tr = el("tr", i === 0 ? "rank-strong" : "");
+      tr.appendChild(el("td", "", ruleTitle(rid)));
+      days.forEach(function (d) { const v = dd[d] && dd[d][rid]; tr.appendChild(el("td", v ? cls(v[0] - 1) : "", v ? pc((v[0] - 1) * 100, 2) : "—")); });
+      body.appendChild(tr);
+    });
+    t.appendChild(body);
+    const wr = el("div", "agent-table-wrap"); wr.appendChild(t); wrap.appendChild(wr);
+    wrap.appendChild(el("p", "small muted", "Показано останню точку кожного дня. Дивіться на послідовність днів, а не на один: окремий день легко може бути везінням."));
+    return wrap;
+  }
+
+  // Чи достатньо даних для висновків: потрібно хоча б кілька днів і десятки закритих угод
+  const GATE_DAYS = 3, GATE_TRADES = 30;
+  function gateInfo(ruleId) {
+    const rd = sim.paper.round, days = Math.max(0, (Date.now() - Date.parse(rd.start)) / 864e5), total = Math.max(1, (Date.parse(rd.end) - Date.parse(rd.start)) / 864e5);
+    let closed = 0;
+    Object.keys(evts || {}).forEach(function (rid) {
+      if (ruleId && rid !== ruleId) return;
+      const open = {};
+      (evts[rid] || []).slice().sort(function (a, b) { return a.candle - b.candle; }).forEach(function (e) { if (e.side === "BUY") open[e.coin] = 1; else if (open[e.coin]) { closed++; delete open[e.coin]; } });
+    });
+    return { days: days, total: total, closed: closed, ok: days >= GATE_DAYS && closed >= GATE_TRADES };
+  }
+  function gateNode(ruleId, who) {
+    const g = gateInfo(ruleId), n = el("div", "tr-gate " + (g.ok ? "ok" : "low"));
+    const f = function (v) { return v.toLocaleString("uk-UA", { maximumFractionDigits: 1 }); };
+    n.appendChild(el("b", "", g.ok ? "Даних достатньо для попередньої оцінки" : "Замало даних для висновків: відсотки зараз переважно випадковість"));
+    n.appendChild(el("span", "small", "Пройшло " + f(g.days) + " із " + f(g.total) + " днів (потрібно хоча б " + GATE_DAYS + ") · закритих угод " + who + ": " + g.closed + " (потрібно хоча б " + GATE_TRADES + ")" + (g.ok ? ". Навіть тоді це не гарантія на майбутнє." : "")));
+    return n;
   }
 
 
@@ -679,6 +1112,9 @@
     if (def.stop) t.push(["стоп " + def.stop + "%", "same"]);
     if (def.take) t.push(["тейк " + def.take + "%", "same"]);
     if (def.sizing === "vol") t.push(["за мінливістю", "same"]);
+    if (def.kind === "setup") t.push(["миттєво за умовами", "up"]);
+    if (def.kind !== "setup" && def.band) t.push(["буфер " + def.band + "%", "same"]);
+    if (def.cooldown) t.push(["пауза " + def.cooldown + " св.", "same"]);
     return t;
   }
 
@@ -742,12 +1178,12 @@
     const TF = { "1d": "щодня", "1h": "щогодини", "15m": "кожні 15 хв", "30m": "кожні 30 хв", "2h": "кожні 2 год" };
     const rows = ids.map(function (id, i) {
       const st = sim.paper.strategies[id], m = liveMarks(id), def = sim.strategies.filter(function (s) { return s.id === id; })[0] || {};
-      return { id: id, def: def, color: BOT_COLORS[i % BOT_COLORS.length], title: def.title || id, tf: TF[def.tf] || def.tf, inv: def.invert, pair: def.pair, st: st, ret: (m.eq - 1) * 100, hold: (m.hold - 1) * 100 };
+      return { id: id, def: def, color: BOT_COLORS[i % BOT_COLORS.length], title: def.title || id, tf: def.kind === "setup" ? "одразу за умовами" : (TF[def.tf] || def.tf), inv: def.invert, pair: def.pair, st: st, ret: (m.eq - 1) * 100, hold: (m.hold - 1) * 100 };
     });
     rows.forEach(function (r) { r.vs = r.ret - r.hold; });
     const sorted = rows.slice().sort(function (a, b) { return arenaSort === "trades" ? b.st.trades - a.st.trades : arenaSort === "vs" ? b.vs - a.vs : b.ret - a.ret; });
-    box.replaceChildren();
     const wrap = el("div", "arena");
+    wrap.appendChild(gateNode(null, "усіх ботів"));
 
     const bar = el("div", "arena-bar");
     bar.appendChild(el("b", "", "Сортування рейтингу:"));
@@ -772,10 +1208,10 @@
       const card = el("div", "arena-row" + (pStrat.value === r.id ? " sel" : "") + (arenaHidden[r.id] ? " off" : ""));
       const dot = el("button", "arena-dot"); dot.type = "button"; dot.style.background = arenaHidden[r.id] ? "transparent" : r.color; dot.style.borderColor = r.color;
       dot.setAttribute("aria-pressed", arenaHidden[r.id] ? "false" : "true"); dot.setAttribute("aria-label", "Показати " + r.title + " на діаграмі"); dot.title = "Показати чи сховати на діаграмі";
-      dot.addEventListener("click", function () { arenaHidden[r.id] = !arenaHidden[r.id]; renderBoard(); });
+      dot.setAttribute("data-adot", r.id);
       card.appendChild(dot);
       const main = el("button", "arena-main"); main.type = "button"; main.title = "Показати цього бота в рахунках вище";
-      main.addEventListener("click", function () { pStrat.value = r.id; renderPaper(true); renderDecisions(); renderBoard(); });
+      main.setAttribute("data-amain", r.id);
       const top = el("div", "arena-top");
       top.appendChild(el("span", "arena-rank", (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "#" + (i + 1))));
       top.appendChild(el("b", "", r.title));
@@ -790,8 +1226,8 @@
       list.appendChild(card);
     });
     wrap.appendChild(list);
-    box.appendChild(wrap);
     arenaChart(chartBox, ro, rows);
+    const tmpA = document.createElement("div"); tmpA.appendChild(wrap); morphKids(box, tmpA);
 
     const lines = [];
     rows.filter(function (r) { return r.inv && r.pair; }).forEach(function (r) {
@@ -1156,6 +1592,17 @@
       });
       box.appendChild(ul);
     }
+    const conn = el("div", "tr-conn");
+    try {
+      const nt = await loadJson("data/notify.json"), tr2 = await loadJson("data/trader.json");
+      [["Telegram-сповіщення", nt.configured, "TELEGRAM_BOT_TOKEN і TELEGRAM_CHAT_ID"], ["Бот на тестовій біржі", tr2.configured, "BINANCE_TESTNET_API_KEY і BINANCE_TESTNET_API_SECRET"]].forEach(function (x) {
+        const row = el("div", "tr-conn-row " + (x[1] ? "ok" : "off"));
+        row.appendChild(el("b", "", x[0] + ": " + (x[1] ? "підключено" : "не підключено")));
+        if (!x[1]) row.appendChild(el("span", "small", "Щоб увімкнути: GitHub → Settings → Secrets and variables → Actions → New repository secret: " + x[2] + ". Ключі вводяться лише там, не в чаті й не у файлах сайту."));
+        conn.appendChild(row);
+      });
+    } catch (e) { /* стан підключень необов'язковий */ }
+    box.appendChild(conn);
     const links = el("p", "small");
     [["data/simulation.json", "Дані агента"], ["knowledge/simulation.json", "База знань (правила, комісія, суми)"], ["agents.html#simulation", "Вкладка агента"]].forEach(function (x, i) {
       if (i) links.appendChild(document.createTextNode(" · "));
@@ -1194,8 +1641,8 @@
       const first = !sim;
       sim = d;
       if (first || !pStrat.options.length) {
-        const TF = { "1d": "щодня", "1h": "щогодини", "15m": "кожні 15 хв" };
-        fill(pStrat, d.strategies.map(function (s) { return [s.id, s.title + " · рішення " + (TF[s.tf] || s.tf)]; }));
+        const TF = { "1d": "щодня", "1h": "щогодини", "15m": "кожні 15 хв", "30m": "кожні 30 хв", "2h": "кожні 2 год" };
+        fill(pStrat, d.strategies.map(function (s) { return [s.id, s.title + " · " + (s.kind === "setup" ? "рішення одразу за умовами" : "рішення " + (TF[s.tf] || s.tf))]; }));
         fill(hStrat, d.strategies.filter(function (s) { return s.tf === "1d"; }).map(function (s) { return [s.id, s.title]; }));
         fill(hCoin, Object.keys(d.coins).map(function (s) { return [s, s]; }), "BTC");
       }

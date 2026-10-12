@@ -29,7 +29,13 @@
   var sim = { strategies: RULES.map(function (r) { return { id: r.id, title: r.title }; }), paper: paper, updated: new Date(T0 + 290 * MIN).toISOString() };
   var NOW = T0 + 295 * MIN;
   WalletsPage.mount(document.getElementById("wlRoot"), { feed: false, refreshMs: 1e9, priceMs: 1e9, now: function () { return NOW; }, storage: { getItem: function () { return null; }, setItem: function () {} },
-    loadJson: function (u) { return Promise.resolve(/trader/.test(u) ? { configured: false } : sim); }, loadPrices: function () { return Promise.resolve({ BTC: 110 }); } });
+    loadJson: function (u) {
+      if (/trader/.test(u)) return Promise.resolve({ configured: false });
+      if (/simulation\.json/.test(u)) return Promise.resolve(sim);
+      if (/live_feed/.test(u)) return Promise.resolve({ v: 1, events: [], open: [{ pos: "p1", wallet: 1000, bot: "b1", coin: "BTC", entry: 100, entry_t: T0 }] });
+      if (/paper_events\.json/.test(u)) return Promise.resolve({ b2: [{ at: iso(T0 + 20 * MIN), candle: 1, coin: "BNB", side: "BUY", price: 100, w: 0.25, eq: 1, cost: 0.0015, reason: "тест" }, { at: iso(T0 + 50 * MIN), candle: 2, coin: "BNB", side: "SELL", price: 101, w: 0.25, eq: 1.0068, cost: 0.0015, exit: "take", reason: "тест" }] });
+      return Promise.reject(new Error("404"));
+    }, loadPrices: function () { return Promise.resolve({ BTC: 110 }); } });
 })();
 </script>
 </body>

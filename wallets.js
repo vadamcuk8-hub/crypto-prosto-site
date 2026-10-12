@@ -489,11 +489,11 @@
       // зміна місць
       host.appendChild(h("h3", "wl-h3", "Зміна місць стратегій"));
       host.appendChild(h("p", "wl-muted wl-small", "Правила рейтингу однакові в обох періодах (" + (r.wallet === "" ? "середня дохідність % трьох незалежних рахунків" : r.metric === "usd" ? "результат у $ вибраного гаманця" : "дохідність % вибраного гаманця") + "); боти без угод " + (r.idle ? "включені" : "не входять") + "."));
-      if (!r.rankComparable) { const w = h("p", "wl-warn"); w.setAttribute("data-rank-state", "invalid"); w.textContent = "Місця не порівнюються: " + r.rankReason; host.appendChild(w); }
+      if (!r.rankComparable) { const w = h("p", "wl-warn wl-small"); w.setAttribute("data-rank-state", "invalid"); w.textContent = "Місця не порівнюються: " + r.rankReason; host.appendChild(w); }
       const rt = h("table", "wl-tbl wl-rank"), rh = h("tr"); ["Стратегія", "Місце A", "Місце B", "Зміна"].forEach(function (c, i) { rh.appendChild(h("th", i && i < 3 ? "wl-num" : "", c)); }); rt.appendChild(h("thead")).appendChild(rh); const rb = h("tbody");
       r.strategies.forEach(function (s) { const tr = h("tr"), g = CHG[s.change], lab = function (td, k) { td.setAttribute("data-label", k); return td; }; tr.setAttribute("data-bot", s.bot); tr.appendChild(lab(h("td", "wl-botc", s.title), "Стратегія"));
-        lab(numCell(tr, s.rankA === null ? "—" : (s.tieA ? "= " : "") + s.rankA), "Місце A"); lab(numCell(tr, s.rankB === null ? "—" : (s.tieB ? "= " : "") + s.rankB), "Місце B");
-        const td = h("td", g[2]); const b = h("span", "wl-rk wl-rk-" + s.change, g[0] + " " + g[1]); b.setAttribute("data-change", s.change); if (s.reason) b.title = s.reason; td.appendChild(b); if (s.change === "insufficient" && s.reason) td.appendChild(h("span", "wl-muted wl-small", " — " + s.reason)); tr.appendChild(lab(td, "Зміна")); rb.appendChild(tr); });
+        lab(numCell(tr, !r.rankComparable || s.rankA === null ? "—" : (s.tieA ? "= " : "") + s.rankA), "Місце A"); lab(numCell(tr, !r.rankComparable || s.rankB === null ? "—" : (s.tieB ? "= " : "") + s.rankB), "Місце B");
+        const td = h("td", g[2]); const b = h("span", "wl-rk wl-rk-" + s.change, g[0] + " " + g[1]); b.setAttribute("data-change", s.change); if (s.reason) b.title = s.reason; td.appendChild(b); if (s.change === "insufficient" && s.reason && r.rankComparable) td.appendChild(h("span", "wl-muted wl-small", " — " + s.reason)); tr.appendChild(lab(td, "Зміна")); rb.appendChild(tr); });
       rt.appendChild(rb); host.appendChild(wrapTable(rt));
       // рахунки (деталізація, лише порівнянні)
       const det = document.createElement("details"); det.className = "wl-pro-det"; det.appendChild(h("summary", "", "Деталі по рахунках (" + r.comparableAccounts + " із " + r.accounts.length + " порівнянні)"));

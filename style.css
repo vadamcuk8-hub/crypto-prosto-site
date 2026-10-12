@@ -2629,9 +2629,13 @@ html.lf-lock { overflow: hidden; }
 .wl-dyn-chart{width:100%;min-width:0}
 .wl-dyn-svg{width:100%;height:auto;display:block}
 .wl-dyn-grid{stroke:currentColor;opacity:.12}.wl-dyn-zero{stroke:currentColor;opacity:.4;stroke-dasharray:3 3}
-.wl-dyn-ax{fill:currentColor;opacity:.65;font-size:10px}
+.wl-dyn-ax{fill:currentColor;opacity:.7;font-size:13px}
 .wl-risk{margin-top:8px;border-top:1px solid var(--border,#2a3342);padding-top:6px}.wl-risk .wl-h4{margin:0 0 4px;font-size:13px}
 .wl-warn{color:#d9a441}.wl-cmp-no{border:1px dashed currentColor;border-radius:8px;padding:8px 12px;opacity:.9}
 .wl-rk{white-space:nowrap;font-weight:600}.wl-rk-up{color:#2fbf71}.wl-rk-down{color:#e5534b}.wl-rk-same,.wl-rk-insufficient{opacity:.75}
 .wl-pcmp .wl-seg{flex-wrap:wrap;margin-bottom:8px}
 @media (max-width:640px){.wl-cmp thead,.wl-rank thead,.wl-cmpacc thead{display:none}.wl-cmp tr,.wl-rank tr,.wl-cmpacc tr{display:block;border-bottom:1px solid var(--border,#2a3342);padding:6px 0}.wl-cmp td,.wl-rank td,.wl-cmpacc td{display:flex;justify-content:space-between;gap:10px;text-align:right;border:0;padding:2px 4px}.wl-cmp td::before,.wl-rank td::before,.wl-cmpacc td::before{content:attr(data-label);opacity:.65;text-align:left}}
+
+/* Pro 4: мобільні поправки (заголовки з кнопками експорту, таблиця зміни місць) */
+.wl-proacc .wl-card-h,.wl-prohist .wl-card-h{flex-wrap:wrap;gap:8px}
+@media (max-width:640px){.wl-rank td.wl-botc,.wl-cmpacc td.wl-botc{white-space:normal;max-width:none;overflow:visible;text-overflow:clip;text-align:right}.wl-rank td,.wl-cmpacc td{flex-wrap:wrap;min-width:0}.wl-rank td .wl-rk{white-space:normal}.wl-rank td .wl-small{display:none}}

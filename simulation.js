@@ -543,6 +543,9 @@
       else if (gross > 0) { tone = "warn"; tag = "з'їли комісії"; text = "Ціна зросла лише на " + f1(gross) + "%, а витрати ≈" + f1(cp) + "% забрали весь прибуток."; }
       else { tone = "bad"; tag = "сигнал помилився"; text = "Після купівлі ціна впала на " + f1(gross) + "% за " + dur(t.held) + ": сигнал виявився хибним." + (t.held <= 3600000 * 1.01 ? " Утримання менше години — схоже на шум." : ""); }
       if (t.flapMs !== null) text += " Купівля була через " + Math.max(1, Math.round(t.flapMs / 60000)) + " хв після попереднього продажу цієї монети: правило «смикається» біля середньої.";
+      const xd = typeof LiveFeedCore !== "undefined" ? LiveFeedCore.exitDetail(t.sell.exit_info) : null;      // фактичне виконання виходу (лише якщо рушій його записав; для старих виходів нічого не вигадуємо)
+      if (xd) text += " " + xd.label + ": заявлений поріг " + (xd.declared >= 0 ? "+" : "−") + f1(xd.threshold) + "%" + (xd.kind === "trail" ? " від піку" : "") + ", фактична ціна виходу " + pxfmt(xd.exitPrice) + (xd.entry !== null ? " (вхід " + pxfmt(xd.entry) + ")" : "") + ", фактичний рух " + pc(xd.move, 2)
+        + (xd.gap !== null ? ", відхилення від порогу " + (xd.gap >= 0 ? "+" : "−") + f1(xd.gap) + " п.п." : "") + (xd.gap !== null ? " " : ". ") + LiveFeedCore.EXIT_NOTE;
     } else {
       tag = t.isStart ? "старт раунду" : "відкрито";
       if (t.pl === null) { tone = "neutral"; text = "Чекаємо живу ціну."; }
@@ -695,6 +698,9 @@
       else if (/^Трейлінг/.test(r)) lines.push("Вихід: трейлінг-стоп. Ціна зросла, потім трохи відкотилась, і бот зафіксував накопичений прибуток.");
       else if (/^Стоп-лос/.test(r)) lines.push("Вихід: спрацював стоп-лос, тобто бот обмежив збиток, щоб він не ріс далі.");
       else lines.push("Вихід: " + (good ? "тренд зберігався, поки правило не вийшло за своєю умовою; " : "") + r.replace(/\.$/, "") + ".");
+      const xd = typeof LiveFeedCore !== "undefined" ? LiveFeedCore.exitDetail(t.sell.exit_info) : null;      // фактичне виконання виходу: лише те, що записав рушій (для старих виходів даних немає, їх не вигадуємо)
+      if (xd) lines.push(xd.label + ": заявлений поріг " + (xd.declared >= 0 ? "+" : "−") + f2(Math.abs(xd.threshold)) + "%" + (xd.kind === "trail" ? " від піку" : "") + ", ціна " + (xd.entry !== null ? pxfmt(xd.entry) + " → " : "") + pxfmt(xd.exitPrice) + ", фактичний рух " + pc(xd.move, 2)
+        + (xd.gap !== null ? ", відхилення від порогу " + (xd.gap >= 0 ? "+" : "−") + f2(Math.abs(xd.gap)) + " п.п." : "") + (xd.gap !== null ? " " : ". ") + LiveFeedCore.EXIT_NOTE);
       lines.push("Утримання " + dur(t.held) + (t.held <= 3600000 * 1.01 ? ": дуже коротка угода, результат більше схожий на випадковість." : good ? ": ціна встигла рухнути достатньо, щоб покрити витрати." : "."));
     } else {
       lines.push("Угода ще відкрита: купили по " + pxfmt(e.price) + ", зараз " + (t.pl === null ? "—" : pc(t.pl, 2)) + " до витрат на вихід (≈" + f2(cp) + "%).");

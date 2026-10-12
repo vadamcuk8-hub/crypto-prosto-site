@@ -2508,3 +2508,33 @@ html.lf-lock { overflow: hidden; }
 .wl-block > .wl-card-h { margin-bottom: 0; }
 .wl-exnote { margin: 0; }
 .wl-pos td:nth-child(7) { white-space: normal; min-width: 11em; }
+
+/* 3.3.3: підтверджені угоди, повний архів, виконання Stop Loss / Take Profit */
+.wl-cb { display: inline-block; padding: 1px 8px; border: 1px solid var(--wl-line); border-radius: 999px; font-size: .72rem; line-height: 1.5; white-space: nowrap; color: var(--wl-muted); }
+.wl-cb-full { color: var(--wl-up); border-color: rgba(14, 203, 129, .5); background: rgba(14, 203, 129, .08); }
+.wl-cb-partial, .wl-cb-mismatch { color: var(--wl-accent); border-color: rgba(240, 185, 11, .5); background: rgba(240, 185, 11, .08); }
+.wl-cb-unknown, .wl-cb-insufficient { color: var(--wl-muted); }
+.wl-warn { margin: 0; color: var(--wl-accent); }
+.wl-arch { margin: 6px 0; }
+.wl-arch p { margin: 2px 0; }
+.wl-exline { display: block; margin-top: 2px; max-width: 36em; white-space: normal; color: var(--wl-muted); font-size: .74rem; }
+.wl-more { margin-top: 8px; border-color: var(--wl-line); }
+.wl-exnote2 { margin: 8px 0 0; }
+.wl-hcount, .wl-qsum, .wl-exsum { margin: 6px 0; }
+.wl-ops td:last-child, .wl-qual td:last-child, .wl-exec td:last-child { white-space: normal; }
+.wl-ops td:nth-child(10) { white-space: normal; min-width: 14em; }
+@media (max-width: 640px) {
+  .wl-ops thead, .wl-qual thead, .wl-exec thead { display: none; }
+  .wl-ops, .wl-ops tbody, .wl-ops tr, .wl-ops td, .wl-qual, .wl-qual tbody, .wl-qual tr, .wl-qual td, .wl-exec, .wl-exec tbody, .wl-exec tr, .wl-exec td { display: block; width: 100%; box-sizing: border-box; }
+  .wl-ops tr, .wl-qual tr, .wl-exec tr { margin: 0 0 10px; padding: 6px 10px; border: 1px solid var(--wl-line); border-radius: 10px; background: var(--wl-card); }
+  .wl-ops td, .wl-qual td, .wl-exec td { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border: 0; white-space: normal; text-align: right; min-width: 0; }
+  .wl-ops td::before, .wl-qual td::before, .wl-exec td::before { content: attr(data-label); flex: 0 0 40%; text-align: left; color: var(--wl-muted); font-size: .74rem; }
+  .wl-ops td:nth-child(10), .wl-ops td:last-child { min-width: 0; }
+  .wl-exline { max-width: none; }
+  .wl-cb { white-space: normal; text-align: right; border-radius: 10px; }
+  .wl-scope .wl-btn, .wl-more { min-height: 44px; }
+  .wl-tw { border: 0; background: transparent; }
+}
+.wl-src .wl-cb { margin-left: 8px; }
+@media (min-width: 641px) { .wl-botc { max-width: 15em; overflow: hidden; text-overflow: ellipsis; } }
+@media (max-width: 640px) { .wl-src { flex-wrap: wrap; justify-content: flex-end; row-gap: 4px; } .wl-src .wl-cb { margin-left: 8px; } }

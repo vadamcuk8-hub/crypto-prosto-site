@@ -1,5 +1,6 @@
 // Сторінка «Аналітика гаманців»: режими «Вибраний бот» / «Середнє по ботах», головний графік трьох гаманців, періоди й шкали.
 // Дані: data/simulation.json (лише збережені криві curve і денні значення daily; нічого не перераховується й не домальовується), статус Testnet: data/trader.json.
+// Історія угод: повний архів Paper Trading data/paper_archive/ (індекс + лише потрібні сегменти, кеш у пам'яті з перевіркою за індексом), журнал paper_events*.json і live_feed.json; Testnet не змішується.
 // Потребує wallets-data.js, wallets-chart.js; кнопка «Торгові події» використовує наявний LiveFeed.mount() (live-feed.js), якщо він підключений.
 // Це симуляція на віртуальних грошах, а не фінансова порада.
 
@@ -29,18 +30,20 @@
   function mount(host, envIn) {
     const env = Object.assign(defaultEnv(), envIn || {});
     const params = new URLSearchParams(env.search || "");
-    let prefs = { mode: "bot", bot: null, unit: "pct", period: "all", view: "curve" };
+    let prefs = { mode: "bot", bot: null, unit: "pct", period: "all", view: "curve", scope: "round" };
     try { const s = JSON.parse(env.storage.getItem(PREFS)); if (s && typeof s === "object") Object.keys(prefs).forEach(function (k) { if (typeof s[k] === "string") prefs[k] = s[k]; }); } catch (e) { /* без збережень */ }
     if (["bot", "avg"].indexOf(prefs.mode) < 0) prefs.mode = "bot";
     if (["pct", "usd", "log"].indexOf(prefs.unit) < 0) prefs.unit = "pct";
     if (!(prefs.period in D.PERIODS)) prefs.period = "all";
     if (["curve", "daily"].indexOf(prefs.view) < 0) prefs.view = "curve";
+    if (["round", "all"].indexOf(prefs.scope) < 0) prefs.scope = "round";
     let focus = parseInt(params.get("wallet"), 10) || null;
     const urlDetail = parseInt(params.get("detail"), 10) || null;
     const urlBot = params.get("bot");
     let model = null, loadError = null, trader = null, traderErr = null, hidden = {}, chart = null, feed = null, timer = 0, destroyed = false, lastOk = 0, detailCap = null, prices = {}, pricesAt = null, priceTimer = 0, priceLoopOn = false;
-    let extra = { ops: [], notes: { fromEvents: 0, fromFeed: 0, both: 0, skipped: 0 }, feedOpen: [], eventsLoaded: 0, feedLoaded: false, ready: false };
-    const tbl = { wallet: "", bot: "", onlyOpen: false, q: "", sort: "resultPct", dir: "desc" }, hist = { wallet: "", bot: "", type: "", shown: 40 }, dtbl = { sort: "resultPct", dir: "desc" };
+    let extra = { ops: [], notes: { fromEvents: 0, fromFeed: 0, fromArchive: 0, both: 0, withArchive: 0, skipped: 0 }, comp: null, feedOpen: [], eventsLoaded: 0, feedLoaded: false, ready: false };
+    let arch = { status: "idle", index: null, segs: {}, errors: [], needed: 0, names: [], reason: "" }, rawBy = {}, rawFeed = null, archReq = 0;
+    const tbl = { wallet: "", bot: "", onlyOpen: false, q: "", sort: "resultPct", dir: "desc" }, hist = { wallet: "", bot: "", coin: "", type: "", period: "round", shown: 50 }, qf = { wallet: "", bot: "", status: "" }, ef = { wallet: "", bot: "", shown: 25 }, dtbl = { sort: "resultPct", dir: "desc" };
     let capTab = null;
     const ui = {};
 
@@ -86,12 +89,12 @@
       if (kind) { const b = h("button", "wl-btn wl-export", "Експорт CSV"); b.type = "button"; b.setAttribute("data-export", kind); b.setAttribute("aria-label", "Експортувати в CSV: " + title); b.title = "Завантажити CSV для Excel з урахуванням поточних фільтрів"; b.addEventListener("click", function () { doExport(kind); }); head.appendChild(b); }
       c.appendChild(head); if (note) c.appendChild(h("p", "wl-muted wl-small wl-bnote", note)); const body = h("div", "wl-bbody"); c.appendChild(body); return { card: c, body: body }; }
     const bCmp = block("wlCompare", "Порівняння результатів між гаманцями", "Дохідність кожного бота в трьох незалежних гаманцях, у % від депозиту поточного раунду."), bTbl = block("wlTable", "Статистика ботів: 16 ботів × 3 гаманці = 48 незалежних рахунків", "", "bots"),
-      bCap = block("wlCapital", "Розподіл капіталу"), bHist = block("wlHistory", "Історія збережених торгових операцій", "", "ops"), bRounds = block("wlRounds", "Підсумки попередніх раундів", "", "rounds"), bDaily = block("wlDaily", "Денні результати", "", "daily");
-    ui.cmp = bCmp.body; ui.tbl = bTbl.body; ui.cap = bCap.body; ui.hist = bHist.body; ui.rounds = bRounds.body; ui.daily = bDaily.body;
+      bQual = block("wlQuality", "Підтверджені угоди та реалізований PnL: 48 рахунків", "", "quality"), bCap = block("wlCapital", "Розподіл капіталу"), bHist = block("wlHistory", "Історія торгових операцій (архів Paper Trading)", "", "ops"), bExec = block("wlExec", "Фактичне виконання Stop Loss / Take Profit / Trailing Stop"), bRounds = block("wlRounds", "Підсумки попередніх раундів", "", "rounds"), bDaily = block("wlDaily", "Денні результати", "", "daily");
+    ui.cmp = bCmp.body; ui.tbl = bTbl.body; ui.qual = bQual.body; ui.exec = bExec.body; ui.cap = bCap.body; ui.hist = bHist.body; ui.rounds = bRounds.body; ui.daily = bDaily.body;
     const tn = h("div", "wl-card wl-testnet"); tn.id = "wlTestnet"; tn.appendChild(h("h2", "wl-h2", "Binance Testnet")); ui.tn = h("p", "wl-muted", "Перевіряємо статус…"); tn.appendChild(ui.tn);
     tn.appendChild(h("p", "wl-muted wl-small", "Окремий тестовий режим: не входить у статистику віртуальних рахунків і ніколи не змішується з нею."));
     const disc = h("p", "wl-disc", "Це симуляція на віртуальних грошах: інформація, а не фінансова порада й не прогноз. Дані беруться зі збережених точок історії; прогалини не заповнюються.");
-    [bar, ui.err, ui.note, ui.focusNote, kpiBox, card, cardsSec, ui.detail, bCmp.card, bTbl.card, bCap.card, bHist.card, bRounds.card, bDaily.card, tn, disc].forEach(function (n) { host.appendChild(n); });
+    [bar, ui.err, ui.note, ui.focusNote, kpiBox, card, cardsSec, ui.detail, bCmp.card, bTbl.card, bQual.card, bCap.card, bHist.card, bExec.card, bRounds.card, bDaily.card, tn, disc].forEach(function (n) { host.appendChild(n); });
 
     chart = root.WalletsChart.create(chartHost, { onView: function (z) { resetBtn.hidden = !z; } });
 
@@ -279,7 +282,7 @@
 
     // ---------- Статистика ботів, капітал, історія, раунди, денні ----------
     const EXIT = { stop: "Stop Loss", take: "Take Profit", trail: "Трейлінг-стоп", trend: "Злам тренду", signal: "Сигнал правила", unknown: "причина не вказана" };
-    function rows() { return D.accountRows(model, extra.ops); }
+    function rows() { return D.accountRows(model, extra.ops, prefs.scope); }
     function wrapTable(table) { const w = h("div", "wl-tw"); w.setAttribute("tabindex", "0"); w.setAttribute("role", "region"); w.setAttribute("aria-label", "Таблиця: прокручується всередині блоку"); w.appendChild(table); return w; }
     function sel(label, opts, cur, onChange) {
       const l = h("label", "wl-fl"); l.appendChild(h("span", "wl-lbl", label)); const x = document.createElement("select"); x.setAttribute("aria-label", label);
@@ -308,15 +311,25 @@
         if (!r.hasData) { const c = h("td", "wl-muted", "Немає збережених точок"); c.colSpan = COLS.length - 1 - (fixedWallet ? 1 : 0); row.appendChild(c); tb.appendChild(row); return; }
         numCell(row, nf(r.value, 2) + " $"); numCell(row, usdTxt(r.resultUsd), tone(r.resultPct)); numCell(row, pctTxt(r.resultPct), tone(r.resultPct));
         numCell(row, dash(r.trades, String)); numCell(row, dash(r.open, String)); numCell(row, r.dd === null ? "—" : ddTxt(r.dd));
-        numCell(row, r.winRate === null ? "Немає даних" : nf(r.winRate, 0) + "% (" + r.wins + "/" + r.closed + ")", r.winRate === null ? "wl-muted" : tone(r.winRate - 50), r.winRate === null ? "Збережених закриттів з відомим результатом немає" : "Частковий: лише за " + r.closed + " збереженими закриттями");
-        numCell(row, r.realized === null ? "Немає даних" : usdTxt(r.realized), r.realized === null ? "wl-muted" : tone(r.realized), "За збереженими закриттями (" + r.closed + ")");
+        const wc = winCell(r); numCell(row, wc[0], wc[1], wc[2]); const pc2 = pnlCell(r); numCell(row, pc2[0], pc2[1], pc2[2]);
         tb.appendChild(row);
       });
       if (!tb.children.length) { const r = h("tr"), c = h("td", "wl-muted", "За вибраними фільтрами рахунків немає."); c.colSpan = COLS.length; r.appendChild(c); tb.appendChild(r); }
       t.appendChild(tb); return t;
     }
+    // Win Rate й реалізований PnL: завжди з позначкою повноти; без доказу повноти й без закриттів — «Недостатньо даних» (не 0 %)
+    function winCell(r) {
+      if (r.status === "insufficient") return ["Недостатньо даних", "wl-muted", "Немає ні доказу повноти історії, ні підтверджених закриттів з відомим результатом"];
+      if (r.noClosed) return ["Закритих угод немає", "wl-muted", "Історія повна: за цей період угоди не закривалися"];
+      return [nf(r.winRate, 0) + "% (" + r.wins + "/" + r.closed + ") · " + (r.status === "full" ? "повні дані" : "часткові"), tone(r.winRate - 50), (r.status === "full" ? "Повні дані: кількість підтверджених угод збігається з лічильником рушія. " : "Часткові дані: частина історії відсутня, Win Rate лише за " + r.closed + " підтвердженими закриттями. ") + "Закриття без відомого відкриття не рахуються."];
+    }
+    function pnlCell(r) {
+      if (r.status === "insufficient") return ["Недостатньо даних", "wl-muted", ""];
+      if (r.noClosed) return ["—", "wl-muted", "Закритих угод немає"];
+      return [usdTxt(r.realized) + (r.status === "full" ? "" : " · часткові"), tone(r.realized), "Сума підтверджених закритих угод (" + r.closed + "), чиста з комісіями"];
+    }
     function sortRowsView(list, st) { return D.sortRows(list, st.sort, st.dir); }
-    function tableNote() { return h("p", "wl-muted wl-small", "* Win Rate і реалізований PnL — лише за збереженими закриттями (останні події журналів), це не повна статистика раунду. Реалізований PnL не додається до вартості рахунку: вона вже враховує всі угоди. «Немає даних» означає, що збережених закриттів немає (це не 0%)."); }
+    function tableNote() { return h("p", "wl-muted wl-small", "* Область: " + (prefs.scope === "all" ? "усі завантажені раунди" : "поточний раунд") + ". Win Rate і реалізований PnL — лише за підтвердженими закриттями. «Повні дані» — кількість підтверджених подій збігається з лічильником угод рушія; «часткові» — частина історії відсутня; «Недостатньо даних» — показник неможливо коректно розрахувати (це не 0%). Реалізований PnL не додається до вартості рахунку: вона вже враховує всі угоди. Докладніше — у блоці «Підтверджені угоди та реалізований PnL»."); }
 
     function renderCompare() {
       const rs = rows(), by = {}; rs.forEach(function (r) { (by[r.bot] = by[r.bot] || {})[r.wallet] = r; });
@@ -374,32 +387,144 @@
       ui.cap.replaceChildren(tabs, capitalNode(cap));
     }
 
-    // історія операцій
-    function opType(o) { return o.type === "open" ? (o.initial ? "Стартова позиція раунду" : "Відкриття") : "Закриття" + (o.exit && o.exit !== "unknown" ? " · " + (EXIT[o.exit] || o.exit) : ""); }
-    function opsTable(list, fixedWallet) {
-      const t = h("table", "wl-tbl wl-ops"), hr = h("tr");
-      ["Час", "Бот"].concat(fixedWallet ? [] : ["Гаманець"]).concat(["Монета", "Подія", "Ціна входу", "Ціна виходу", "PnL, $", "PnL, %", "Джерело"]).forEach(function (x, i) { hr.appendChild(h("th", i >= 5 - (fixedWallet ? 1 : 0) && x !== "Джерело" ? "wl-num" : "", x)); });
-      t.appendChild(h("thead")).appendChild(hr); const tb = h("tbody");
-      list.forEach(function (o) {
-        const tr = h("tr", "wl-r"); tr.setAttribute("data-key", o.key);
-        tr.appendChild(h("td", "", hhmm(o.t))); tr.appendChild(h("td", "", ruleTitle(o.bot))); if (!fixedWallet) tr.appendChild(h("td", "", capLabel(o.wallet))); tr.appendChild(h("td", "", o.coin)); tr.appendChild(h("td", "", opType(o)));
-        numCell(tr, o.type === "open" ? nf(o.price, o.price >= 100 ? 2 : 4) : o.entry !== null ? nf(o.entry, o.entry >= 100 ? 2 : 4) : "—"); numCell(tr, o.type === "close" ? nf(o.price, o.price >= 100 ? 2 : 4) : "—");
-        numCell(tr, o.type === "close" && o.pnlUsd !== null ? usdTxt(o.pnlUsd) : "—", o.type === "close" && o.pnlUsd !== null ? tone(o.pnlUsd) : "wl-muted", o.type === "close" && o.pnlUsd === null ? "Результат невідомий: відкриття немає в збережених журналах" : ""); numCell(tr, o.type === "close" && o.pnlPct !== null ? pctTxt(o.pnlPct) : "—", o.type === "close" && o.pnlPct !== null ? tone(o.pnlPct) : "wl-muted");
-        tr.appendChild(h("td", "wl-muted", o.src.join(" + "))); tb.appendChild(tr);
+    // ---------- область показників і стан архіву ----------
+    function scopeControl(onDone) {
+      const box = h("div", "wl-seg wl-scope"); box.setAttribute("role", "group"); box.setAttribute("aria-label", "Область показників");
+      [["round", "Поточний раунд"], ["all", "Усі завантажені раунди"]].forEach(function (x) {
+        const b = h("button", "wl-btn" + (prefs.scope === x[0] ? " on" : ""), x[1]); b.type = "button"; b.setAttribute("data-scope", x[0]); b.setAttribute("aria-pressed", prefs.scope === x[0] ? "true" : "false");
+        b.addEventListener("click", function () { if (prefs.scope === x[0]) return; prefs.scope = x[0]; persist(); ensureArchive(); renderExtra(); if (onDone) onDone(); }); box.appendChild(b);
       });
-      if (!list.length) { const r = h("tr"), c = h("td", "wl-muted", "Збережених операцій за вибраними фільтрами немає."); c.colSpan = 10; r.appendChild(c); tb.appendChild(r); }
+      return box;
+    }
+    function archiveStatusNode() {
+      const box = h("div", "wl-arch"); box.setAttribute("role", "status");
+      if (!extra.ready || arch.status === "idle" || arch.status === "loading") { box.appendChild(h("p", "wl-muted wl-small", !extra.ready ? "Завантаження журналів подій…" : "Завантаження архіву Paper Trading…" + (arch.needed ? " (сегментів: " + arch.needed + ")" : ""))); return box; }
+      if (arch.status === "error") { box.appendChild(h("p", "wl-warn wl-small", "Архів недоступний (" + arch.reason + "): показано лише журнали paper_events і live_feed. Історія за цей період неповна, доказу повноти немає.")); return box; }
+      const idx = arch.index, got = arch.names.length;
+      box.appendChild(h("p", "wl-muted wl-small", "Архів: " + idx.total + " подій у " + idx.segments.length + " сегм.; завантажено " + got + " з " + idx.segments.length + " (лише потрібні для вибраного періоду)" + (idx.sizeWarning ? "; архів уже великий: завантаження повного періоду може бути повільним" : "") + "."));
+      arch.errors.forEach(function (e) { box.appendChild(h("p", "wl-warn wl-small", "Сегмент " + e.name + " недоступний або пошкоджений (" + e.msg + "): операції за цей період неповні.")); });
+      return box;
+    }
+    function complBadge(st, tip) { const b = h("span", "wl-cb wl-cb-" + st, D.COMPL_TXT[st] || st); if (tip) b.title = tip; return b; }
+
+    // ---------- Підтверджені угоди та реалізований PnL ----------
+    function qualityList() { return D.sortRows(D.filterRows(rows(), qf), "wallet", "asc"); }
+    function qualityTable(list) {
+      const t = h("table", "wl-tbl wl-qual"), hr = h("tr");
+      ["Бот", "Гаманець", "Повнота", "Закриті (приб./збит.)", "Win Rate", "Реалізований PnL", "Середній результат", "Комісії й проковзання", "Операцій / угод рушія"].forEach(function (x, i) { hr.appendChild(h("th", i >= 3 ? "wl-num" : "", x)); });
+      t.appendChild(h("thead")).appendChild(hr); const tb = h("tbody");
+      list.forEach(function (r) {
+        const tr = h("tr", "wl-r"); tr.setAttribute("data-bot", r.bot); tr.setAttribute("data-wallet", r.wallet); tr.setAttribute("data-status", r.status);
+        const lab = function (td, k) { td.setAttribute("data-label", k); return td; };
+        const bq = h("td", "wl-botc", r.title); bq.title = r.title; tr.appendChild(lab(bq, "Бот")); tr.appendChild(lab(h("td", "", capLabel(r.wallet)), "Гаманець"));
+        const tdc = h("td", ""); tdc.appendChild(complBadge(r.status, r.status === "full" ? "Кількість підтверджених подій збігається з лічильником угод рушія" : r.status === "partial" ? "Частина історії відсутня" : "Неможливо коректно розрахувати")); tr.appendChild(lab(tdc, "Повнота"));
+        const wc = winCell(r), pcl = pnlCell(r);
+        lab(numCell(tr, r.status === "insufficient" ? "—" : r.closed + " (" + r.wins + "/" + r.losses + (r.flat ? "/" + r.flat : "") + ")", r.status === "insufficient" ? "wl-muted" : ""), "Закриті (приб./збит.)");
+        lab(numCell(tr, wc[0].replace(/ · (повні дані|часткові)$/, ""), wc[1], wc[2]), "Win Rate"); lab(numCell(tr, pcl[0].replace(/ · часткові$/, ""), pcl[1], pcl[2]), "Реалізований PnL");
+        lab(numCell(tr, r.avgUsd === null ? "—" : usdTxt(r.avgUsd) + " · " + pctTxt(r.avgPct), r.avgUsd === null ? "wl-muted" : tone(r.avgUsd), "Середнє арифметичне чистих результатів закритих угод" + (r.pctEst ? ". Для " + r.pctEst + " угод витрати входу невідомі: відсоток оцінено за комісією моделі (результат у $ від цього не залежить)" : "")), "Середній результат");
+        lab(numCell(tr, r.feeUsd === null ? "—" : (r.feeMissing ? "≥ " : "") + nf(r.feeUsd, 2) + " $", r.feeUsd === null ? "wl-muted" : "", r.feeMissing ? "Для " + r.feeMissing + " операцій немає даних про витрати" : "Комісія біржі + проковзання моделі за всі підтверджені операції"), "Комісії й проковзання");
+        lab(numCell(tr, r.confirmed + " / " + (r.expected === null ? "—" : r.expected) + (r.missing ? " (бракує " + r.missing + ")" : ""), r.missing ? "wl-muted" : "", "Підтверджених операцій / угод за лічильником рушія"), "Операцій / угод рушія"); tb.appendChild(tr);
+      });
+      if (!list.length) { const r = h("tr"), c = h("td", "wl-muted", "За вибраними фільтрами рахунків немає."); c.colSpan = 9; r.appendChild(c); tb.appendChild(r); }
       t.appendChild(tb); return t;
     }
-    function histNote() { const n = extra.notes; return h("p", "wl-muted wl-small", "Історія неповна й обмежена збереженими журналами: paper_events (останні 40 подій на бота в кожному гаманці) і підтверджені записи live_feed.json (з моменту підключення агента, до 1000). Записів: " + extra.ops.length + " (лише paper_events: " + n.fromEvents + ", лише live_feed: " + n.fromFeed + ", в обох: " + n.both + "; однакові операції не дублюються). Тут лише виконання віртуальних угод: цінові сповіщення й Binance Testnet не змішуються з ними."); }
+    function renderQuality() {
+      if (!model) return;
+      const bar = h("div", "wl-filters");
+      bar.appendChild(scopeControl());
+      bar.appendChild(sel("Гаманець", walletOpts("Усі гаманці"), qf.wallet, function (v) { qf.wallet = v; renderQuality(); }));
+      bar.appendChild(sel("Бот", botOpts("Усі боти"), qf.bot, function (v) { qf.bot = v; renderQuality(); }));
+      bar.appendChild(sel("Повнота", [["", "Будь-яка"], ["full", "Повні дані"], ["partial", "Часткові дані"], ["insufficient", "Недостатньо даних"]], qf.status, function (v) { qf.status = v; renderQuality(); }));
+      const all = rows(), cnt = { full: 0, partial: 0, insufficient: 0 }; all.forEach(function (r) { cnt[r.status]++; });
+      const sum = h("p", "wl-muted wl-small wl-qsum", "Область: " + (prefs.scope === "all" ? "усі завантажені раунди" : "поточний раунд") + ". Рахунків: повні дані — " + cnt.full + ", часткові — " + cnt.partial + ", недостатньо даних — " + cnt.insufficient + " із " + all.length + ".");
+      const list = qualityList();
+      ui.qual.replaceChildren(bar, archiveStatusNode(), sum, wrapTable(qualityTable(list)),
+        h("p", "wl-muted wl-small", "Метод. Реалізований PnL — сума чистих результатів підтверджених закритих угод: депозит · частка · (eq продажу − eq купівлі), тобто з урахуванням комісії й проковзання обох сторін; пара «купівля → продаж» утворюється лише в межах одного раунду. Win Rate — частка прибуткових закриттів. Середній результат — середнє арифметичне чистих результатів. Комісії й проковзання — за всіма підтвердженими операціями рахунку. «Повні дані» присвоюється тільки тоді, коли кількість підтверджених подій раунду дорівнює лічильнику угод рушія (а не тому, що подій багато). Реалізований PnL — окрема величина: вона не підміняє загальну зміну вартості рахунку."));
+    }
+
+    // ---------- історія операцій ----------
+    function opType(o) { return o.type === "open" ? (o.initial ? "BUY · старт раунду" : "BUY") : "SELL"; }
+    function px(v) { return nf(v, v >= 100 ? 2 : 4); }
+    function execText(o) {
+      const d = D.execDetail(o); if (!d) return null;
+      return d.label + ": поріг " + (d.declared >= 0 ? "+" : "−") + nf(Math.abs(d.declared), 2) + "%" + (d.kind === "trail" ? " від піку" : "") + " · " + (d.entry !== null ? px(d.entry) + " → " : "вихід ") + px(d.exitPrice) + " · рух " + pctTxt(d.move) + (d.gap !== null ? " · відхилення " + sign(d.gap) + nf(Math.abs(d.gap), 2) + " п.п. " + (d.kind === "trail" ? "(від піку)" : "") : "");
+    }
+    function opsTable(list, fixedWallet) {
+      const t = h("table", "wl-tbl wl-ops"), hr = h("tr");
+      const cols = ["Дата й час", "Бот"].concat(fixedWallet ? [] : ["Гаманець"]).concat(["Монета", "Операція", "Ціна", "Обсяг", "Комісія", "Результат закриття", "Причина виходу", "Джерело · повнота"]);
+      cols.forEach(function (x) { hr.appendChild(h("th", /^(Ціна|Обсяг|Комісія|Результат закриття)$/.test(x) ? "wl-num" : "", x)); });
+      t.appendChild(h("thead")).appendChild(hr); const tb = h("tbody");
+      list.forEach(function (o) {
+        const tr = h("tr", "wl-r " + (o.type === "open" ? "wl-buy" : "wl-sell")); tr.setAttribute("data-key", o.key);
+        const lab = function (td, k) { td.setAttribute("data-label", k); return td; };
+        tr.appendChild(lab(h("td", "", hhmm(o.t)), "Дата й час")); const bc = h("td", "wl-botc", ruleTitle(o.bot)); bc.title = ruleTitle(o.bot); tr.appendChild(lab(bc, "Бот")); if (!fixedWallet) tr.appendChild(lab(h("td", "", capLabel(o.wallet)), "Гаманець")); tr.appendChild(lab(h("td", "", o.coin), "Монета"));
+        tr.appendChild(lab(h("td", o.type === "open" ? "up" : "down", opType(o)), "Операція"));
+        lab(numCell(tr, px(o.price)), "Ціна");
+        const vol = numCell(tr, o.volUsd === null ? "—" : nf(o.volUsd, 2) + " $", o.volUsd === null ? "wl-muted" : "", o.volQty === null ? "Кількість невідома: немає даних про витрати" : "Кількість: " + nf(o.volQty, o.volQty >= 1 ? 4 : 6) + " " + o.coin); lab(vol, "Обсяг");
+        lab(numCell(tr, o.feeUsd === null ? "—" : nf(o.feeUsd, 2) + " $ (" + nf(o.cost * 100, 3) + "%)", o.feeUsd === null ? "wl-muted" : "", "Комісія біржі + проковзання моделі"), "Комісія");
+        const hasRes = o.type === "close" && o.pnlUsd !== null;
+        lab(numCell(tr, o.type === "open" ? "—" : hasRes ? usdTxt(o.pnlUsd) + " · " + pctTxt(o.pnlPct) : "невідомий", o.type === "open" ? "wl-muted" : hasRes ? tone(o.pnlUsd) : "wl-muted", o.type === "close" && !hasRes ? "Результат невідомий: відкриття немає в підтверджених записах цього раунду" : ""), "Результат закриття");
+        const why = h("td", ""); if (o.type === "close") { why.appendChild(document.createTextNode(o.exit && o.exit !== "unknown" ? (EXIT[o.exit] || o.exit) : EXIT.unknown)); const x = execText(o); if (x) { why.appendChild(h("small", "wl-exline", x)); } } else why.className = "wl-muted", why.textContent = "—"; tr.appendChild(lab(why, "Причина виходу"));
+        const src = h("td", "wl-src"); src.appendChild(h("span", "wl-muted", o.src.map(function (x) { return x === "paper_archive" ? "архів" : x === "paper_events" ? "журнал" : "стрічка"; }).join(" + "))); src.appendChild(complBadge(o.compl, o.complEntry ? "Підтверджено подій: " + o.complEntry.confirmed + ", угод за лічильником рушія: " + (o.complEntry.expected === null ? "невідомо" : o.complEntry.expected) : "Лічильник угод цього раунду невідомий")); tr.appendChild(lab(src, "Джерело · повнота"));
+        tb.appendChild(tr);
+      });
+      if (!list.length) { const r = h("tr"), c = h("td", "wl-muted", "Підтверджених операцій за вибраними фільтрами немає."); c.colSpan = cols.length; r.appendChild(c); tb.appendChild(r); }
+      t.appendChild(tb); return t;
+    }
+    function histNote() {
+      const n = extra.notes, first = extra.ops.length ? extra.ops[0].t : null, ar = extra.ops.filter(function (o) { return o.src.indexOf("paper_archive") >= 0; });
+      return h("p", "wl-muted wl-small", "Джерела: архів Paper Trading (повний, без обмеження 40 подій), журнал paper_events і підтверджені записи live_feed.json; однакові операції не дублюються (записів: " + extra.ops.length + ", з них є в архіві: " + ar.length + ", лише в журналі: " + n.fromEvents + ", лише в стрічці: " + n.fromFeed + "). Архів не відновлює операції, що зникли з журналів до його появи" + (first ? "; найраніша завантажена операція: " + hhmm(first) : "") + ". Показаний обсяг, комісія й результат — за моделлю симулятора; це не біржові операції, цінові сповіщення й Binance Testnet сюди не входять.");
+    }
+    const HP = { "24h": 86400000, "7d": 604800000 };
+    function histList() {
+      const f = hist, now = env.now();
+      return extra.ops.filter(function (o) { return (!f.wallet || o.wallet === Number(f.wallet)) && (!f.bot || o.bot === f.bot) && (!f.coin || o.coin === f.coin) && (!f.type || o.type === f.type)
+        && (f.period === "all" || (f.period === "round" ? o.roundCurrent : HP[f.period] ? o.t >= now - HP[f.period] : true)); }).sort(function (a, b) { return b.t - a.t; });
+    }
     function renderHistory() {
-      const f = hist, bar = h("div", "wl-filters");
-      bar.appendChild(sel("Гаманець", walletOpts("Усі гаманці"), f.wallet, function (v) { f.wallet = v; f.shown = 40; renderHistory(); }));
-      bar.appendChild(sel("Бот", botOpts("Усі боти"), f.bot, function (v) { f.bot = v; f.shown = 40; renderHistory(); }));
-      bar.appendChild(sel("Подія", [["", "Усі події"], ["open", "Відкриття"], ["close", "Закриття"]], f.type, function (v) { f.type = v; f.shown = 40; renderHistory(); }));
-      const list = extra.ops.filter(function (o) { return (!f.wallet || o.wallet === Number(f.wallet)) && (!f.bot || o.bot === f.bot) && (!f.type || o.type === f.type); }).sort(function (a, b) { return b.t - a.t; });
-      const body = [bar, wrapTable(opsTable(list.slice(0, f.shown), false))];
-      if (list.length > f.shown) { const m = h("button", "wl-btn", "Показати ще (" + (list.length - f.shown) + ")"); m.type = "button"; m.addEventListener("click", function () { f.shown += 40; renderHistory(); }); body.push(m); }
+      if (!model) return;
+      const f = hist, bar = h("div", "wl-filters"), reset = function () { f.shown = 50; renderHistory(); };
+      bar.appendChild(sel("Гаманець", walletOpts("Усі гаманці"), f.wallet, function (v) { f.wallet = v; reset(); }));
+      bar.appendChild(sel("Бот", botOpts("Усі боти"), f.bot, function (v) { f.bot = v; reset(); }));
+      const coins = {}; extra.ops.forEach(function (o) { coins[o.coin] = 1; });
+      bar.appendChild(sel("Монета", [["", "Усі монети"]].concat(Object.keys(coins).sort().map(function (c) { return [c, c]; })), f.coin, function (v) { f.coin = v; reset(); }));
+      bar.appendChild(sel("Операція", [["", "BUY і SELL"], ["open", "BUY (відкриття)"], ["close", "SELL (закриття)"]], f.type, function (v) { f.type = v; reset(); }));
+      bar.appendChild(sel("Період", [["round", "Поточний раунд"], ["24h", "24 години"], ["7d", "7 днів"], ["all", "Увесь архів"]], f.period, function (v) { f.period = v; ensureArchive(); reset(); }));
+      const list = histList(), body = [bar, archiveStatusNode()];
+      body.push(h("p", "wl-muted wl-small wl-hcount", "Показано " + Math.min(list.length, f.shown) + " із " + list.length + " операцій за фільтрами."));
+      body.push(wrapTable(opsTable(list.slice(0, f.shown), false)));
+      if (list.length > f.shown) { const m = h("button", "wl-btn wl-more", "Показати ще (" + Math.min(50, list.length - f.shown) + " із " + (list.length - f.shown) + ")"); m.type = "button"; m.addEventListener("click", function () { f.shown += 50; renderHistory(); }); body.push(m); }
       body.push(histNote()); ui.hist.replaceChildren.apply(ui.hist, body);
+    }
+
+    // ---------- Фактичне виконання Stop Loss / Take Profit / Trailing Stop ----------
+    function renderExec() {
+      if (!model) return;
+      const bar = h("div", "wl-filters");
+      bar.appendChild(sel("Гаманець", walletOpts("Усі гаманці"), ef.wallet, function (v) { ef.wallet = v; ef.shown = 25; renderExec(); }));
+      bar.appendChild(sel("Бот", botOpts("Усі боти"), ef.bot, function (v) { ef.bot = v; ef.shown = 25; renderExec(); }));
+      const sl = extra.ops.filter(function (o) { return o.type === "close" && (o.exit === "stop" || o.exit === "take" || o.exit === "trail"); }), withInfo = sl.filter(function (o) { return !!o.exitInfo; });
+      const list = withInfo.filter(function (o) { return (!ef.wallet || o.wallet === Number(ef.wallet)) && (!ef.bot || o.bot === ef.bot); }).sort(function (a, b) { return b.t - a.t; });
+      const t = h("table", "wl-tbl wl-exec"), hr = h("tr");
+      ["Дата й час", "Бот", "Гаманець", "Монета", "Тип виходу", "Заявлений поріг", "Ціна входу", "Ціна виходу", "Фактичний рух", "Відхилення від порогу", "Результат угоди"].forEach(function (x, i) { hr.appendChild(h("th", i >= 5 ? "wl-num" : "", x)); });
+      t.appendChild(h("thead")).appendChild(hr); const tb = h("tbody");
+      list.slice(0, ef.shown).forEach(function (o) {
+        const d = D.execDetail(o), tr = h("tr", "wl-r"); tr.setAttribute("data-key", o.key); tr.setAttribute("data-kind", d.kind);
+        const lab = function (td, k) { td.setAttribute("data-label", k); return td; };
+        tr.appendChild(lab(h("td", "", hhmm(o.t)), "Дата й час")); tr.appendChild(lab(h("td", "", ruleTitle(o.bot)), "Бот")); tr.appendChild(lab(h("td", "", capLabel(o.wallet)), "Гаманець")); tr.appendChild(lab(h("td", "", o.coin), "Монета")); tr.appendChild(lab(h("td", d.kind === "take" ? "up" : "down", d.label), "Тип виходу"));
+        lab(numCell(tr, (d.declared >= 0 ? "+" : "−") + nf(Math.abs(d.declared), 2) + "%" + (d.kind === "trail" ? " від піку" : "")), "Заявлений поріг");
+        lab(numCell(tr, d.entry === null ? "—" : px(d.entry), d.entry === null ? "wl-muted" : ""), "Ціна входу"); lab(numCell(tr, px(d.exitPrice)), "Ціна виходу");
+        lab(numCell(tr, pctTxt(d.move) + (d.kind === "trail" && d.fromPeak !== null ? " (від піку " + pctTxt(d.fromPeak) + ")" : ""), tone(d.move), "Фактичний рух ціни від входу до виходу"), "Фактичний рух");
+        lab(numCell(tr, d.gap === null ? "—" : sign(d.gap) + nf(Math.abs(d.gap), 2) + " п.п.", d.gap === null ? "wl-muted" : tone(d.gap), d.gap === null ? "" : "Фактичний рух мінус заявлений поріг (" + d.gapBase + "): від'ємне — гірше за поріг, додатне — краще"), "Відхилення від порогу");
+        lab(numCell(tr, d.pnlUsd === null ? "невідомий" : usdTxt(d.pnlUsd) + " · " + pctTxt(d.pnlPct), d.pnlUsd === null ? "wl-muted" : tone(d.pnlUsd), d.pnlUsd === null ? "Немає запису про відкриття" : "Чистий результат угоди з комісіями й проковзанням"), "Результат угоди"); tb.appendChild(tr);
+      });
+      if (!list.length) { const r = h("tr"), c = h("td", "wl-muted", withInfo.length ? "За вибраними фільтрами виходів немає." : "Виходів за стопом, тейком чи трейлінгом із даними про виконання (exit_info) поки немає. Такі дані з'являються лише для нових виходів; для старих їх не вигадуємо."); c.colSpan = 11; r.appendChild(c); tb.appendChild(r); }
+      t.appendChild(tb);
+      const body = [bar, h("p", "wl-muted wl-small wl-exsum", "Виходів за Stop Loss / Take Profit / Trailing Stop у завантажених даних: " + sl.length + ", з даними про виконання (exit_info): " + withInfo.length + ", без них (записані до їх появи): " + (sl.length - withInfo.length) + "."), wrapTable(t)];
+      if (list.length > ef.shown) { const m = h("button", "wl-btn wl-more", "Показати ще (" + (list.length - ef.shown) + ")"); m.type = "button"; m.addEventListener("click", function () { ef.shown += 25; renderExec(); }); body.push(m); }
+      body.push(h("p", "wl-note wl-exnote2", D.EXIT_NOTE));
+      body.push(h("p", "wl-muted wl-small", "Фактичний рух — зміна ціни від входу до ціни виходу; відхилення — різниця між ним і заявленим порогом (для Trailing Stop — відкат від піку). Результат угоди — чистий, з комісіями й проковзанням, рахується з пари купівля → продаж; якщо відкриття немає в підтверджених записах, він невідомий."));
+      ui.exec.replaceChildren.apply(ui.exec, body);
     }
 
     // раунди й денні
@@ -419,7 +544,7 @@
         model.caps.forEach(function (cp) { const x = r.cells[cp]; numCell(tr, x ? c + nf(x.value, 2) + " $ · " + pctTxt(x.pct) + (x.trades !== null ? " · угод: " + x.trades : "") : "—", x ? tone(x.pct) : "wl-muted"); }); tb.appendChild(tr); });
       t.appendChild(tb); ui.daily.replaceChildren(wrapTable(t), h("p", "wl-muted wl-small", "Частота: день — значення останнього запуску агента за добу (UTC), а не 10-хвилинні точки графіка. Режим: " + (prefs.mode === "avg" ? "середнє по ботах (умовно)." : "бот «" + ruleTitle(prefs.bot) + "».")));
     }
-    function renderExtra() { renderCompare(); renderTable(); renderCapital(); renderHistory(); renderRounds(); renderDaily(); }
+    function renderExtra() { renderCompare(); renderTable(); renderQuality(); renderCapital(); renderHistory(); renderExec(); renderRounds(); renderDaily(); }
 
     // розширена деталізація гаманця
     function renderDetailExtra(cap) {
@@ -451,35 +576,78 @@
     }
 
     // ---------- Експорт CSV: враховує поточні фільтри; лише наявні підтверджені дані ----------
-    function histList() { const f = hist; return extra.ops.filter(function (o) { return (!f.wallet || o.wallet === Number(f.wallet)) && (!f.bot || o.bot === f.bot) && (!f.type || o.type === f.type); }).sort(function (a, b) { return b.t - a.t; }); }
     function exportCsv(kind) {
       if (!model) return null;
       let text = null;
       if (kind === "bots") { const l = D.sortRows(D.filterRows(rows(), tbl), tbl.sort, tbl.dir); if (l.length) text = D.botsCsv(l); }
-      else if (kind === "ops") { const l = histList(); if (l.length) text = D.opsCsv(l); }
+      else if (kind === "ops") { const l = histList(); if (l.length) text = D.opsCsv(l.map(function (o) { return Object.assign({}, o, { botTitle: ruleTitle(o.bot) }); })); }
+      else if (kind === "quality") { const l = qualityList(); if (l.length) text = D.qualityCsv(l); }
       else if (kind === "daily") { if (D.dailyRows(model, query()).length) text = D.dailyCsv(model, query()); }
       else if (kind === "rounds") { if (D.roundsRows(model, query()).length) text = D.roundsCsv(model, query()); }
       if (!text) return null;
-      const d = new Date(env.now()).toISOString().slice(0, 10), names = { bots: "boty", ops: "operatsii", daily: "dennі-rezultaty", rounds: "raundy" };
+      const d = new Date(env.now()).toISOString().slice(0, 10), names = { bots: "boty", ops: "operatsii", quality: "pidtverdzheni-uhody", daily: "dennі-rezultaty", rounds: "raundy" };
       return { name: "wallets-" + (names[kind] || kind).replace("і", "i") + "-" + d + ".csv", text: text, rows: text.split("\r\n").length - 2 };
     }
     function doExport(kind) {
-      const r = exportCsv(kind), note = document.querySelector("#" + ({ bots: "wlTable", ops: "wlHistory", daily: "wlDaily", rounds: "wlRounds" }[kind] || "wlTable") + " .wl-exnote");
+      const r = exportCsv(kind), note = document.querySelector("#" + ({ bots: "wlTable", ops: "wlHistory", quality: "wlQuality", daily: "wlDaily", rounds: "wlRounds" }[kind] || "wlTable") + " .wl-exnote");
       let msg = host.querySelector('[data-export="' + kind + '"]');
       const box = msg && msg.closest(".wl-card"); let n = box && box.querySelector(".wl-exnote"); if (box && !n) { n = h("p", "wl-muted wl-small wl-exnote"); n.setAttribute("role", "status"); box.querySelector(".wl-card-h").insertAdjacentElement("afterend", n); }
       if (!r) { if (n) n.textContent = "Немає даних для експорту за вибраними фільтрами."; return null; }
       env.download(r.name, r.text); if (n) n.textContent = "Файл " + r.name + " завантажено: " + r.rows + " рядків. Числа з десятковою комою, роздільник «;» (для Excel з українськими налаштуваннями)."; return r;
     }
 
-    // додаткові файли: журнали подій і підтверджені записи (необов'язкові; відсутність не ламає сторінку)
+    // додаткові файли: журнали подій і підтверджені записи (необов'язкові; відсутність не ламає сторінку), потім архів Paper Trading
+    let histSig = "";
+    function rebuildHistory() {
+      // Дорога операція (десятки тисяч подій за рік): не перебудовуємо, якщо вхідні дані не змінились (щохвилинне оновлення сторінки).
+      const sig = [model.updated, rawFeed && rawFeed.updated, Object.keys(rawBy).map(function (k) { return k + ":" + Object.keys(rawBy[k]).map(function (b) { return (rawBy[k][b] || []).length; }).join(","); }).join(";"), arch.status, arch.names.map(function (n) { const c = arch.segs[n]; return n + ":" + (c ? c.count + "/" + c.bytes : 0); }).join(";")].join("|");
+      if (sig === histSig && extra.ready && extra.ops.length) return;
+      histSig = sig;
+      const hh = D.buildHistory(model, rawBy, rawFeed, archiveEvents());
+      extra = { ops: hh.ops, notes: hh.notes, comp: hh.comp, feedOpen: extra.feedOpen, eventsLoaded: extra.eventsLoaded, feedLoaded: extra.feedLoaded, ready: true };
+    }
+    function archiveEvents() {
+      if (arch.status !== "ok" || !arch.index) return [];
+      const out = []; arch.index.segments.forEach(function (sg) { const c = arch.segs[sg.name]; if (c && c.ok && c.count === sg.count && c.bytes === sg.bytes) Array.prototype.push.apply(out, c.events); });
+      return out;
+    }
+    // Потрібне вікно архіву: від початку найстарішого поточного раунду (мінус запас) або довше, якщо вибрано більший період; null — увесь архів.
+    function demandFrom() {
+      if (prefs.scope === "all" || hist.period === "all") return null;
+      let f = null; model.caps.forEach(function (c) { const w = model.wallets[c]; if (w && w.roundStart !== null) f = f === null ? w.roundStart : Math.min(f, w.roundStart); });
+      if (f === null) return null;
+      f -= 2 * 3600000; if (HP[hist.period]) f = Math.min(f, env.now() - HP[hist.period]);
+      return f;
+    }
+    // Індекс завжди читається заново; сегмент береться з кешу лише якщо його count і bytes збігаються з індексом (інакше це застарілі дані й вони перезавантажуються).
+    function loadArchive() {
+      const from = demandFrom(), req = ++archReq;
+      if (arch.status !== "ok") arch.status = "loading";
+      return Promise.resolve().then(function () { return env.loadJson("data/paper_archive/index.json"); }).then(function (raw) {
+        const idx = D.parseArchiveIndex(raw); if (!idx.ok) throw new Error(idx.reason);
+        const need = D.neededSegments(idx, from), errors = [];
+        arch.needed = need.length;
+        return Promise.all(need.map(function (sg) {
+          const c = arch.segs[sg.name]; if (c && c.ok && c.count === sg.count && c.bytes === sg.bytes) return c;
+          return Promise.resolve().then(function () { return env.loadJson("data/paper_archive/" + sg.name + ".json"); }).then(function (d) {
+            const r = D.parseArchiveSegment(d, sg.name); if (!r.ok) throw new Error(r.reason);
+            return (arch.segs[sg.name] = { name: sg.name, count: sg.count, bytes: sg.bytes, ok: true, events: r.events, bad: r.bad });
+          }).catch(function (e) { errors.push({ name: sg.name, msg: (e && e.message ? e.message : "помилка").slice(0, 80) }); delete arch.segs[sg.name]; return null; });
+        })).then(function () { if (req !== archReq) return; arch.index = idx; arch.errors = errors; arch.names = need.filter(function (sg) { return arch.segs[sg.name]; }).map(function (sg) { return sg.name; }); arch.status = "ok"; arch.reason = ""; });
+      }).catch(function (e) { if (req !== archReq) return; arch.status = "error"; arch.index = null; arch.segs = {}; arch.names = []; arch.errors = []; arch.reason = (e && e.message ? e.message : "помилка").slice(0, 60); });
+    }
+    function ensureArchive() { if (!model || destroyed) return Promise.resolve(); return loadArchive().then(function () { if (!destroyed) { rebuildHistory(); renderExtra(); } }); }
     function loadExtras() {
       const files = model.caps.map(function (cap) { return { cap: cap, url: cap === model.midCap ? "data/paper_events.json" : "data/paper_events_" + cap + ".json" }; });
       return Promise.all(files.map(function (f) { return Promise.resolve().then(function () { return env.loadJson(f.url); }).then(function (d) { return [f.cap, d && typeof d === "object" ? d : null]; }).catch(function () { return [f.cap, null]; }); }))
         .then(function (pairs) {
           const by = {}; let ok = 0; pairs.forEach(function (x) { if (x[1]) { by[x[0]] = x[1]; ok++; } });
           return Promise.resolve().then(function () { return env.loadJson("data/live_feed.json"); }).catch(function () { return null; }).then(function (feed) {
-            const hh = D.buildHistory(model, by, feed && typeof feed === "object" ? feed : null);
-            extra = { ops: hh.ops, notes: hh.notes, feedOpen: feed && Array.isArray(feed.open) ? feed.open.filter(function (x) { return x && Number.isInteger(x.wallet) && typeof x.bot === "string" && typeof x.coin === "string" && typeof x.entry === "number"; }) : [], eventsLoaded: ok, feedLoaded: !!feed, ready: true };
+            rawBy = by; rawFeed = feed && typeof feed === "object" ? feed : null;
+            extra = { ops: [], notes: extra.notes, comp: null, feedOpen: rawFeed && Array.isArray(rawFeed.feedOpen || rawFeed.open) ? (rawFeed.open || []).filter(function (x) { return x && Number.isInteger(x.wallet) && typeof x.bot === "string" && typeof x.coin === "string" && typeof x.entry === "number"; }) : [], eventsLoaded: ok, feedLoaded: !!rawFeed, ready: true };
+            rebuildHistory();                                                                  // спочатку журнали: сторінка показується одразу, архів дозавантажується поступово
+            if (!destroyed) renderExtra();
+            return loadArchive().then(function () { if (!destroyed) { rebuildHistory(); } });
           });
         });
     }

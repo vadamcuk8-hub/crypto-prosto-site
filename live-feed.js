@@ -190,7 +190,10 @@ const LiveFeed = (function () {
       row("Гаманець", C.walletLabel(it.wallet)); row("Бот", it.botTitle || it.bot); row("Напрямок", it.direction);
       if (it.kind === "trade") {
         row(it.type === "open" ? "Ціна входу" : "Ціна виходу", fmtPx(it.price)); row("Ціна входу", it.type === "close" && it.entry !== null ? fmtPx(it.entry) : null); row("Кількість", it.qty !== null ? it.qty.toLocaleString("uk-UA", { maximumFractionDigits: 8 }) : null);
-        if (it.type === "close") { row("Причина виходу", C.EXIT_LABEL[it.exit] || it.exit); row("Результат", it.pnlUsd !== null ? fmtUsd(it.pnlUsd) + (it.pnlPct !== null ? " (" + fmtPct(it.pnlPct) + ")" : "") : "невідомий"); row("Точність результату", it.pnlUsd !== null ? C.pnlNote(it) : null); }
+        if (it.type === "close") { row("Причина виходу", C.EXIT_LABEL[it.exit] || it.exit); row("Результат", it.pnlUsd !== null ? fmtUsd(it.pnlUsd) + (it.pnlPct !== null ? " (" + fmtPct(it.pnlPct) + ")" : "") : "невідомий"); row("Точність результату", it.pnlUsd !== null ? C.pnlNote(it) : null);
+          const xd = it.exitInfo;
+          if (xd) { row("Заявлений поріг", (xd.declared >= 0 ? "+" : "−") + Math.abs(xd.threshold).toLocaleString("uk-UA", { maximumFractionDigits: 2 }) + "%" + (xd.kind === "trail" ? " від піку" : "")); row("Ціна входу (за записом виходу)", xd.entry !== null ? fmtPx(xd.entry) : null); row("Фактична ціна виходу", fmtPx(xd.exitPrice));
+            row("Фактичний рух від входу", fmtPct(xd.move)); row("Відхилення від порогу", xd.gap === null ? null : (xd.gap >= 0 ? "+" : "−") + Math.abs(xd.gap).toLocaleString("uk-UA", { maximumFractionDigits: 2 }) + " п.п. (від'ємне — гірше за поріг)"); row("Про виконання", C.EXIT_NOTE); } }
         row("Витрати входу (комісія + проковзання)", it.cost !== null ? (it.cost * 100).toLocaleString("uk-UA", { maximumFractionDigits: 3 }) + "%" : null);
         row("Ордер біржі", it.orderId); row("Статус ордера", it.status);
         row("Комісії біржі", it.fees && Object.keys(it.fees).length ? Object.keys(it.fees).map(function (k) { return it.fees[k] + " " + k; }).join(", ") : null);

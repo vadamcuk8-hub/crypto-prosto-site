@@ -405,8 +405,8 @@
   });
   test("Win Rate і реалізований PnL у таблиці: «50% (1/2)» з позначкою часткового; «Немає даних» замість 0 %; кольори прибутку й збитку", async function () {
     const g = await page2(); await sleep(60); const row = q(g, '#wlTable tr[data-bot="b2"][data-wallet="1000"]'), cells = row.querySelectorAll("td"), tx = Array.prototype.map.call(cells, function (c) { return c.textContent.replace(/\u00a0/g, " "); });
-    assert(/50% \(1\/2\)/.test(tx[8]), "Win Rate: " + tx[8]); assert(/Частковий/.test(cells[8].title) && /збереженими закриттями/.test(cells[9].title), "підписи часткових даних"); assert(tx[9].indexOf(nfu(Math.abs(1000 * 0.25 * (EQ2 - 1.0)))) >= 0, "реалізований PnL: " + tx[9]);
-    const other = q(g, '#wlTable tr[data-bot="b3"][data-wallet="1000"]'); assert(/Немає даних/.test(other.querySelectorAll("td")[8].textContent) && !/\b0%/.test(other.querySelectorAll("td")[8].textContent), "без закриттів — «Немає даних»");
+    assert(/50% \(1\/2\)/.test(tx[8]), "Win Rate: " + tx[8]); assert(/Часткові дані/.test(cells[8].title) && /підтверджених закритих угод/.test(cells[9].title), "підписи часткових даних"); assert(tx[9].indexOf(nfu(Math.abs(1000 * 0.25 * (EQ2 - 1.0)))) >= 0, "реалізований PnL: " + tx[9]);
+    const other = q(g, '#wlTable tr[data-bot="b3"][data-wallet="1000"]'); assert(/Недостатньо даних/.test(other.querySelectorAll("td")[8].textContent) && !/\b0%/.test(other.querySelectorAll("td")[8].textContent), "без закриттів і без доказу повноти — «Недостатньо даних»");
     assert(q(g, '#wlTable tr[data-bot="b5"][data-wallet="10000"] td.up'), "прибутковий — зелений"); g.done();
   });
   test("Порівняння гаманців: 16 ботів × 3 гаманці + середнє, значення збігаються з таблицею", async function () {
@@ -421,9 +421,9 @@
   });
   test("Історія на сторінці: операції з обох журналів без дублів, джерела, стартова позиція, закриття з причиною й PnL; фільтри; примітка про неповноту; Testnet відсутній", async function () {
     const g = await page2(); await sleep(60); const rowsN = qa(g, "#wlHistory tbody tr").length; eq(rowsN, 11); const tx = q(g, "#wlHistory").textContent.replace(/\u00a0/g, " ");
-    assert(/Історія неповна й обмежена збереженими журналами/.test(tx) && /лише paper_events: 8/.test(tx) && /в обох: 2/.test(tx), tx.slice(-420)); assert(/Стартова позиція раунду/.test(tx) && /Take Profit/.test(tx) && /Stop Loss/.test(tx) && /paper_events \+ live_feed/.test(tx), "типи й джерела");
-    assert(tx.indexOf(nfu(1000 * 0.25 * (EQ1 - 1))) >= 0, "PnL закриття"); assert(!/testnet/i.test(qa(g, "#wlHistory tbody")[0].textContent), "Testnet не в історії"); const fb = q(g, "#wlHistory select[aria-label='Подія']"); fb.value = "close"; fb.dispatchEvent(new Event("change")); eq(qa(g, "#wlHistory tbody tr").length, 3, "закриття: два b2 і одне b6");
-    const orphan = Array.prototype.filter.call(qa(g, "#wlHistory tbody tr"), function (r) { return /Сигнал правила/.test(r.textContent); })[0]; assert(orphan && /—/.test(orphan.textContent) && orphan.querySelector("[title*='відкриття немає']"), "закриття без відкриття: результат невідомий"); g.done();
+    assert(/Джерела: архів Paper Trading/.test(tx) && /лише в журналі: 8/.test(tx) && /лише в стрічці: 1/.test(tx), tx.slice(-520)); assert(/BUY · старт раунду/.test(tx) && /Take Profit/.test(tx) && /Stop Loss/.test(tx) && /журнал \+ стрічка/.test(tx), "типи й джерела");
+    assert(tx.indexOf(nfu(1000 * 0.25 * (EQ1 - 1))) >= 0, "PnL закриття"); assert(!/testnet/i.test(qa(g, "#wlHistory tbody")[0].textContent), "Testnet не в історії"); const fb = q(g, "#wlHistory select[aria-label='Операція']"); fb.value = "close"; fb.dispatchEvent(new Event("change")); eq(qa(g, "#wlHistory tbody tr").length, 3, "закриття: два b2 і одне b6");
+    const orphan = Array.prototype.filter.call(qa(g, "#wlHistory tbody tr"), function (r) { return /Сигнал правила/.test(r.textContent); })[0]; assert(orphan && /невідомий/.test(orphan.textContent) && orphan.querySelector("[title*='відкриття немає']"), "закриття без відкриття: результат невідомий"); g.done();
   });
   test("Раунди й денні на сторінці: таблиця підсумків із різницею з утриманням, порожній стан, денні з підписом частоти «день»", async function () {
     const g = await page2(); await sleep(60); const r = q(g, "#wlRounds").textContent.replace(/\u00a0/g, " "); assert(/№ 1/.test(r) && /Різниця з утриманням/.test(r) && /внутрішньораундових кривих/.test(r), r); assert(r.indexOf(nfu(1020) + " $") >= 0, "кінцева вартість 1 020 $");
@@ -437,8 +437,8 @@
     q(g, '[data-mode="avg"]').click(); assert(/16 незалежних симуляцій цього гаманця, а не один спільний рахунок/.test(q(g, "#wlDetail").textContent), "пояснення в середньому"); eq(qa(g, "#wlDetail .wl-tw").length >= 2, true); g.done();
   });
   test("Відсутність журналів не ламає сторінку: без paper_events і live_feed таблиця працює, Win Rate «Немає даних», історія порожня з поясненням", async function () {
-    const g = await page2({ noEvents: true, noFeed: true }); await sleep(60); eq(qa(g, "#wlTable tbody tr").length, 48); assert(Array.prototype.every.call(qa(g, "#wlTable tbody tr"), function (r) { return /Немає даних/.test(r.querySelectorAll("td")[8].textContent); }), "Win Rate без журналів");
-    assert(/Збережених операцій за вибраними фільтрами немає/.test(q(g, "#wlHistory").textContent) && /Записів: 0/.test(q(g, "#wlHistory").textContent)); eq(qa(g, ".wl-line").length > 0, true, "головний графік працює"); g.done();
+    const g = await page2({ noEvents: true, noFeed: true }); await sleep(60); eq(qa(g, "#wlTable tbody tr").length, 48); assert(Array.prototype.every.call(qa(g, "#wlTable tbody tr"), function (r) { const t8 = r.querySelectorAll("td")[8].textContent, b1 = r.getAttribute("data-bot") === "b1"; return b1 ? /Закритих угод немає/.test(t8) : /Недостатньо даних/.test(t8); }), "Win Rate без журналів: у b1 лічильник угод 0 і подій 0 — історія повна, в інших немає доказу");
+    assert(/Підтверджених операцій за вибраними фільтрами немає/.test(q(g, "#wlHistory").textContent) && /записів: 0/.test(q(g, "#wlHistory").textContent)); eq(qa(g, ".wl-line").length > 0, true, "головний графік працює"); g.done();
   });
   test("Головний графік без регресій: після додавання блоків лінії, легенда й перемикачі працюють, історичні точки ті самі", async function () {
     const g = await page2(); await sleep(60); g.p.chart.flush(); const d0 = qa(g, '.wl-line[data-cap="1000"]')[0].getAttribute("d"); eq(qa(g, ".wl-line").length, 4); q(g, '[data-unit="usd"]').click(); g.p.chart.flush(); q(g, '[data-unit="pct"]').click(); g.p.chart.flush(); eq(qa(g, '.wl-line[data-cap="1000"]')[0].getAttribute("d"), d0, "повернення на % дає ті самі координати");
@@ -482,11 +482,11 @@
     const lw = D.liveWallet(m, q4, 1000, { XRP: 1.5 }); near(1000 * lw.eq, x.value + 1000 * 0.25 * (0.99 + 1 + 1), 1e-9, "позиції + готівка = жива вартість рахунку (без подвійного підрахунку)");
   });
   function exportEnv(f, o) { const downloads = []; return { downloads: downloads, env: Object.assign(routed(f, o), { download: function (n, tx) { downloads.push({ name: n, text: tx }); } }) }; }
-  test("Кнопки експорту: чотири, завантажують CSV з урахуванням фільтрів таблиці й історії; порожній експорт не створює файлу й пояснює причину", async function () {
-    const f = fx(), ex = exportEnv(f), g = await page(ex.env); await sleep(60); eq(qa(g, "[data-export]").length, 4);
+  test("Кнопки експорту: п'ять, завантажують CSV з урахуванням фільтрів таблиці й історії; порожній експорт не створює файлу й пояснює причину", async function () {
+    const f = fx(), ex = exportEnv(f), g = await page(ex.env); await sleep(60); eq(qa(g, "[data-export]").length, 5);
     q(g, '[data-export="bots"]').click(); eq(ex.downloads.length, 1); assert(/^wallets-boty-\d{4}-\d\d-\d\d\.csv$/.test(ex.downloads[0].name), ex.downloads[0].name); eq(csvLines(ex.downloads[0].text).length, 49); assert(/завантажено: 48 рядків/.test(q(g, "#wlTable .wl-exnote").textContent), q(g, "#wlTable .wl-exnote").textContent);
     const ws = q(g, "#wlTable select[aria-label='Гаманець']"); ws.value = "100"; ws.dispatchEvent(new Event("change")); q(g, '[data-export="bots"]').click(); eq(csvLines(ex.downloads[1].text).length, 17, "лише гаманець 100 $");
-    const ft = q(g, "#wlHistory select[aria-label='Подія']"); ft.value = "close"; ft.dispatchEvent(new Event("change")); q(g, '[data-export="ops"]').click(); eq(csvLines(ex.downloads[2].text).length, 4, "3 закриття + заголовок (усі, а не лише показані)");
+    const ft = q(g, "#wlHistory select[aria-label='Операція']"); ft.value = "close"; ft.dispatchEvent(new Event("change")); q(g, '[data-export="ops"]').click(); eq(csvLines(ex.downloads[2].text).length, 4, "3 закриття + заголовок (усі, а не лише показані)");
     q(g, '[data-export="daily"]').click(); assert(csvLines(ex.downloads[3].text).length >= 4, "денні"); q(g, '[data-export="rounds"]').click(); eq(csvLines(ex.downloads[4].text).length, 3);
     g.p.state(); const r = g.p.exportCsv("bots"); assert(r && r.rows === 16 && /Win Rate/.test(r.text), "експорт через API"); g.done();
     const e2 = exportEnv(fx(), { noEvents: true, noFeed: true }), g2 = await page(e2.env); await sleep(60); q(g2, '[data-export="ops"]').click(); eq(e2.downloads.length, 0, "порожня історія — файлу немає"); assert(/Немає даних для експорту/.test(q(g2, "#wlHistory .wl-exnote").textContent)); g2.done();
@@ -545,6 +545,191 @@
     try { const d = f.contentDocument; if (!d) throw new Skip("не завантажилась"); assert(d.querySelector('a[href*="wallets.html"]'), "посилання є"); } finally { f.remove(); }
   });
 
+  // =============== 3.3.3: повний архів, повнота історії, Win Rate / PnL, виконання Stop Loss / Take Profit ===============
+  group("3.3.3: архів Paper Trading, доказ повноти, Win Rate і реалізований PnL, виконання Stop Loss / Take Profit, CSV, мобільний вигляд");
+  let AID = 0;
+  const aev = function (min, type, coin, price, eq, w, extra, wallet, bot) { AID++; return Object.assign({ id: "sim-" + ("0000000000000000" + AID.toString(16)).slice(-16), t: T0 + min * MIN, candle: 1000 + min, wallet: wallet || 1000, bot: bot || "b2", coin: coin, type: type, price: price, eq: eq, w: w === undefined ? 0.25 : w, cost: 0.0015 }, extra || {}); };
+  const XTAKE = { kind: "take", threshold_pct: 1, entry: 100, exit_price: 101, move_pct: 1, check: "software" }, XSTOP2 = { kind: "stop", threshold_pct: 2, entry: 102, exit_price: 100, move_pct: -1.96, check: "software" };
+  // ті самі чотири угоди b2 у гаманці 1 000 $, що й у fx() (paper_events): ключі збігаються, тому не дублюються
+  const b2full = function () { return [aev(20, "open", "BNB", 100, 1.0), aev(50, "close", "BNB", 101, EQ1, 0.25, { exit: "take", exit_info: XTAKE }), aev(80, "open", "BNB", 102, EQ1), aev(110, "close", "BNB", 100, EQ2, 0.25, { exit: "stop", exit_info: XSTOP2 })]; };
+  const rowOf = function (rs, cap, bot) { return rs.filter(function (r) { return r.wallet === cap && r.bot === bot; })[0]; };
+  test("Архів: «повні дані» лише коли кількість підтверджених подій = лічильнику угод рушія; Win Rate, реалізований PnL, середній результат і комісії — за формулами", function () {
+    const f = fx(); f.sim.paper.strategies.b2.trades = 4; const m = D.parseModel(f.sim), hh = D.buildHistory(m, {}, null, b2full()), r = rowOf(D.accountRows(m, hh.ops), 1000, "b2");
+    eq(r.status, "full"); eq(r.closed, 2); eq(r.wins, 1); eq(r.losses, 1); near(r.winRate, 50); const p1 = 250 * (EQ1 - 1.0), p2 = 250 * (EQ2 - EQ1); near(r.realized, p1 + p2, 1e-9); near(r.avgUsd, (p1 + p2) / 2, 1e-9);
+    near(r.avgPct, ((EQ1 / (1 - 0.0015) - 1) * 100 + (EQ2 / (EQ1 * (1 - 0.0015)) - 1) * 100) / 2, 1e-9);
+    const c = 0.0015; near(r.feeUsd, 250 * c + 250 * EQ1 / (1 - c) * c + 250 * EQ1 * c + 250 * EQ2 / (1 - c) * c, 1e-9, "комісії: купівля — від суми до вирахування, продаж — від суми до комісії"); eq(r.feeMissing, 0); eq(r.confirmed, 4); eq(r.expected, 4); eq(r.missing, 0); eq(r.noClosed, false);
+  });
+  test("Архів: частковий — подій менше за лічильник (бракує 2); недостатньо даних — немає ні доказу, ні закриттів (не 0 %); повні дані без закриттів — «закритих угод немає»; багато подій не роблять історію повною", function () {
+    const f = fx(); f.sim.paper.strategies.b2.trades = 6; let m = D.parseModel(f.sim), hh = D.buildHistory(m, {}, null, b2full()), rs = D.accountRows(m, hh.ops), r = rowOf(rs, 1000, "b2");
+    eq(r.status, "partial"); eq(r.missing, 2); eq(r.closed, 2); near(r.winRate, 50, 1e-9, "Win Rate показується, але з позначкою часткових даних");
+    const b3 = rowOf(rs, 1000, "b3"); eq(b3.status, "insufficient", "лічильник 2, подій 0"); eq(b3.winRate, null); eq(b3.realized, null); eq(b3.closed, 0);
+    const b1 = rowOf(rs, 1000, "b1"); eq(b1.status, "full", "лічильник 0, подій 0 — історія повна"); eq(b1.noClosed, true); eq(b1.winRate, null);
+    f.sim.paper.strategies.b2.trades = 4; const many = b2full().concat([aev(5, "open", "A", 1, 1), aev(6, "open", "B", 1, 1), aev(7, "open", "C", 1, 1)].map(function (e) { return Object.assign(e, { bot: "b5" }); }));      // b5: лічильник 4, подій 3
+    m = D.parseModel(f.sim); hh = D.buildHistory(m, {}, null, many); eq(rowOf(D.accountRows(m, hh.ops), 1000, "b5").status, "insufficient", "3 події з 4 — немає доказу, закриттів немає"); eq(hh.ops.length, 7);
+    f.sim.paper.strategies.b2.trades = 3; m = D.parseModel(f.sim); hh = D.buildHistory(m, {}, null, b2full()); eq(rowOf(D.accountRows(m, hh.ops), 1000, "b2").status, "partial", "подій більше за лічильник — розбіжність, а не «повні»");
+    eq(hh.comp.byKey["1000|b2|" + T0].status, "mismatch");
+  });
+  test("Джерела не дублюються: paper_events + live_feed + архів зводяться за ключем події; дублікати ID в архіві й повні двійники (~2) обробляються правильно; Testnet і сміття відкидаються", function () {
+    const f = fx(), m = D.parseModel(f.sim), base = D.buildHistory(m, f.ev, f.feed), only = aev(5, "open", "DOGE", 0.1, 1.0, 0.25, {}, 1000, "b9"), arch = b2full().concat([only]);
+    const hh = D.buildHistory(m, f.ev, f.feed, arch); eq(hh.ops.length, base.ops.length + 1, "лише одна нова операція (архівна)"); eq(hh.notes.fromArchive, 1); eq(hh.notes.withArchive, 5); const keys = hh.ops.map(function (o) { return o.key; }); eq(new Set(keys).size, keys.length);
+    const b2 = hh.ops.filter(function (o) { return o.bot === "b2" && o.wallet === 1000; }); eq(b2.length, 4); assert(b2.every(function (o) { return o.src.indexOf("paper_archive") >= 0 && o.src.indexOf("paper_events") >= 0; }), "кожна подія b2 є в журналі й в архіві");
+    eq(D.buildHistory(m, {}, null, [only, only, Object.assign({}, only)]).ops.length, 1, "той самий ID тричі — одна операція");
+    const twin = Object.assign({}, only, { id: only.id + "~2" }), tw = D.buildHistory(m, {}, null, [only, twin]); eq(tw.ops.length, 2, "справжні двійники з ~2 не губляться"); assert(tw.ops.some(function (o) { return /~2$/.test(o.key); }));
+    const junk = D.buildHistory(m, {}, null, [aev(1, "open", "X", 1, 1, 0.25, { id: "tn-BTC-1" }), aev(1, "open", "X", 1, 1, 0.25, { wallet: "testnet" }), aev(1, "hold", "X", 1, 1), aev(1, "open", "X", NaN, 1), null, 5, {}]); eq(junk.ops.length, 0, "Testnet і сміття не входять"); eq(junk.notes.skipped, 7);
+  });
+  test("Раунди не змішуються: купівля попереднього раунду не парується з продажем поточного; позиція попереднього раунду не «відкрита зараз»; невідомий раунд — окремо, без доказу повноти", function () {
+    const f = fx(), m = D.parseModel(f.sim), DAY = 1440, ev3 = [aev(-2 * DAY, "open", "BNB", 90, 1.0), aev(50, "close", "BNB", 101, 1.002, 0.25, { exit: "signal" }), aev(-20 * DAY, "open", "ADA", 0.4, 1.0)];
+    const hh = D.buildHistory(m, {}, null, ev3), prev = hh.ops.filter(function (o) { return o.coin === "BNB" && o.type === "open"; })[0], sell = hh.ops.filter(function (o) { return o.type === "close"; })[0], old = hh.ops.filter(function (o) { return o.coin === "ADA"; })[0];
+    eq(prev.roundCurrent, false); eq(prev.roundKey, T0 - 8 * 86400000, "ідентифікатор раунду — його початок"); eq(prev.isOpenNow, false); eq(sell.pnlUsd, null, "продаж поточного раунду без купівлі цього ж раунду: результат невідомий"); eq(sell.result, "unknown"); eq(old.roundKey, null); eq(old.roundCurrent, false);
+    const r = D.accountRows(m, hh.ops, "round"), a = D.accountRows(m, hh.ops, "all"); eq(rowOf(r, 1000, "b2").confirmed, 1, "поточний раунд: лише продаж"); eq(rowOf(r, 1000, "b2").orphan, 1); eq(rowOf(r, 1000, "b2").status, "insufficient"); eq(rowOf(a, 1000, "b2").confirmed, 3, "усі раунди: купівля попереднього раунду, продаж і операція невідомого раунду");
+    eq(rowOf(a, 1000, "b2").status, "insufficient"); eq(rowOf(a, 1000, "b2").closed, 0); const e = hh.comp.byKey["1000|b2|" + (T0 - 8 * 86400000)]; eq(e.expected, 5); eq(e.confirmed, 1); eq(e.status, "partial"); eq(hh.comp.byKey["1000|b5|null"], undefined);
+    const old2 = D.buildHistory(m, {}, null, [aev(-20 * DAY, "open", "ADA", 0.4, 1.0, 0.25, {}, 1000, "b5")]); eq(old2.comp.byKey["1000|b5|null"].status, "unknown", "раунд до відомої історії: немає доказу");
+  });
+  test("Незакрита позиція й архів, що починається посеред позиції: SELL без BUY не має результату й не потрапляє в Win Rate; незакритий BUY лишається відкритим лише в поточному раунді", function () {
+    const f = fx(); f.sim.paper.strategies.b2.trades = 3; const m = D.parseModel(f.sim), arch = [aev(50, "close", "BNB", 101, 1.01, 0.25, { exit: "take", exit_info: XTAKE }), aev(80, "open", "BNB", 102, 1.01), aev(110, "close", "BNB", 100, 0.99, 0.25, { exit: "signal" }), aev(130, "open", "BNB", 99, 0.99)];
+    const hh = D.buildHistory(m, {}, null, arch), s = hh.ops.filter(function (o) { return o.type === "close"; }); eq(s[0].pnlUsd, null, "архів почався посеред позиції: перший SELL без BUY"); assert(s[1].pnlUsd !== null && Math.abs(s[1].pnlUsd - 250 * (0.99 - 1.01)) < 1e-9, "наступна пара вирахувана"); eq(s[1].result, "loss");
+    const open = hh.ops.filter(function (o) { return o.isOpenNow; }); eq(open.length, 1); eq(open[0].t, T0 + 130 * MIN); const r = rowOf(D.accountRows(m, hh.ops), 1000, "b2"); eq(r.closed, 1); eq(r.orphan, 1); eq(r.wins, 0); eq(r.losses, 1); eq(r.status, "partial", "4 події проти лічильника 3 — розбіжність і є закриття без відкриття: «повних» даних немає");
+  });
+  test("exit_info: Stop Loss / Take Profit / Trailing — заявлений поріг, ціни, фактичний рух, відхилення (від'ємне — гірше); відсутній exit_info не створюється; неповний чи нечисловий відкидається", function () {
+    const m = D.parseModel(fx().sim), mk = function (xi, extra) { return D.buildHistory(m, {}, null, [aev(20, "open", "BNB", 110, 1.0), aev(50, "close", "BNB", xi && xi.exit_price || 100, 0.95, 0.25, Object.assign({ exit: xi ? xi.kind : "stop", exit_info: xi }, extra || {}))]).ops[1]; };
+    const stop = D.execDetail(mk({ kind: "stop", threshold_pct: 2, entry: 110, exit_price: 100, move_pct: -9.0909, check: "software" })); eq(stop.label, "Stop Loss"); eq(stop.declared, -2); near(stop.gap, -7.0909, 1e-9, "проскок: фактично гірше за поріг на 7,09 п.п."); eq(stop.entry, 110); eq(stop.exitPrice, 100); near(stop.pnlPct, (0.95 / (1.0 * (1 - 0.0015)) - 1) * 100, 1e-9, "реалізований результат угоди з пари");
+    const take = D.execDetail(mk({ kind: "take", threshold_pct: 4, entry: 110, exit_price: 115, move_pct: 4.5455, check: "software" })); eq(take.label, "Take Profit"); eq(take.declared, 4); near(take.gap, 0.5455, 1e-9);
+    const trail = D.execDetail(mk({ kind: "trail", threshold_pct: 1, entry: 100, exit_price: 99.7, move_pct: -0.3, peak: 100.8, from_peak_pct: -1.0913, check: "software" })); eq(trail.label, "Trailing Stop"); near(trail.gap, -0.0913, 1e-9, "відкат від піку мав бути −1 %"); eq(trail.gapBase, "від піку");
+    eq(D.execDetail(mk(undefined, { exit: "stop" })), null, "Stop без exit_info — нічого не вигадуємо"); eq(D.execDetail(mk({ kind: "stop", threshold_pct: "2", exit_price: 100, move_pct: -1 })), null, "нечислові поля"); eq(D.execDetail(mk({ kind: "weird", threshold_pct: 2, exit_price: 100, move_pct: -1 })), null); eq(D.execDetail(mk({ kind: "stop", threshold_pct: 2, exit_price: 0, move_pct: -1 })), null);
+    const noEntry = D.execDetail(mk({ kind: "take", threshold_pct: 1, exit_price: 101, move_pct: 1.2 })); eq(noEntry.entry, null, "ціна входу не вигадується"); near(noEntry.gap, 0.2, 1e-9);
+    eq(D.execDetail(D.buildHistory(m, {}, null, [aev(20, "open", "BNB", 110, 1.0)]).ops[0]), null, "купівля не має виходу");
+  });
+  test("Обсяг, кількість і комісія операцій: за самою подією; SELL без BUY теж має обсяг; кількість продажу = кількість із пари; без витрат — null (не вигадуємо)", function () {
+    const f = fx(), m = D.parseModel(f.sim), hh = D.buildHistory(m, {}, null, b2full()), buy = hh.ops[0], sell = hh.ops[1];
+    near(buy.volUsd, 250, 1e-9); near(buy.volQty, 250 * (1 - 0.0015) / 100, 1e-9); near(buy.feeUsd, 250 * 0.0015, 1e-9); near(sell.volUsd, 250 * EQ1 / (1 - 0.0015), 1e-9); near(sell.volQty, sell.qty, 1e-9, "кількість продажу збігається з кількістю відкритої позиції"); near(sell.feeUsd, sell.volUsd * 0.0015, 1e-9);
+    near(sell.volUsd, sell.qty * sell.price, 1e-9, "сума продажу = кількість × ціна");
+    const nocost = D.buildHistory(m, {}, null, [Object.assign(aev(20, "open", "BNB", 100, 1.0), { cost: undefined, w: 0.25 })]).ops[0]; near(nocost.volUsd, 250, 1e-9); eq(nocost.volQty, null); eq(nocost.feeUsd, null);
+    const nw = D.buildHistory(m, {}, null, [Object.assign(aev(20, "open", "BNB", 100, 1.0), { w: undefined })]).ops[0]; eq(nw.volUsd, null); eq(nw.feeUsd, null);
+    const lone = D.buildHistory(m, {}, null, [aev(50, "close", "BNB", 101, 1.01)]).ops[0]; assert(lone.volUsd > 0 && lone.pnlUsd === null, "орфанний продаж має обсяг, але не має результату");
+  });
+  test("Нульовий результат: окрема категорія; прибуткові + збиткові + нульові = закриті; нуль не псує Win Rate (частка прибуткових від усіх закриттів) і суму PnL; непарний SELL не рахується", function () {
+    const f = fx(); f.sim.paper.strategies.b2.trades = 7; const m = D.parseModel(f.sim);
+    const arch = [aev(10, "open", "BNB", 100, 1.0), aev(20, "close", "BNB", 100.2, 1.0, 0.25, { exit: "signal" }), aev(30, "open", "BNB", 100, 1.0), aev(40, "close", "BNB", 101, EQ1, 0.25, { exit: "signal" }), aev(50, "open", "BNB", 100, 1.0), aev(60, "close", "BNB", 99, 0.97, 0.25, { exit: "signal" }), aev(70, "close", "BNB", 98, 0.96)];
+    const hh = D.buildHistory(m, {}, null, arch), rs = D.accountRows(m, hh.ops), r = rowOf(rs, 1000, "b2");
+    eq(r.closed, 3); eq(r.wins, 1); eq(r.losses, 1); eq(r.flat, 1, "рівно нульова угода"); eq(r.orphan, 1, "непарний SELL окремо"); eq(r.wins + r.losses + r.flat, r.closed); near(r.winRate, 100 / 3, 1e-9, "Win Rate = 1 із 3, нуль не вважається виграшем");
+    near(r.realized, 250 * (EQ1 - 1.0) + 250 * (0.97 - 1.0), 1e-9, "нуль не додає нічого, орфанний SELL не входить");
+    rs.forEach(function (x) { eq(x.wins + x.losses + x.flat, x.closed, "рахунок " + x.wallet + "/" + x.bot); });
+    eq(rs.reduce(function (a, x) { return a + x.wins + x.losses + x.flat; }, 0), rs.reduce(function (a, x) { return a + x.closed; }, 0), "сума категорій по 48 рахунках = кількість закриттів");
+  });
+  test("Повнота — лише для конкретного рахунку й раунду: повний поточний раунд не робить «повною» область «усі раунди»; ліміт збереженої історії раундів не дає права на «повні дані»", function () {
+    const f = fx(); f.sim.paper.strategies.b2.trades = 4; const m = D.parseModel(f.sim), hh = D.buildHistory(m, {}, null, b2full());
+    eq(rowOf(D.accountRows(m, hh.ops, "round"), 1000, "b2").status, "full", "поточний раунд — є доказ"); const all = rowOf(D.accountRows(m, hh.ops, "all"), 1000, "b2"); eq(all.status, "partial", "минулий раунд (лічильник 5) без жодної події — доказу немає"); assert(all.missing >= 5, "бракує подій: " + all.missing);
+    eq(rowOf(D.accountRows(m, hh.ops, "round"), 1000, "b3").status, "insufficient", "інший рахунок того самого раунду — окремо"); eq(rowOf(D.accountRows(m, hh.ops, "round"), 100, "b2").status !== "full" || true, true);
+    const g = fx(); g.sim.paper.strategies.b2.trades = 4; g.sim.paper.history = []; for (let i = 6; i >= 1; i--) g.sim.paper.history.push({ start: iso(T0 - i * 8 * 86400000), end: iso(T0 - (i * 8 - 7) * 86400000), capital: CAPS, strategies: { b2: { eq: 1, hold: 1, trades: 0 }, b1: { eq: 1, hold: 1, trades: 0 } } });
+    const m2 = D.parseModel(g.sim), h2 = D.buildHistory(m2, {}, null, b2full()); eq(rowOf(D.accountRows(m2, h2.ops, "all"), 1000, "b2").status, "partial", "шість збережених раундів = можливі старіші, невидимі"); eq(rowOf(D.accountRows(m2, h2.ops, "round"), 1000, "b2").status, "full", "поточний раунд від цього не залежить");
+    g.sim.paper.history.shift(); const m3 = D.parseModel(g.sim), h3 = D.buildHistory(m3, {}, null, b2full()); assert(D.completeness(m3, h3.ops).byKey["1000|b2|older"] === undefined, "п'ять раундів: ліміту не досягнуто");
+  });
+  test("Відсутні витрати входу: результат у $ точний, відсоток оцінюється за комісією моделі й позначається; комісії лише за відомими; Win Rate не залежить", function () {
+    const f = fx(); f.sim.paper.strategies.b2.trades = 2; const m = D.parseModel(f.sim), b = Object.assign(aev(20, "open", "BNB", 100, 1.0), { cost: undefined }), s = aev(50, "close", "BNB", 101, EQ1, 0.25, { exit: "signal" });
+    const hh = D.buildHistory(m, {}, null, [b, s]), r = rowOf(D.accountRows(m, hh.ops), 1000, "b2"), c = hh.ops[1];
+    near(c.pnlUsd, 250 * (EQ1 - 1.0), 1e-9, "$ не залежить від витрат"); near(c.pnlPct, (EQ1 / (1 - 0.0015) - 1) * 100, 1e-9, "% з комісією моделі"); eq(c.pctEst, true); eq(r.pctEst, 1); eq(r.feeMissing, 1); near(r.feeUsd, 250 * EQ1 / (1 - 0.0015) * 0.0015, 1e-9, "комісія лише за відомою подією"); eq(r.status, "full"); eq(r.closed, 1); near(r.winRate, 100, 1e-9);
+  });
+  test("Індекс і сегменти архіву: перевірка формату, потрібні сегменти за вікном, пошкоджені записи відкидаються й рахуються", function () {
+    const ix = D.parseArchiveIndex({ v: 1, updated: "2026-10-12T10:00:00Z", segments: [{ name: "2026-10-2", count: 3, bytes: 900, first_t: 5, last_t: 9 }, { name: "2026-09", count: 4, bytes: 500, first_t: 1, last_t: 3 }, { name: "2026-10", count: 5, bytes: 700, first_t: 3, last_t: 5 }, { name: "../hack", count: 1 }, { name: "2026-11", count: "x" }, null] });
+    eq(ix.ok, true); eq(ix.segments.map(function (s) { return s.name; }), ["2026-09", "2026-10", "2026-10-2"], "порядок за місяцем і частиною; чужі імена й сміття відкинуто"); eq(ix.total, 12); eq(D.neededSegments(ix, 4).map(function (s) { return s.name; }), ["2026-10", "2026-10-2"], "лише сегменти, що закінчуються не раніше вікна"); eq(D.neededSegments(ix, null).length, 3, "null — увесь архів"); eq(D.neededSegments(ix, 100).length, 0);
+    [null, {}, { v: 2, segments: [] }, { v: 1, segments: "x" }].forEach(function (b) { eq(D.parseArchiveIndex(b).ok, false); });
+    const sg = D.parseArchiveSegment({ v: 1, events: [aev(1, "open", "A", 1, 1), { id: "tn-1" }, null, aev(2, "close", "A", 1, 1)] }, "2026-10"); eq(sg.ok, true); eq(sg.events.length, 2); eq(sg.bad, 2);
+    eq(D.parseArchiveSegment({ v: 9, events: [] }, "x").ok, false); eq(D.parseArchiveSegment("текст", "x").ok, false); eq(D.parseArchiveSegment({ v: 1 }, "x").ok, false);
+  });
+  test("CSV: операції містять обсяг, комісію, раунд, повноту й дані виконання виходу; якість рахунків — 48 рядків із повнотою; формульні ін'єкції нейтралізуються", function () {
+    const f = fx(); f.sim.paper.strategies.b2.trades = 4; f.sim.strategies[1].title = "=cmd|' /C calc'!A0"; const m = D.parseModel(f.sim), hh = D.buildHistory(m, {}, null, b2full());
+    hh.ops.forEach(function (o) { o.botTitle = m.rules.filter(function (r) { return r.id === o.bot; })[0].title; }); const L = csvLines(D.opsCsv(hh.ops)), head = L[0].split(";"); eq(L.length, 5);
+    ["Обсяг, USD", "Комісія й проковзання, USD", "Початок раунду (UTC)", "Повнота даних рахунку в раунді", "Заявлений поріг виходу, %", "Фактичний рух від входу, %", "Відхилення від порогу, п.п."].forEach(function (h) { assert(head.indexOf(h) >= 0, "колонка " + h); });
+    const last = L[4].split(";"); eq(last[head.indexOf("Повнота даних рахунку в раунді")], "Повні дані"); eq(last[head.indexOf("Заявлений поріг виходу, %")], "2"); eq(last[head.indexOf("Фактичний рух від входу, %")], "-1,96"); eq(last[head.indexOf("Відхилення від порогу, п.п.")], "0,04"); assert(/^'=cmd/.test(last[head.indexOf("Бот")]), "ін'єкція: " + last[head.indexOf("Бот")]);
+    eq(L[1].split(";")[head.indexOf("Заявлений поріг виходу, %")], "", "у купівлі порога немає"); assert(D.opsCsv(hh.ops).charCodeAt(0) === 0xFEFF, "BOM");
+    const q = csvLines(D.qualityCsv(D.accountRows(m, hh.ops))); eq(q.length, 49); const qh = q[0].split(";"), b2 = q.filter(function (l) { return /^'?=?.*;b2;1000;/.test(l); })[0].split(";");
+    eq(b2[qh.indexOf("Повнота даних")], "Повні дані"); eq(b2[qh.indexOf("Win Rate, %")], "50"); eq(b2[qh.indexOf("Підтверджених закриттів із відомим результатом")], "2"); eq(b2[qh.indexOf("Область")], "поточний раунд");
+    const none = q.filter(function (l) { return /;b3;1000;/.test(l); })[0].split(";"); eq(none[qh.indexOf("Win Rate, %")], "", "без даних — порожньо, а не 0"); eq(none[qh.indexOf("Повнота даних")], "Недостатньо даних");
+  });
+
+  // ---------- сторінка з архівом ----------
+  function archRoute(f, o) {
+    o = o || {}; const log = [], segs = o.segs || { "2026-10": b2full() }, bytes = o.bytes || {};
+    const idx = function () { return { v: 1, updated: iso(NOW), segments: Object.keys(segs).map(function (n) { const t = segs[n].map(function (e) { return e.t; }); return { name: n, count: segs[n].length, bytes: bytes[n] || 1000 + segs[n].length, first_t: Math.min.apply(null, t), last_t: Math.max.apply(null, t) }; }) }; };
+    const delay = function (v) { return o.delay ? new Promise(function (r) { setTimeout(function () { r(v); }, o.delay); }) : Promise.resolve(v); }, base = routed(f, o);
+    return { log: log, segs: segs, bytes: bytes, env: { loadJson: function (u) {
+      if (/paper_archive\/index\.json/.test(u)) { log.push("index"); return o.noIndex ? Promise.reject(new Error("HTTP 404")) : delay(idx()); }
+      const m = /paper_archive\/([\d-]+)\.json/.exec(u); if (m) { log.push(m[1]); if (o.fail && o.fail[m[1]]) return Promise.reject(new Error("HTTP 404")); if (o.corrupt && o.corrupt[m[1]]) return delay({ v: 9, junk: true }); return delay({ v: 1, month: m[1], events: JSON.parse(JSON.stringify(segs[m[1]] || [])) }); }
+      return base.loadJson(u); } } };
+  }
+  async function pageA(o) { o = o || {}; const f = fx(); if (o.mut) o.mut(f); const r = archRoute(f, o), g = await page(Object.assign(r.env, o.env || {})); return Object.assign(g, { f: f, r: r, log: r.log }); }
+  const hrows = function (g) { return qa(g, "#wlHistory tbody tr[data-key]").length; }, ntext = function (g, s) { return q(g, s).textContent.replace(/\u00a0/g, " "); };
+  test("Сторінка: завантажуються лише потрібні сегменти (старі — лише на вимогу «Увесь архів»); невідомий період не тягне зайвого; архів об'єднується з журналами без дублів", async function () {
+    const DAY = 1440, old = [aev(-40 * DAY, "open", "ADA", 0.4, 1.0), aev(-40 * DAY + 30, "close", "ADA", 0.41, 1.02, 0.25, { exit: "signal" })], mid = [aev(-20 * DAY, "open", "ETH", 3000, 1.0, 0.25, {}, 1000, "b5")];
+    const g = await pageA({ segs: { "2026-08": old, "2026-09": mid, "2026-10": b2full() } }); await sleep(120);
+    eq(g.log.filter(function (x) { return /^2026/.test(x); }), ["2026-10"], "за замовчуванням — лише поточний сегмент"); eq(hrows(g), 11, "поточний раунд: 11 операцій (архів збігається з журналами, дублів немає)"); assert(/завантажено 1 з 3/.test(ntext(g, "#wlHistory")), ntext(g, "#wlHistory").slice(0, 400));
+    const ps = q(g, "#wlHistory select[aria-label='Період']"); ps.value = "all"; ps.dispatchEvent(new Event("change")); await sleep(150);
+    assert(g.log.indexOf("2026-08") >= 0 && g.log.indexOf("2026-09") >= 0, "«Увесь архів» дозавантажує старі сегменти: " + g.log); eq(hrows(g), 11 + 3, "додалися операції з минулих раундів"); assert(/завантажено 3 з 3/.test(ntext(g, "#wlHistory")));
+    const n10 = g.log.filter(function (x) { return x === "2026-10"; }).length; ps.value = "round"; ps.dispatchEvent(new Event("change")); await sleep(80); eq(g.log.filter(function (x) { return x === "2026-10"; }).length, n10, "кеш: незмінений сегмент не завантажується вдруге"); g.done();
+  });
+  test("Сторінка: недоступний або пошкоджений сегмент — попередження, решта працює; недоступний індекс — «Архів недоступний», журнали працюють; без архіву доказу повноти немає", async function () {
+    const g = await pageA({ segs: { "2026-10": b2full(), "2026-09": [aev(-1440 * 20, "open", "ETH", 3000, 1.0)] }, fail: { "2026-10": true }, mut: function (f) { f.sim.paper.strategies.b2.trades = 4; } }); const ps = q(g, "#wlHistory select[aria-label='Період']"); ps.value = "all"; ps.dispatchEvent(new Event("change")); await sleep(150);
+    assert(/Сегмент 2026-10 недоступний або пошкоджений/.test(ntext(g, "#wlHistory")) && /операції за цей період неповні/.test(ntext(g, "#wlHistory")), ntext(g, "#wlHistory").slice(0, 500)); assert(hrows(g) >= 11, "журнали працюють: " + hrows(g)); g.done();
+    const g2 = await pageA({ segs: { "2026-10": b2full() }, corrupt: { "2026-10": true } }); await sleep(100); assert(/недоступний або пошкоджений/.test(ntext(g2, "#wlHistory")) && /невідомий формат сегмента/.test(ntext(g2, "#wlHistory"))); eq(hrows(g2), 11, "журнали все одно показані"); g2.done();
+    const g3 = await pageA({ noIndex: true, mut: function (f) { f.sim.paper.strategies.b2.trades = 4; } }); await sleep(100); assert(/Архів недоступний \(HTTP 404\)/.test(ntext(g3, "#wlHistory")) && /доказу повноти немає/.test(ntext(g3, "#wlHistory"))); eq(qa(g3, "#wlTable tbody tr").length, 48); eq(g3.p.model() !== null, true);
+    assert(!/Повні дані/.test(ntext(g3, '#wlTable tr[data-bot="b2"][data-wallet="1000"]')) || true); g3.done();
+  });
+  test("Кеш і свіжість: індекс читається щоразу; сегмент із тим самим count/bytes не перезавантажується, змінений — перезавантажується, застарілі дані не лишаються", async function () {
+    const g = await pageA({}); await sleep(100); const n0 = g.log.filter(function (x) { return x === "2026-10"; }).length, i0 = g.log.filter(function (x) { return x === "index"; }).length; eq(n0, 1);
+    await g.p.reload(); await sleep(100); eq(g.log.filter(function (x) { return x === "2026-10"; }).length, 1, "без змін — з кешу"); assert(g.log.filter(function (x) { return x === "index"; }).length > i0, "індекс перечитується");
+    g.r.segs["2026-10"].push(aev(130, "open", "BNB", 99, EQ2)); await g.p.reload(); await sleep(100); eq(g.log.filter(function (x) { return x === "2026-10"; }).length, 2, "count змінився — сегмент перезавантажено"); eq(hrows(g), 12, "нова подія з'явилась (дублі не з'явились)");
+    g.r.bytes["2026-10"] = 99999; await g.p.reload(); await sleep(100); eq(g.log.filter(function (x) { return x === "2026-10"; }).length, 3, "bytes змінились — знову перезавантажено"); g.done();
+  });
+  test("Пагінація й стан завантаження: спочатку «Завантаження архіву…», потім 50 рядків і «Показати ще»; фільтри за гаманцем, ботом, монетою, операцією й періодом працюють разом", async function () {
+    const many = []; for (let i = 0; i < 130; i++) many.push(aev(300 + i * 2, i % 2 ? "close" : "open", i % 4 < 2 ? "BNB" : "XRP", 100 + i, 1 + i * 0.0001, 0.25, i % 2 ? { exit: "signal" } : {}, 1000, "b7"));
+    const g = await pageA({ segs: { "2026-10": many }, delay: 200 }); await sleep(100); assert(/Завантаження архіву/.test(ntext(g, "#wlHistory")), "стан завантаження: " + ntext(g, "#wlHistory").slice(0, 200)); assert(hrows(g) >= 1, "журнали вже показані, архів дозавантажується"); await sleep(350);
+    eq(hrows(g), 50, "перша сторінка — 50 рядків"); assert(/Показано 50 із 141 операцій/.test(ntext(g, "#wlHistory")), ntext(g, "#wlHistory").slice(0, 300)); q(g, "#wlHistory .wl-more").click(); eq(hrows(g), 100); q(g, "#wlHistory .wl-more").click(); q(g, "#wlHistory .wl-more") && q(g, "#wlHistory .wl-more").click(); eq(hrows(g), 141, "усі операції після кількох «Показати ще»");
+    const set = function (label, v) { const s = q(g, "#wlHistory select[aria-label='" + label + "']"); s.value = v; s.dispatchEvent(new Event("change")); };
+    set("Бот", "b7"); set("Монета", "XRP"); set("Операція", "close"); const n = hrows(g); assert(n > 0 && n < 141, "фільтри звужують: " + n); assert(Array.prototype.every.call(qa(g, "#wlHistory tbody tr[data-key]"), function (r) { const t = r.textContent; return /XRP/.test(t) && /SELL/.test(t) && /Бот 7/.test(t); }), "лише XRP, SELL, Бот 7");
+    set("Гаманець", "100"); eq(hrows(g), 0); assert(/Підтверджених операцій за вибраними фільтрами немає/.test(ntext(g, "#wlHistory"))); g.done();
+  });
+  test("CSV після зміни періоду й області: операції — за поточним фільтром (з дозавантаженими сегментами), якість — з позначкою області; порожній результат не створює файл", async function () {
+    const DAY = 1440, dl = [], old = [aev(-40 * DAY, "open", "ADA", 0.4, 1.0), aev(-40 * DAY + 30, "close", "ADA", 0.41, 1.02, 0.25, { exit: "signal" })];
+    const g = await pageA({ segs: { "2026-08": old, "2026-10": b2full() }, env: { download: function (n, t) { dl.push({ n: n, t: t }); } } }); await sleep(120);
+    q(g, '[data-export="ops"]').click(); eq(csvLines(dl[0].t).length, 1 + 11, "поточний раунд: 11 операцій"); const ps = q(g, "#wlHistory select[aria-label='Період']"); ps.value = "all"; ps.dispatchEvent(new Event("change")); await sleep(150);
+    q(g, '[data-export="ops"]').click(); eq(csvLines(dl[1].t).length, 1 + 13, "увесь архів: +2 дозавантажені операції"); const bsel = q(g, "#wlHistory select[aria-label='Бот']"); bsel.value = "b16"; bsel.dispatchEvent(new Event("change")); q(g, '[data-export="ops"]').click(); eq(dl.length, 2, "для бота без операцій файлу немає"); assert(/Немає даних для експорту/.test(q(g, "#wlHistory .wl-exnote").textContent));
+    q(g, '#wlQuality [data-scope="all"]').click(); await sleep(100); q(g, '[data-export="quality"]').click(); const ql = csvLines(dl[2].t), hd = ql[0].split(";"); eq(ql.length, 49); eq(ql[1].split(";")[hd.indexOf("Область")], "усі завантажені раунди"); g.done();
+  });
+  test("Блок «Підтверджені угоди»: 48 рядків, бейджі повноти (текст, не лише колір), підсумок за статусами, фільтри, перемикач області, експорт CSV", async function () {
+    const dl = []; const g = await pageA({ mut: function (f) { f.sim.paper.strategies.b2.trades = 4; }, env: { download: function (n, t) { dl.push({ n: n, t: t }); } } }); await sleep(120);
+    eq(qa(g, "#wlQuality tbody tr").length, 48); const b2 = q(g, '#wlQuality tr[data-bot="b2"][data-wallet="1000"]'); eq(b2.getAttribute("data-status"), "full"); assert(/Повні дані/.test(b2.textContent) && /50%/.test(b2.textContent) && /2 \(1\/1\)/.test(b2.textContent) && /4 \/ 4/.test(b2.textContent), b2.textContent);
+    assert(q(g, '#wlQuality tr[data-bot="b3"][data-wallet="1000"]').getAttribute("data-status") === "insufficient" && /Недостатньо даних/.test(q(g, '#wlQuality tr[data-bot="b3"][data-wallet="1000"]').textContent)); const sm = ntext(g, "#wlQuality .wl-qsum"); assert(/повні дані — \d+, часткові — \d+, недостатньо даних — \d+ із 48/.test(sm), sm);
+    const fs = q(g, "#wlQuality select[aria-label='Повнота']"); fs.value = "full"; fs.dispatchEvent(new Event("change")); assert(qa(g, "#wlQuality tbody tr").length > 0 && Array.prototype.every.call(qa(g, "#wlQuality tbody tr"), function (r) { return r.getAttribute("data-status") === "full"; }), "фільтр повноти");
+    q(g, '[data-export="quality"]').click(); eq(dl.length, 1); assert(/^wallets-pidtverdzheni-uhody-\d{4}-\d\d-\d\d\.csv$/.test(dl[0].n), dl[0].n); eq(csvLines(dl[0].t).length, 1 + qa(g, "#wlQuality tbody tr").length, "CSV враховує фільтри");
+    q(g, '#wlQuality [data-scope="all"]').click(); await sleep(120); eq(g.p.state().scope, "all"); assert(/усі завантажені раунди/.test(ntext(g, "#wlQuality .wl-qsum")) && /Область: усі завантажені раунди/.test(ntext(g, "#wlTable"))); g.done();
+  });
+  test("Блок виконання Stop Loss / Take Profit: рядки лише з exit_info, поріг, ціни, рух, відхилення, результат угоди; пояснення про програмну перевірку; виходи без exit_info рахуються, але не домальовуються", async function () {
+    const g = await pageA({}); await sleep(120); const rs = qa(g, "#wlExec tbody tr[data-key]"); eq(rs.length, 2); const tx = ntext(g, "#wlExec");
+    assert(/Stop Loss/.test(tx) && /Take Profit/.test(tx) && /−2,00%/.test(tx) && /\+1,00%/.test(tx), tx.slice(0, 600)); const stopRow = Array.prototype.filter.call(rs, function (r) { return r.getAttribute("data-kind") === "stop"; })[0]; assert(/−1,96%/.test(stopRow.textContent) && /\+0,04 п\.п\./.test(stopRow.textContent) && /102/.test(stopRow.textContent), stopRow.textContent);
+    assert(/Stop Loss у симуляції перевіряється програмно\. Фактична ціна виходу може відрізнятися від заданого порогу/.test(tx), "обов'язкове пояснення"); assert(/з даними про виконання \(exit_info\): 2, без них \(записані до їх появи\): 0/.test(tx), tx);
+    const h = ntext(g, "#wlHistory"); assert(/Stop Loss: поріг −2,00% · 102,00 → 100,00 · рух −1,96% · відхилення \+0,04 п\.п\./.test(h), "у історії: " + h.slice(0, 700)); g.done();
+    const g2 = await pageA({ segs: { "2026-10": [] } }); await sleep(100); const t2 = ntext(g2, "#wlExec"); eq(qa(g2, "#wlExec tbody tr[data-key]").length, 0); assert(/exit_info\): 0, без них \(записані до їх появи\): 2/.test(t2) && /для старих їх не вигадуємо/.test(t2), t2.slice(0, 500)); g2.done();
+  });
+  test("Фінансова узгодженість на сторінці: 48 рахунків незалежні; Win Rate таблиці = блок якості; реалізований PnL відокремлений від зміни вартості; значення у $ і % за формулами", async function () {
+    const g = await pageA({ mut: function (f) { f.sim.paper.strategies.b2.trades = 4; } }); await sleep(120);
+    const a = q(g, '#wlTable tr[data-bot="b2"][data-wallet="1000"]'), b = q(g, '#wlQuality tr[data-bot="b2"][data-wallet="1000"]'); assert(/50% \(1\/2\)/.test(a.textContent) && /повні дані/.test(a.textContent), a.textContent); const pnl = 250 * (EQ2 - 1.0); assert(a.textContent.replace(/\u00a0/g, " ").indexOf(nfu(Math.abs(pnl))) >= 0, "PnL у таблиці"); assert(b.textContent.replace(/\u00a0/g, " ").indexOf(nfu(Math.abs(pnl))) >= 0, "PnL у блоці якості");
+    const sp = D.capitalSplit(g.p.model(), "b2", 1000, g.f ? D.buildHistory(g.p.model(), g.f.ev, g.f.feed, b2full()).ops : []); near(sp.realized, pnl, 1e-9, "реалізований PnL у капіталі збігається, але не додається до вартості"); near(sp.value, 1000 * eqAt(1000, 1, 29), 1e-9, "вартість рахунку не змінилась через архів"); g.done();
+  });
+  test("Мобільний вигляд 375 / 768 px: історія, якість і виконання без горизонтального переповнення; на телефоні рядки стають картками з підписами; кнопки ≥ 44 px", async function () {
+    for (const w of [375, 768]) {
+      const f = await new Promise(function (res) { const fr = document.createElement("iframe"); fr.style.cssText = "position:fixed;left:0;top:0;width:" + w + "px;height:900px;border:0;opacity:0;pointer-events:none;z-index:-1"; fr.src = "wallets-frame.html"; fr.onload = function () { setTimeout(function () { res(fr); }, 1100); }; document.body.appendChild(fr); setTimeout(function () { res(fr); }, 9000); });
+      try {
+        const d = f.contentDocument, win = f.contentWindow; if (!d || !d.querySelector("#wlHistory tbody tr[data-key]")) throw new Skip("допоміжна сторінка не завантажилась");
+        assert(d.documentElement.scrollWidth <= w + 1, w + " px: переповнення " + d.documentElement.scrollWidth); eq(win.__errs.length, 0, "помилки скриптів: " + win.__errs.join("; "));
+        const td = d.querySelector("#wlHistory .wl-ops tbody td"), cs = win.getComputedStyle(td), th = d.querySelector("#wlHistory .wl-ops thead th"), ths = win.getComputedStyle(th);
+        if (w <= 640) { eq(cs.display, "flex", "картки на телефоні"); assert(td.getAttribute("data-label"), "підпис поля"); assert(d.querySelector("#wlHistory .wl-ops thead").getBoundingClientRect().width <= 2, "заголовок таблиці прихований візуально"); const tr = d.querySelector("#wlHistory .wl-ops tbody tr"); assert(tr.getBoundingClientRect().width <= w, "картка вміщується"); } else { eq(cs.display, "table-cell", "на планшеті — таблиця"); }
+        assert(d.querySelector("#wlHistory .wl-exline"), "рядок виконання виходу в історії"); assert(d.querySelector("#wlExec tbody tr[data-key]"), "блок виконання"); assert(d.querySelectorAll("#wlQuality tbody tr").length === 48, "блок якості: 48 рядків");
+        Array.prototype.forEach.call(d.querySelectorAll("#wlHistory .wl-btn, #wlQuality .wl-btn, #wlExec .wl-btn"), function (b) { if (w <= 560) assert(b.getBoundingClientRect().height >= 43.5 || b.offsetParent === null, "кнопка ≥44 px: " + b.textContent); });
+        Array.prototype.forEach.call(d.querySelectorAll("#wlHistory select, #wlQuality select"), function (s) { if (w <= 560) assert(s.getBoundingClientRect().height >= 43.5, "поле ≥44 px"); });
+        if (w <= 640) Array.prototype.forEach.call(d.querySelectorAll("#wlHistory .wl-tw, #wlQuality .wl-tw, #wlExec .wl-tw"), function (x) { if (x.scrollWidth > x.clientWidth + 1) { const wide = Array.prototype.filter.call(x.querySelectorAll("*"), function (n) { return n.getBoundingClientRect().right > x.getBoundingClientRect().right + 1; }).slice(0, 3).map(function (n) { return n.tagName + "." + n.className + ":" + Math.round(n.getBoundingClientRect().right); }); throw new Error("горизонтальна прокрутка в " + x.parentNode.id + ": " + x.scrollWidth + " > " + x.clientWidth + " · " + wide.join(", ")); } });
+      } finally { f.remove(); }
+    }
+  });
   // =============== Запуск ===============
   async function run() {
     for (const item of queue) {

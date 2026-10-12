@@ -32,9 +32,17 @@
       price: e.price, entry: num(e.entry_price) ? e.entry_price : null, qty: num(e.qty) ? e.qty : null, pnlPct: num(e.pnl_pct) ? e.pnl_pct : null, pnlUsd: num(e.pnl_usd) ? e.pnl_usd : null,
       reason: str(e.reason, 300), confirmed: e.confirmed === "exchange" ? "exchange" : "engine", orderId: e.order_id ? str(String(e.order_id), 40) : null, status: str(e.status, 24),
       fees: e.fees && typeof e.fees === "object" ? e.fees : null, partial: !!e.partial, cost: num(e.cost) ? e.cost : null,
-      initial: e.initial === true,
+      initial: e.initial === true, exitInfo: e.type === "close" ? exitDetail(e.exit_info) : null,
       pnlExact: e.source === "sim" && e.pnl_basis === "model",         // лише модель симулятора має повний облік витрат; Testnet-результат — завжди наближений
     };
+  }
+  // Фактичне виконання Stop Loss / Take Profit / Trailing (поле exit_info з рушія): лише те, що записав рушій, нічого не вигадується
+  const EXIT_NOTE = "Stop Loss у симуляції перевіряється програмно. Фактична ціна виходу може відрізнятися від заданого порогу.";
+  function exitDetail(x) {
+    if (!x || typeof x !== "object" || ["stop", "take", "trail"].indexOf(x.kind) < 0 || !num(x.threshold_pct) || !num(x.exit_price) || !num(x.move_pct)) return null;
+    const trail = x.kind === "trail", declared = x.kind === "take" ? x.threshold_pct : -x.threshold_pct, actual = trail && num(x.from_peak_pct) ? x.from_peak_pct : x.move_pct;
+    return { kind: x.kind, label: EXIT_LABEL[x.kind], threshold: x.threshold_pct, declared: declared, entry: num(x.entry) ? x.entry : null, exitPrice: x.exit_price, move: x.move_pct, fromPeak: trail && num(x.from_peak_pct) ? x.from_peak_pct : null,
+      gap: trail && !num(x.from_peak_pct) ? null : actual - declared };
   }
   function normInfo(e) {
     if (!e || typeof e !== "object" || typeof e.id !== "string" || !num(e.t) || PRICE_TYPES.indexOf(e.type) < 0 || typeof e.coin !== "string" || !num(e.price)) return null;
@@ -372,7 +380,7 @@
   function release() { users = Math.max(0, users - 1); if (!users && shared) { shared.stop(); shared = null; } }
 
   root.LiveFeedCore = {
-    PERIODS: PERIODS, EXIT_LABEL: EXIT_LABEL, DEFAULT_PREFS: DEFAULT_PREFS, normTrade: normTrade, normInfo: normInfo, mergeItems: mergeItems, cats: cats, title: title, tone: tone, sourceLabel: sourceLabel, sourceNote: sourceNote,
+    PERIODS: PERIODS, EXIT_LABEL: EXIT_LABEL, EXIT_NOTE: EXIT_NOTE, exitDetail: exitDetail, DEFAULT_PREFS: DEFAULT_PREFS, normTrade: normTrade, normInfo: normInfo, mergeItems: mergeItems, cats: cats, title: title, tone: tone, sourceLabel: sourceLabel, sourceNote: sourceNote,
     pnlNote: pnlNote, walletLabel: walletLabel, applyFilter: applyFilter, counts: counts, beOf: beOf, pnlPct: pnlPct, distBe: distBe, evalPosition: evalPosition, createStorage: createStorage, createHub: createHub, createSound: createSound,
     createController: createController, acquire: acquire, release: release, defaultEnv: defaultEnv,
   };

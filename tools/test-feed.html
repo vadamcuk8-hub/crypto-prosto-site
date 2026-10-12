@@ -98,6 +98,18 @@
     eq(C.cats(stop), ["loss", "sltp"]); eq(C.cats(unk), ["loss"], "unknown — не SL/TP"); eq(C.cats(noexit), ["loss"], "немає поля — unknown"); assert(/Stop Loss/.test(C.title(stop)) && !/Stop Loss/.test(C.title(unk)));
     eq(C.cats(C.normTrade(tEvent({ result: "unknown", exit: "signal", pnl_usd: undefined }))), []); eq(C.cats(C.normTrade(tEvent({ type: "open", result: undefined, exit: undefined }))), []);
   });
+  test("exit_info: фактичне виконання Stop Loss / Take Profit / Trailing — поріг, ціни, рух, відхилення; без exit_info нічого не вигадується; у подробицях є пояснення про програмну перевірку", async function () {
+    const XI = { kind: "stop", threshold_pct: 2, entry: 110, exit_price: 100, move_pct: -9.0909, check: "software" };
+    const a = C.normTrade(tEvent({ exit: "stop", result: "loss", exit_info: XI })); eq(a.exitInfo.label, "Stop Loss"); eq(a.exitInfo.declared, -2); assert(Math.abs(a.exitInfo.gap - (-7.0909)) < 1e-9, "відхилення " + a.exitInfo.gap);
+    const tk = C.exitDetail({ kind: "take", threshold_pct: 4, entry: 110, exit_price: 115, move_pct: 4.5455 }); assert(tk.declared === 4 && Math.abs(tk.gap - 0.5455) < 1e-9 && tk.label === "Take Profit");
+    const tr = C.exitDetail({ kind: "trail", threshold_pct: 1, entry: 100, exit_price: 99.7, move_pct: -0.3, from_peak_pct: -1.0913 }); assert(tr.label === "Trailing Stop" || /Трейлінг/.test(tr.label), tr.label); assert(Math.abs(tr.gap - (-0.0913)) < 1e-9 && tr.fromPeak === -1.0913);
+    eq(C.normTrade(tEvent({ exit: "stop", result: "loss" })).exitInfo, null, "без exit_info — null"); eq(C.exitDetail({ kind: "stop", threshold_pct: "2", exit_price: 1, move_pct: 1 }), null); eq(C.exitDetail({ kind: "x", threshold_pct: 2, exit_price: 1, move_pct: 1 }), null); eq(C.exitDetail(null), null);
+    eq(C.normTrade(tEvent({ type: "open", result: undefined, exit: undefined, exit_info: XI })).exitInfo, null, "купівля не має виходу");
+    const env = fakeEnv({ journal: journal([tEvent({ id: "x1", exit: "stop", result: "loss", pnl_usd: -3, pnl_pct: -2.5, exit_info: XI }), tEvent({ id: "x2", t: NOW - 90000, exit: "stop", result: "loss" })]) }), u = await mountUI(env, { period: "all" }), cards = qa(u, ".lf-card");
+    cards[0].click(); let d = q(u, ".lf-detail").textContent.replace(/\u00a0/g, " "); assert(/Заявлений поріг/.test(d) && /−2/.test(d) && /Фактична ціна виходу/.test(d) && /Фактичний рух від входу/.test(d) && /−9,09%/.test(d) && /Відхилення від порогу/.test(d) && /−7,09 п\.п\./.test(d), d);
+    assert(/Stop Loss у симуляції перевіряється програмно\. Фактична ціна виходу може відрізнятися від заданого порогу/.test(d), "пояснення");
+    cards[1].click(); d = q(u, ".lf-detail").textContent; assert(!/Заявлений поріг/.test(d) && !/Фактична ціна виходу/.test(d), "для виходу без exit_info рядків немає"); u.done();
+  });
   test("Цінові події: категорії беззбитковості, плюсу й мінусу; підпис «Оцінка»", function () {
     const mk = function (type) { return C.normInfo({ id: "px-" + type, t: NOW, type: type, coin: "BNB", price: 1, wallet: 1000, bot: "b" }); };
     eq(C.cats(mk("near_be")), ["be"]); eq(C.cats(mk("reached_be")), ["be"]); eq(C.cats(mk("to_plus")), ["profit"]); eq(C.cats(mk("to_minus")), ["loss"]);

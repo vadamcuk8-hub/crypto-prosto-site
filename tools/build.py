@@ -30,7 +30,7 @@ PARTIALS = os.path.join(ROOT, "tools", "partials")
 PAGE_SCRIPTS = {
     "index.html": ["core.js", "agent-ui.js", "charts.js", "chart-tool.js", "widget-defs.js", "widgets.js", "home.js", "chartbg.js"],
     "simulation.html": ["core.js", "agent-ui.js", "chart-tool.js", "simulation.js", "live-feed.js", "simulation-feed.js"],
-    "wallets.html": ["core.js", "agent-ui.js", "wallets-data.js", "wallets-chart.js", "live-feed.js", "wallets.js"],
+    "wallets.html": ["core.js", "agent-ui.js", "wallets-data.js", "report-core.js", "wallets-chart.js", "live-feed.js", "report-ui.js", "wallets.js"],
     "agents.html": ["core.js", "agent-ui.js", "charts.js", "chart-tool.js", "widget-defs.js", "widgets.js", "agents.js"],
     "learn.html": ["core.js", "learn.js"],
     "market.html": ["core.js", "agent-ui.js", "chart-tool.js", "market-live.js", "market-charts.js", "market-terminal.js", "market-calc.js",
@@ -39,6 +39,8 @@ PAGE_SCRIPTS = {
     "analytics.html": ["core.js", "agent-ui.js", "charts.js", "chart-tool.js", "analytics.js", "signals.js", "outlook.js", "report.js"],
     "sources.html": ["core.js"],
 }
+# Важкі модулі, що вантажаться лише за потреби (експорт у PDF / Excel): їхні адреси з версіями записуються в <script type="application/json" id="lazyScripts">
+LAZY_SCRIPTS = {"wallets.html": ["report-export.js", "report-pdf.js"]}
 DEFAULT_SCRIPTS = ["core.js"]          # решта сторінок (news-*.html)
 
 # Підрозділ меню: сторінки новин підсвічують пункт «Новини»
@@ -113,7 +115,12 @@ def render_scripts(page):
             i = names.index(main)
             names[i:i] = [d for d in deps if d not in names]
     names.insert(1, "help.js")            # підказки-помічник потрібні кожній сторінці (одразу після core.js)
-    return "\n".join('  <script src="%s"></script>' % n for n in names)
+    out = ['  <script src="%s"></script>' % n for n in names]
+    lazy = LAZY_SCRIPTS.get(page)
+    if lazy:
+        import json
+        out.append('  <script type="application/json" id="lazyScripts">%s</script>' % json.dumps({n: n + "?v=" + (file_hash(n) or "0") for n in lazy}, ensure_ascii=False, separators=(",", ":")))
+    return "\n".join(out)
 
 
 def block(text, name, content):

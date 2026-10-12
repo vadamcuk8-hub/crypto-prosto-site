@@ -372,11 +372,12 @@
       model.rules.forEach(function (r) {
         const s = walletStats(model, { mode: "bot", bot: r.id }, cap), t = accountStats(model, ops || [], cap, r.id, sc, comp);
         rows.push({ bot: r.id, title: r.title, wallet: cap, value: s.value, resultUsd: s.resultUsd, resultPct: s.resultPct, trades: s.trades, open: s.open, dd: s.dd, winRate: t.winRate, closed: t.closed, wins: t.wins, losses: t.losses, flat: t.flat, realized: t.realized,
-          avgUsd: t.avgUsd, avgPct: t.avgPct, pctEst: t.pctEst, feeUsd: t.feeUsd, feeMissing: t.feeMissing, orphan: t.orphan, status: t.status, noClosed: t.noClosed, confirmed: t.confirmed, expected: t.expected, missing: t.missing, scope: sc, hasData: !!s.last, last: s.last ? s.last.t : null });
+          avgUsd: t.avgUsd, avgPct: t.avgPct, pctEst: t.pctEst, feeUsd: t.feeUsd, feeMissing: t.feeMissing, orphan: t.orphan, status: t.status, noClosed: t.noClosed, confirmed: t.confirmed, expected: t.expected, missing: t.missing, scope: sc, statusRank: STATUS_RANK[t.status], hasData: !!s.last, last: s.last ? s.last.t : null });
       });
     });
     return rows;
   }
+  const STATUS_RANK = { full: 0, partial: 1, insufficient: 2 };
   function filterRows(rows, f) {
     const q = (f.q || "").trim().toLowerCase();
     return rows.filter(function (r) { return (!f.wallet || r.wallet === Number(f.wallet)) && (!f.bot || r.bot === f.bot) && (!f.status || r.status === f.status) && (!f.onlyOpen || (r.open || 0) > 0) && (!q || r.title.toLowerCase().indexOf(q) >= 0 || r.bot.toLowerCase().indexOf(q) >= 0); });
@@ -482,6 +483,70 @@
     return out;
   }
 
+  // ---------- Результат за період за ЗБЕРЕЖЕНИМИ точками кривої (для звітів) ----------
+  // Нічого не береться з поточного знімка: початок і кінець періоду мають бути підтверджені точками кривої (допуск tol).
+  //   • from === null або початок періоду не раніше початку поточного раунду: база — депозит (eq0 = 1), тобто результат збігається з показниками інтерфейсу.
+  //   • Початок раніше за початок раунду: період скорочується до раунду (coverage = "partial"); попередні раунди не змішуються.
+  //   • Початок усередині раунду: база — eq найближчої точки до початку (в межах tol), інакше status = "nodata".
+  //   • to === null — остання збережена точка; інакше — найближча до to точка в межах tol, інакше "nodata".
+  function nearestPoint(points, t, tol) {
+    let best = null, bd = Infinity;
+    points.forEach(function (p) { const d = Math.abs(p.t - t); if (d < bd) { bd = d; best = p; } });
+    return best && bd <= tol ? best : null;
+  }
+  function periodResult(model, cap, bot, from, to, tol) {
+    const w = model.wallets[cap], st = w && w.strategies[bot], T = num(tol) ? tol : 25 * 60000;
+    if (!st || !st.curve.length) return { status: "nodata", reason: "немає збережених точок рахунку" };
+    const pts = st.curve, rs = w.roundStart;
+    let end = null; if (to === null || to === undefined) end = pts[pts.length - 1]; else { end = nearestPoint(pts, to, T); if (!end) return { status: "nodata", reason: "немає точки equity на кінець періоду" }; }
+    let eq0, startT, coverage = "full", basis;
+    if (from === null || from === undefined || (rs !== null && from <= rs + T)) {
+      eq0 = 1; startT = rs !== null ? rs : pts[0].t; basis = "deposit"; if (from !== null && from !== undefined && rs !== null && from < rs - T) coverage = "partial";
+    } else { const p0 = nearestPoint(pts, from, T); if (!p0) return { status: "nodata", reason: "немає точки equity на початок періоду" }; eq0 = p0.eq; startT = p0.t; basis = "point"; }
+    if (!(end.t > startT) && basis === "point") return { status: "nodata", reason: "порожнє вікно періоду" };
+    const inside = pts.filter(function (p) { return p.t >= startT - 1 && p.t <= end.t; });
+    return { status: "ok", coverage: coverage, basis: basis, startT: startT, endT: end.t, eq0: eq0, eq1: end.eq, pct: (end.eq / eq0 - 1) * 100, usd: cap * (end.eq - eq0), points: inside.length, series: inside.map(function (p) { return { t: p.t, eq: p.eq, hold: p.hold === undefined ? null : p.hold }; }),
+      dd: maxDrawdown(inside.map(function (p) { return p.eq; })), ddKnown: inside.length >= 2 };      // просідання за збереженими точками (як у таблицях інтерфейсу)
+  }
+
+  // ---------- Analytics Pro 2: компактна таблиця рахунків, деталі, історія з пошуком ----------
+  function proFilterRows(rows, f) {
+    const q = (f.q || "").trim().toLowerCase();
+    return rows.filter(function (r) {
+      if (f.wallet && r.wallet !== Number(f.wallet)) return false; if (f.status && r.status !== f.status) return false; if (f.onlyTrades && !((r.trades || 0) > 0)) return false; if (f.onlyOpen && !((r.open || 0) > 0)) return false;
+      if (f.sign) { if (!r.hasData) return false; const u = r.resultUsd; if (f.sign === "plus" ? !(u > PRO_EPS) : f.sign === "minus" ? !(u < -PRO_EPS) : !(Math.abs(u) <= PRO_EPS)) return false; }
+      return !q || (r.title + " " + r.bot + " " + r.wallet).toLowerCase().indexOf(q) >= 0;
+    });
+  }
+  // Деталі одного рахунку: лише наявні дані; тут же — той самий бот в інших гаманцях (окремі незалежні рахунки, USD кожного окремо)
+  function accountDetail(model, ops, cap, bot, scope, comp, rows) {
+    const w = model.wallets[cap], st = w && w.strategies[bot]; if (!st) return null;
+    const last = st.curve[st.curve.length - 1], mine = ops.filter(function (o) { return o.wallet === cap && o.bot === bot; }).sort(function (a, b) { return b.t - a.t; });
+    const exits = { stop: 0, take: 0, trail: 0, withInfo: 0 };
+    mine.forEach(function (o) { if (o.type === "close" && exits[o.exit] !== undefined) { exits[o.exit]++; if (o.exitInfo) exits.withInfo++; } });
+    const hh = last.hold !== null && last.hold !== undefined;
+    return { cap: cap, bot: bot, coins: w.coins || [], openCoins: st.openCoins || [], trades: st.trades, open: st.open, roundStart: w.roundStart, roundEnd: w.roundEnd, value: cap * last.eq, resultUsd: cap * (last.eq - 1), resultPct: (last.eq - 1) * 100,
+      holdPct: hh ? (last.hold - 1) * 100 : null, vsHold: hh ? (last.eq - last.hold) * 100 : null, last: last.t, stats: accountStats(model, ops, cap, bot, scope, comp), exits: exits, latest: mine.slice(0, 5),
+      siblings: rows.filter(function (r) { return r.bot === bot && r.hasData; }).map(function (r) { return { wallet: r.wallet, usd: r.resultUsd, pct: r.resultPct, trades: r.trades, current: r.wallet === cap }; }).sort(function (a, b) { return a.wallet - b.wallet; }) };
+  }
+  function opResultKind(o) { return o.type === "open" ? "open" : (o.result || "unknown"); }
+  const OP_PERIODS = { "24h": 86400000, "7d": 604800000 };
+  function proOpText(o, titles) { return [titles && titles[o.bot] || "", o.bot, o.coin, o.type === "open" ? "buy купівля" : "sell продаж", o.exit ? (EXIT_KIND[o.exit] || o.exit) : "", o.wallet, o.src.join(" ")].join(" ").toLowerCase(); }
+  function proFilterOps(ops, f, now, titles) {
+    const q = (f.q || "").trim().toLowerCase();
+    return ops.filter(function (o) {
+      if (f.wallet && o.wallet !== Number(f.wallet)) return false; if (f.bot && o.bot !== f.bot) return false; if (f.coin && o.coin !== f.coin) return false; if (f.type && o.type !== f.type) return false;
+      if (f.result && opResultKind(o) !== f.result) return false; if (f.exit && !(o.type === "close" && (o.exit || "unknown") === f.exit)) return false;
+      if (f.period === "round" && !o.roundCurrent) return false; if (OP_PERIODS[f.period] && o.t < now - OP_PERIODS[f.period]) return false;
+      return !q || proOpText(o, titles).indexOf(q) >= 0;
+    });
+  }
+  const OP_SORT = { t: function (o) { return o.t; }, pnl: function (o) { return o.type === "close" ? o.pnlUsd : null; }, vol: function (o) { return o.volUsd; }, fee: function (o) { return o.feeUsd; }, price: function (o) { return o.price; } };
+  function proSortOps(list, key, dir) {
+    const f = OP_SORT[key] || OP_SORT.t, m = dir === "asc" ? 1 : -1;
+    return list.slice().sort(function (a, b) { const x = f(a), y = f(b); if (x === null || x === undefined) return (y === null || y === undefined) ? b.t - a.t : 1; if (y === null || y === undefined) return -1; return m * (x - y) || b.t - a.t; });
+  }
+
   // ---------- Архів подій Paper Trading (data/paper_archive/): індекс і сегменти; завантаження лише потрібних сегментів ----------
   const SEG_RE = /^\d{4}-\d{2}(?:-\d+)?$/;
   function segOrder(a, b) { const x = a.name.split("-"), y = b.name.split("-"); return (x[0] + x[1]).localeCompare(y[0] + y[1]) || (parseInt(x[2] || "1", 10) - parseInt(y[2] || "1", 10)); }
@@ -502,6 +567,54 @@
     if (!d || typeof d !== "object" || d.v !== 1 || !Array.isArray(d.events)) return { ok: false, name: name, events: [], bad: 0, reason: "невідомий формат сегмента" };
     const events = d.events.filter(cleanArchiveEvent);
     return { ok: true, name: name, events: events, bad: d.events.length - events.length };
+  }
+
+  // ---------- Analytics Pro 1: компактні KPI й рейтинги стратегій ----------
+  // Стратегія = бот. Кожен бот у кожному гаманці — НЕЗАЛЕЖНИЙ віртуальний рахунок зі своїм стартом; спільного портфеля немає.
+  //   • Фільтр «Один гаманець»: 16 ботів ранжуються за своїм рахунком у цьому гаманці (результат збереженої вартості поточного раунду).
+  //   • «Усі гаманці»: $ = сума результатів трьох незалежних рахунків бота; % = звичайне середнє трьох відсотків (без зважування за депозитом). Це зручний підсумок, а не результат спільного рахунку.
+  //   • У рейтинг потрапляє бот, лише якщо ВСІ вибрані його рахунки мають збережені точки; решту повертаємо окремо як «виключені» (нічого не домальовуємо).
+  const PRO_EPS = 0.005;                                        // $: менше половини цента — нульовий результат (так само заокруглює відображення)
+  function proCaps(model, wallet) { const w = wallet === "" || wallet === null || wallet === undefined ? null : Number(wallet); return w !== null && model.caps.indexOf(w) >= 0 ? [w] : model.caps.slice(); }
+  function proEntries(model, rows, wallet) {
+    const caps = proCaps(model, wallet), by = {}, entries = [], excluded = [];
+    rows.forEach(function (r) { if (caps.indexOf(r.wallet) >= 0) (by[r.bot] = by[r.bot] || []).push(r); });
+    model.rules.forEach(function (rule) {
+      const have = (by[rule.id] || []).filter(function (r) { return r.hasData; });
+      if (have.length !== caps.length) { excluded.push({ bot: rule.id, title: rule.title, have: have.length, need: caps.length }); return; }
+      const n = have.length, sum = function (k) { return have.reduce(function (a, r) { return a + r[k]; }, 0); }, tr = sumNums(have.map(function (r) { return r.trades; })), op = sumNums(have.map(function (r) { return r.open; }));
+      entries.push({ bot: rule.id, title: rule.title, perWallet: have.map(function (r) { return { wallet: r.wallet, usd: r.resultUsd, pct: r.resultPct, trades: r.trades, open: r.open, value: r.value }; }).sort(function (a, b) { return a.wallet - b.wallet; }), accounts: n, usd: sum("resultUsd"), pct: sum("resultPct") / n, value: sum("value"), deposit: caps.reduce(function (a, c) { return a + c; }, 0), trades: tr, open: op,
+        dd: Math.max.apply(null, have.map(function (r) { return r.dd === null ? 0 : r.dd; })), ddKnown: have.every(function (r) { return r.dd !== null; }), wallets: have.map(function (r) { return r.wallet; }) });
+    });
+    return { entries: entries, excluded: excluded, caps: caps };
+  }
+  // Рейтинг стратегій. Правила:
+  //   • «Усі гаманці»: місце визначається ЛИШЕ простим середнім відсоткової дохідності трьох незалежних рахунків; сума $ трьох гаманців місце не визначає (метрика примусово "pct").
+  //   • Один гаманець: можна за $ (результат цього рахунку) або за %.
+  //   • За замовчуванням боти без угод (trades === 0) у ТОП і АНТИТОП не потрапляють; includeIdle = true повертає їх. Невідома кількість угод (null) — не «нуль угод».
+  //   • Місць менше ніж 6 — списки коротші (показується фактична кількість); ТОП і АНТИТОП ніколи не перетинаються. Результати й первинні дані не змінюються.
+  function proRanking(model, rows, wallet, metric, includeIdle) {
+    const all = proCaps(model, wallet).length > 1, key = all || metric === "pct" ? "pct" : "usd", r = proEntries(model, rows, wallet);
+    const pool = includeIdle ? r.entries.slice() : r.entries.filter(function (e) { return e.trades !== 0; }), idle = r.entries.length - pool.length;
+    const sorted = pool.sort(function (a, b) { return b[key] - a[key] || a.title.localeCompare(b.title, "uk"); });
+    const eps = key === "usd" ? PRO_EPS : 0.0005;
+    sorted.forEach(function (e) { e.rank = 1 + sorted.filter(function (x) { return x[key] - e[key] > eps; }).length; e.tie = sorted.filter(function (x) { return x !== e && Math.abs(x[key] - e[key]) <= eps; }).length > 0; e.noTrades = e.trades === 0; e.sign = e[key] > eps ? "plus" : e[key] < -eps ? "minus" : "zero"; });
+    const k = Math.min(3, sorted.length), rest = sorted.slice(k), anti = rest.slice(-Math.min(3, rest.length)).reverse();
+    return { metric: key, forced: all && metric === "usd", all: all, list: sorted, top: sorted.slice(0, k), anti: anti, excluded: r.excluded, idle: idle, includeIdle: !!includeIdle, caps: r.caps, total: model.rules.length };
+  }
+  // KPI вибраного фільтра: усі підрахунки — за незалежними рахунками (без злиття в один портфель)
+  function proKpis(model, rows, wallet, metric) {
+    const caps = proCaps(model, wallet), all = rows.filter(function (r) { return caps.indexOf(r.wallet) >= 0; }), acc = all.filter(function (r) { return r.hasData; });
+    const key = metric === "pct" ? "resultPct" : "resultUsd", out = { wallets: caps, accounts: acc.length, total: all.length, noData: all.length - acc.length };
+    out.sumUsd = acc.length ? acc.reduce(function (a, r) { return a + r.resultUsd; }, 0) : null;
+    out.meanPct = acc.length ? acc.reduce(function (a, r) { return a + r.resultPct; }, 0) / acc.length : null;
+    out.positive = acc.filter(function (r) { return r.resultUsd > PRO_EPS; }).length; out.negative = acc.filter(function (r) { return r.resultUsd < -PRO_EPS; }).length; out.zero = acc.length - out.positive - out.negative;
+    const sorted = acc.slice().sort(function (a, b) { return b[key] - a[key] || a.wallet - b.wallet || a.title.localeCompare(b.title, "uk"); });
+    out.best = sorted.length ? sorted[0] : null; out.worst = sorted.length ? sorted[sorted.length - 1] : null;
+    out.trades = sumNums(acc.map(function (r) { return r.trades; })); out.open = sumNums(acc.map(function (r) { return r.open; }));
+    const dds = acc.filter(function (r) { return r.dd !== null; }); out.maxDd = dds.length ? Math.max.apply(null, dds.map(function (r) { return r.dd; })) : null; out.maxDdAcc = dds.length ? dds.filter(function (r) { return r.dd === out.maxDd; })[0] : null;
+    out.deposits = acc.reduce(function (a, r) { return a + r.wallet; }, 0); out.idle = acc.filter(function (r) { return r.trades === 0; }).length;
+    return out;
   }
 
   // ---------- CSV (для Excel: UTF-8 з BOM, роздільник «;», десяткова кома; текст захищено від формульних ін'єкцій) ----------
@@ -554,5 +667,5 @@
       ["Початковий депозит гаманця, USD", function (r) { return r.wallet; }], ["Кінцева вартість, USD", function (r) { return r.value; }], ["Дохідність, %", function (r) { return r.pct; }], ["Угоди", function (r) { return r.trades; }], ["Утримання активу, %", function (r) { return r.holdPct; }], ["Різниця з утриманням, п.п.", function (r) { return r.vsHold; }]], rows);
   }
 
-  root.WalletsData = { parseArchiveIndex: parseArchiveIndex, neededSegments: neededSegments, parseArchiveSegment: parseArchiveSegment, cleanArchiveEvent: cleanArchiveEvent, accountStats: accountStats, completeness: completeness, roundsOf: roundsOf, roundOf: roundOf, execDetail: execDetail, cleanExit: cleanExit, qualityCsv: qualityCsv, EXIT_KIND: EXIT_KIND, EXIT_NOTE: EXIT_NOTE, COMPL_TXT: COMPL_TXT, positionEstimates: positionEstimates, csvCell: csvCell, toCsv: toCsv, botsCsv: botsCsv, opsCsv: opsCsv, dailyCsv: dailyCsv, roundsCsv: roundsCsv, buildHistory: buildHistory, tally: tally, accountOps: accountOps, accountRows: accountRows, filterRows: filterRows, sortRows: sortRows, capitalSplit: capitalSplit, capitalSplitAvg: capitalSplitAvg, roundsRows: roundsRows, dailyRows: dailyRows, maxDrawdown: maxDrawdown, walletStats: walletStats, aggregate: aggregate, kpis: kpis, liveEq: liveEq, liveWallet: liveWallet, liveSymbols: liveSymbols, COLORS: COLORS, PERIODS: PERIODS, MIN_GAP: MIN_GAP, parseModel: parseModel, series: series, dailySeries: dailySeries, value: value, gapThreshold: gapThreshold, split: split, clip: clip, periodWindow: periodWindow, logAllowed: logAllowed, median: median };
+  root.WalletsData = { periodResult: periodResult, nearestPoint: nearestPoint, proFilterRows: proFilterRows, accountDetail: accountDetail, proFilterOps: proFilterOps, proSortOps: proSortOps, opResultKind: opResultKind, proEntries: proEntries, proRanking: proRanking, proKpis: proKpis, proCaps: proCaps, PRO_EPS: PRO_EPS, parseArchiveIndex: parseArchiveIndex, neededSegments: neededSegments, parseArchiveSegment: parseArchiveSegment, cleanArchiveEvent: cleanArchiveEvent, accountStats: accountStats, completeness: completeness, roundsOf: roundsOf, roundOf: roundOf, execDetail: execDetail, cleanExit: cleanExit, qualityCsv: qualityCsv, EXIT_KIND: EXIT_KIND, EXIT_NOTE: EXIT_NOTE, COMPL_TXT: COMPL_TXT, positionEstimates: positionEstimates, csvCell: csvCell, toCsv: toCsv, botsCsv: botsCsv, opsCsv: opsCsv, dailyCsv: dailyCsv, roundsCsv: roundsCsv, buildHistory: buildHistory, tally: tally, accountOps: accountOps, accountRows: accountRows, filterRows: filterRows, sortRows: sortRows, capitalSplit: capitalSplit, capitalSplitAvg: capitalSplitAvg, roundsRows: roundsRows, dailyRows: dailyRows, maxDrawdown: maxDrawdown, walletStats: walletStats, aggregate: aggregate, kpis: kpis, liveEq: liveEq, liveWallet: liveWallet, liveSymbols: liveSymbols, COLORS: COLORS, PERIODS: PERIODS, MIN_GAP: MIN_GAP, parseModel: parseModel, series: series, dailySeries: dailySeries, value: value, gapThreshold: gapThreshold, split: split, clip: clip, periodWindow: periodWindow, logAllowed: logAllowed, median: median };
 })(typeof window !== "undefined" ? window : this);

@@ -217,6 +217,33 @@ def _():
     assert "feed" in names and names.index("simulation") < names.index("trader") < names.index("feed")
 
 
+@test("збірка Pages: у публічну копію не потрапляють *.prev.json, *.bad.json, *.tmp, а сегменти, index.json і робочі файли даних лишаються (виключення береться з workflow)")
+def _():
+    import fnmatch
+    import re
+    wf = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".github", "workflows", "update-data.yml"), encoding="utf-8").read()
+    line = [l for l in wf.splitlines() if l.strip().startswith("rsync ")][0]
+    ex = re.findall(r"--exclude '([^']+)'", line)
+    for pat in ("*.prev.json", "*.bad.json", "*.tmp"):
+        assert pat in ex, pat
+    # збереження в гілку data (git add -A) нічого не виключає: резервні файли мають лишатися там
+    save = wf[wf.index("Зберегти дані в гілку data"):wf.index("Зібрати сайт")]
+    assert "--exclude" not in save and "git add -A" in save
+    A.update([fe(1, ms(2026, 9, 10)), fe(2, ms(2026, 10, 10))])
+    A.update([fe(3, ms(2026, 10, 11))])                                     # з'явився .prev
+    d = os.path.join(TMP, "paper_archive")
+    for n in ("2026-10.bad.json", "2026-10.json.tmp"):
+        open(os.path.join(d, n), "w").write("x")
+    put("simulation.json", {"x": 1}); put("live_feed.prev.json", {"v": 1}); put("live_feed.json", {"v": 1})
+    kept = []
+    for root, dirs, files in os.walk(TMP):                                  # як rsync: шаблон без «/» зіставляється з ім'ям кожного файлу й папки
+        dirs[:] = [x for x in dirs if not any(fnmatch.fnmatch(x, p) for p in ex)]
+        kept += [os.path.relpath(os.path.join(root, f), TMP).replace(os.sep, "/") for f in files if not any(fnmatch.fnmatch(f, p) for p in ex)]
+    assert "paper_archive/index.json" in kept and "paper_archive/2026-09.json" in kept and "paper_archive/2026-10.json" in kept and "simulation.json" in kept and "live_feed.json" in kept, kept
+    assert not [k for k in kept if k.endswith((".prev.json", ".bad.json", ".tmp"))], kept
+    assert os.path.exists(os.path.join(d, "2026-10.prev.json")) and os.path.exists(os.path.join(d, "2026-10.bad.json"))     # на диску (а отже, у гілці data) вони є
+
+
 @test("не вигадує втрачене: події, що вже зникли з джерел, лишаються в архіві; відсутні не відновлюються")
 def _():
     A.update([fe(i, ms(2026, 10, 10, 10, i)) for i in range(5)])

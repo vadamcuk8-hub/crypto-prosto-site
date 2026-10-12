@@ -197,7 +197,23 @@ def explain(rule, side, ind, score, why=None):
            ("Оцінка сигналу піднялась до %d, вище −%d: обернене правило виходить (%s)." % (score, rule["exit"], parts))
 
 
-def make_event(rule, sym, side, c, k, scores, tstamp, ctx, now, eq, initial=False, w=None, why_info=None, exit_type=None):
+EXIT_NOTE = ("Програмна перевірка ціни (при запуску агента або на закритті свічки), а не біржовий стоп-ордер: "
+             "фактична ціна виходу може відрізнятися від заявленого порогу, виконання за порогом не гарантується.")
+
+
+def exit_info(rule, kind, entry, price, peak=None):
+    """Достовірність стоп-виходу: заявлений поріг, фактична ціна, фактичний рух від входу. Лише описує вихід, рішень не приймає."""
+    if kind not in ("stop", "take", "trail") or not entry or not price or rule.get(kind) is None:
+        return None
+    info = {"kind": kind, "threshold_pct": rule[kind], "entry": entry, "exit_price": price, "move_pct": round(100 * (price / entry - 1), 3),
+            "check": "software", "note": EXIT_NOTE}
+    if kind == "trail" and peak:
+        info["peak"] = peak
+        info["from_peak_pct"] = round(100 * (price / peak - 1), 3)
+    return info
+
+
+def make_event(rule, sym, side, c, k, scores, tstamp, ctx, now, eq, initial=False, w=None, why_info=None, exit_type=None, ex_info=None):
     ind = indicators(c[:k + 1])
     sc = scores[k] if scores[k] is not None else 0
     why = explain(rule, side, ind, sc, why_info)
@@ -211,6 +227,8 @@ def make_event(rule, sym, side, c, k, scores, tstamp, ctx, now, eq, initial=Fals
           "ctx": ctx.get(sym)}
     if side == "SELL":                             # достовірна причина виходу, відома коду рушія (stop, take, trail, trend, signal); інакше unknown. Лише дописується в журнал, рішень не змінює
         ev["exit"] = exit_type or "unknown"
+        if ex_info:
+            ev["exit_info"] = ex_info
     return ev
 
 
@@ -379,11 +397,12 @@ def setup_step(rule, sd, ptf, cost, ctx, events, now):
                 if co["pos"]:
                     ex = setup_exit(rule, co, c[k], None)
                     if ex:
+                        xi = exit_info(rule, ex[1], co["entry"], c[k], co.get("peak"))
                         cs = cost(sym, "SELL", w, co["eq"])
                         co["eq"] *= 1 - cs
                         co.update(pos=False, entry=None, peak=None, cool=now_ms + rule.get("cooldown_min", 30) * 60000)
                         sd["trades"] += 1
-                        evs = make_event(rule, sym, "SELL", c, k, scores, t, ctx, now, co["eq"], w=round(w, 4), why_info=("setup", ex[0]), exit_type=ex[1])
+                        evs = make_event(rule, sym, "SELL", c, k, scores, t, ctx, now, co["eq"], w=round(w, 4), why_info=("setup", ex[0]), exit_type=ex[1], ex_info=xi)
                         evs["cost"] = round(cs, 5)
                         events.setdefault(rule["id"], []).append(evs)
             # 2) жива ціна зараз: оцінюємо рахунок і, якщо умови зійшлись, діємо одразу
@@ -396,11 +415,12 @@ def setup_step(rule, sd, ptf, cost, ctx, events, now):
             if co["pos"]:
                 ex = setup_exit(rule, co, P, i15["sma50"])
                 if ex:
+                    xi = exit_info(rule, ex[1], co["entry"], P, co.get("peak"))
                     cs = cost(sym, "SELL", w, co["eq"])
                     co["eq"] *= 1 - cs
                     co.update(pos=False, entry=None, peak=None, cool=now_ms + rule.get("cooldown_min", 30) * 60000)
                     sd["trades"] += 1
-                    evs = make_event(rule, sym, "SELL", c, len(c) - 1, scores, t, ctx, now, co["eq"], w=round(w, 4), why_info=("setup", ex[0]), exit_type=ex[1])
+                    evs = make_event(rule, sym, "SELL", c, len(c) - 1, scores, t, ctx, now, co["eq"], w=round(w, 4), why_info=("setup", ex[0]), exit_type=ex[1], ex_info=xi)
                     evs["cost"] = round(cs, 5)
                     events.setdefault(rule["id"], []).append(evs)
             elif now_ms >= co.get("cool", 0):
@@ -460,7 +480,7 @@ def paper_update(ptf, kb, now, tag=""):
         series = ptf.get(rule["tf"], {})
         if not series:
             continue
-        sd = st["strategies"].setdefault(rule["id"], {"coins": {}, "curve": [], "trades": 0, "last": None})
+        sd = st["strategies"].setdefault(rule["id"], {"coins": {}, "curve": [], "trades": 0, "last": None, "hold_basis": "weights"})
         if rule["kind"] == "setup":                                 # сканер умов: рішення за живою ціною при кожному запуску
             res = setup_step(rule, sd, ptf, cost, ctx, events, now)
             if res:
@@ -527,14 +547,17 @@ def paper_update(ptf, kb, now, tag=""):
                             co["cool"] = rule.get("cooldown", 0)
                         sd["trades"] += 1
                         evn = make_event(rule, sym, "BUY" if want else "SELL", c, k, scores, t, ctx, now, eq_before if want else co["eq"], w=round(w, 4), why_info=info,
-                                         exit_type=None if want else (info[0] if info else "signal"))
+                                         exit_type=None if want else (info[0] if info else "signal"),
+                                         ex_info=exit_info(rule, info[0], info[1], c[k]) if info and not want else None)
                         evn["cost"] = round(cc, 5)
                         events.setdefault(rule["id"], []).append(evn)
                     co["t"] = t[k]
             sd["coins"][sym] = co
             base = co.get("sp") or c[closed]                       # до першої закритої свічки відлік іде від стартової ціни
             live = c[-1] / base                                   # поточна ціна відносно останнього закриття: оцінка «на зараз»
-            marks.append((w * co["eq"] * (live if co["pos"] else 1.0), co["hold"] * live / len(series)))
+            # «Просто тримати» з тими самими початковими вагами, що й у стратегії (рахунки, створені до виправлення, лишаються з рівними вагами до кінця раунду: крива не стрибає)
+            hold_part = co["hold"] * live * w if (sd.get("hold_basis") == "weights" and rule.get("sizing") == "vol") else co["hold"] * live / len(series)
+            marks.append((w * co["eq"] * (live if co["pos"] else 1.0), hold_part))
         if marks:
             eq = round(sum(m[0] for m in marks), 5)
             hold = round(sum(m[1] for m in marks), 5)

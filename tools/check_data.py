@@ -75,6 +75,24 @@ def check_agent(name, files, status):
     return problems
 
 
+def check_archive():
+    """Повний архів подій Paper Trading (data/paper_archive/): список проблем, порожній, якщо все гаразд."""
+    d = os.path.join(DATA, "paper_archive")
+    problems = []
+    try:
+        idx = load(os.path.join("paper_archive", "index"))
+    except (OSError, ValueError) as ex:
+        return ["немає або нечитабельний paper_archive/index.json: %s" % type(ex).__name__]
+    if not isinstance(idx.get("segments"), list) or idx.get("v") != 1:
+        problems.append("індекс архіву має невідомий формат")
+    if idx.get("size_warning"):
+        problems.append("архів виріс більше за ліміт (%.1f МБ): час обдумати стиснення старих сегментів" % (idx.get("bytes", 0) / 1e6))
+    bad = sorted(n for n in os.listdir(d) if n.endswith(".bad.json"))
+    if bad:
+        problems.append("відкладені пошкоджені сегменти: " + ", ".join(bad))
+    return problems
+
+
 def main():
     quiet = "--quiet" in sys.argv
     try:
@@ -90,6 +108,10 @@ def main():
         elif not quiet:
             last = status[name]["last_ok"]
             print("ok        %-12s оновлено %d хв тому" % (name, age_seconds(last) / 60))
+    arch_problems = check_archive()                                   # архів Paper Trading: індекс на місці, немає відкладених пошкоджених сегментів, розмір у межах
+    for p in arch_problems:
+        print("ПРОБЛЕМА  %-12s %s" % ("архів подій", p))
+    bad += bool(arch_problems)
     size = sum(os.path.getsize(os.path.join(p, f)) for p, _, fs in os.walk(DATA) for f in fs)
     print("Розмір папки data: %.1f МБ%s" % (size / 1e6, "  (забагато: перевірте історію й _store.json)" if size > MAX_DATA_MB * 1e6 else ""))
     bad += size > MAX_DATA_MB * 1e6

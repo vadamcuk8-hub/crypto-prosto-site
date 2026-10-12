@@ -151,11 +151,13 @@ def _():
     F.run()
     before = events()
     snap = tempfile.mkdtemp(prefix="branch_")
-    for n in os.listdir(TMP):
-        shutil.copy(os.path.join(TMP, n), os.path.join(snap, n))
+    def copy_all(src, dst):                         # як cp -a у workflow: файли й папки (data/paper_archive/)
+        for n in os.listdir(src):
+            p = os.path.join(src, n)
+            shutil.copytree(p, os.path.join(dst, n)) if os.path.isdir(p) else shutil.copy(p, os.path.join(dst, n))
+    copy_all(TMP, snap)
     reset()
-    for n in os.listdir(snap):
-        shutil.copy(os.path.join(snap, n), os.path.join(TMP, n))
+    copy_all(snap, TMP)
     F.run()
     assert events() == before
     shutil.rmtree(snap)

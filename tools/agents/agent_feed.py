@@ -15,6 +15,7 @@ import re
 import shutil
 from datetime import datetime, timezone
 
+from . import paper_archive
 from .common import DATA, load_knowledge, now_iso, write_json
 from .insights import item
 
@@ -127,6 +128,9 @@ def sim_events(kb, titles):
                     ev["initial"] = True                                  # позиція на старті раунду (не рішення посеред раунду): лишається в журналі для пар, але в стрічці не показується
                 if e["side"] == "SELL":
                     ev["exit"] = e.get("exit") if e.get("exit") in EXITS else "unknown"        # причину не вгадуємо: немає поля — unknown
+                    xi = e.get("exit_info")
+                    if isinstance(xi, dict) and xi.get("kind") in ("stop", "take", "trail") and _num(xi.get("threshold_pct")) and _num(xi.get("exit_price")) and _num(xi.get("move_pct")):
+                        ev["exit_info"] = {k: xi[k] for k in ("kind", "threshold_pct", "entry", "exit_price", "move_pct", "peak", "from_peak_pct", "check") if k in xi and (_num(xi[k]) or isinstance(xi[k], str))}                        # check="software": це програмна перевірка ціни, а не біржовий стоп-ордер (повний текст: EXIT_NOTE у agent_simulation.py)
                 out.append(ev)
     return out
 
@@ -237,7 +241,8 @@ def run():
 
     old, main_ok, recovered = read_journal()
     by_id = {e["id"]: e for e in old}                                            # події з журналу незмінні: нові дані їх не перезаписують
-    fresh = [e for e in sim_events(kb, titles) + testnet_events() if e["id"] not in by_id]
+    src_sim = sim_events(kb, titles)
+    fresh = [e for e in src_sim + testnet_events() if e["id"] not in by_id]
     seen = set()
     new = []
     for e in fresh:
@@ -266,7 +271,15 @@ def run():
         except OSError:
             pass
     write_json(JOURNAL + ".json", journal)
+    try:                                                                          # повний архів Paper Trading: збій архіву не повинен ламати живу стрічку
+        arch = paper_archive.update([e for e in events if e["source"] == "sim"] + src_sim)
+    except Exception as ex:   # noqa: BLE001
+        arch = {"error": (type(ex).__name__ + ": " + str(ex))[:120]}
     msg = "Журнал: %d подій (нових %d), відкритих віртуальних позицій %d." % (len(events), len(new), len(positions))
+    if arch.get("error"):
+        msg += " Архів подій: помилка (%s), жива стрічка працює." % arch["error"]
+    else:
+        msg += " Архів Paper Trading: %d подій у %d сегм. (нових %d)%s." % (arch["total"], arch["segments"], arch["added"], ", пошкоджені відкладено: " + ", ".join(arch["bad"]) if arch["bad"] else "")
     if recovered:
         msg += " Основний файл був пошкоджений: відновлено з попередньої копії."
     elif not main_ok and old == [] and not _read(JOURNAL + ".prev"):

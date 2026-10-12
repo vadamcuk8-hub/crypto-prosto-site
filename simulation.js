@@ -1543,6 +1543,16 @@
     let t;
     try { t = await loadJson("data/trader.json"); trader = t; } catch (e) { setup.replaceChildren(el("p", "muted", "Дані тестової біржі ще не створено.")); return; }
     setup.replaceChildren(); tiles.replaceChildren(); orders.replaceChildren();
+    if (Array.isArray(t.config_error) && t.config_error.length) {            // неправильні налаштування: агент нічого не торгує, пояснюємо чому
+      const bad = el("div", "agent-card");
+      bad.appendChild(el("h3", "agent-sub", "Тестова біржа зупинена: помилка налаштувань"));
+      const ul = el("ul", "steps");
+      t.config_error.slice(0, 6).forEach(function (x) { ul.appendChild(el("li", "", String(x).slice(0, 400))); });
+      bad.appendChild(ul);
+      bad.appendChild(el("p", "small", "Ордери не надсилаються, доки налаштування (knowledge/trader.json) не буде виправлено."));
+      setup.appendChild(bad);
+      return;
+    }
     if (!t.configured) {
       const box = el("div", "agent-card");
       box.appendChild(el("h3", "agent-sub", "Як увімкнути (безкоштовно, ненастоящі гроші)"));

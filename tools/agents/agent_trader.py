@@ -118,19 +118,92 @@ def reconcile(api, kb, wanted, balances, prices, steps, log, events=None):
     return done
 
 
+def wallet_view(paper, wallet):
+    """(дані паперового гаманця на wallet $, назва файлу його журналу подій) або (None, None), якщо такого гаманця немає.
+    Середній гаманець лежить у корені paper (журнал paper_events), решта: у paper["wallets"] (журнал paper_events_<сума>)."""
+    if not isinstance(paper, dict):
+        return None, None
+    accounts = [int(c) for c in paper.get("accounts") or []]
+    mid = accounts[min(1, len(accounts) - 1)] if accounts else None
+    nested = (paper.get("wallets") or {}).get(str(wallet))
+    if nested is not None and wallet != mid:
+        return nested, "paper_events_%d" % wallet
+    if wallet == mid:
+        return paper, "paper_events"
+    return None, None
+
+
+def validate_config(kb, sim):
+    """Перевірка відповідності налаштувань перед запуском. Повертає список зрозумілих повідомлень про помилки (порожній, якщо все гаразд).
+    Статичні перевірки роблять без даних симуляції; відповідність гаманця, правила й монет: коли дані симуляції вже є."""
+    errs = []
+    for key in ("wallet", "strategy", "coins", "allocation", "min_order_usdt", "base_url"):
+        if key not in kb:
+            errs.append("у knowledge/trader.json немає поля «%s»" % key)
+    if errs:
+        return errs
+    wallet, strategy, coins = kb["wallet"], kb["strategy"], kb["coins"]
+    if isinstance(wallet, bool) or not isinstance(wallet, int) or wallet <= 0:
+        errs.append("«wallet» має бути сумою гаманця в доларах (ціле число, наприклад 100), а не %r" % (wallet,))
+    if not isinstance(strategy, str) or not strategy:
+        errs.append("«strategy» має бути id правила з knowledge/simulation.json")
+    if not isinstance(coins, list) or not coins or not all(isinstance(c, str) and c for c in coins):
+        errs.append("«coins» має бути непорожнім списком монет, наприклад [\"BTC\", \"ETH\"]")
+    elif len(set(coins)) != len(coins):
+        errs.append("у «coins» є повтори монет: %s" % ", ".join(sorted(c for c in set(coins) if coins.count(c) > 1)))
+    alloc = kb["allocation"]
+    if isinstance(alloc, bool) or not isinstance(alloc, (int, float)) or not 0 < alloc <= 1:
+        errs.append("«allocation» має бути від 0 (виключно) до 1, а не %r" % (alloc,))
+    mo = kb["min_order_usdt"]
+    if isinstance(mo, bool) or not isinstance(mo, (int, float)) or mo <= 0:
+        errs.append("«min_order_usdt» має бути додатним числом, а не %r" % (mo,))
+    try:
+        host = urllib.parse.urlparse(str(kb["base_url"])).hostname
+    except ValueError:
+        host = None
+    if host != ALLOWED_HOST:
+        errs.append("«base_url» має вести лише на %s (тестова біржа), а не на %s" % (ALLOWED_HOST, host))
+    if errs or not isinstance(sim, dict) or not isinstance(sim.get("paper"), dict):
+        return errs
+    view, _events = wallet_view(sim["paper"], wallet)
+    accounts = [int(c) for c in sim["paper"].get("accounts") or []]
+    if view is None:
+        return ["гаманця на %s $ немає в симуляції (є: %s). Змініть «wallet» у knowledge/trader.json" % (wallet, ", ".join("%d $" % c for c in accounts) or "жодного")]
+    strategies = view.get("strategies") or {}
+    if strategy not in strategies:
+        errs.append("правила «%s» немає серед рахунків гаманця %d $ (є: %s)" % (strategy, wallet, ", ".join(sorted(strategies)) or "жодного"))
+        return errs
+    own = ((sim["paper"].get("wallet_coins") or {}).get(str(wallet))) or sorted((strategies[strategy].get("state") or {}).keys())
+    foreign = [c for c in coins if c not in own]
+    if foreign:
+        errs.append("монети %s не належать гаманцю %d $ (його монети: %s): стан правила для них недоступний, ордери не надсилаються. Змініть «coins» або «wallet»"
+                    % (", ".join(foreign), wallet, ", ".join(own)))
+    state = strategies[strategy].get("state") or {}
+    nostate = [c for c in coins if c in own and c not in state]
+    if nostate:
+        errs.append("для монет %s ще немає стану правила «%s» у гаманці %d $" % (", ".join(nostate), strategy, wallet))
+    return errs
+
+
 def run(api_factory=Api):
     kb = load_knowledge(NAME)
     key, secret = os.environ.get("BINANCE_TESTNET_API_KEY", "").strip(), os.environ.get("BINANCE_TESTNET_API_SECRET", "").strip()
     sim = load("simulation")
-    result = {"configured": bool(key and secret), "strategy": kb["strategy"], "coins": kb["coins"], "base": kb["base_url"], "updated": now_iso()}
+    result = {"configured": bool(key and secret), "wallet": kb.get("wallet"), "strategy": kb.get("strategy"), "coins": kb.get("coins"), "base": kb.get("base_url"), "updated": now_iso()}
+    errors = validate_config(kb, sim)
+    if errors:                                  # неправильна конфігурація: жодних запитів до біржі й жодних ордерів
+        result["config_error"] = errors
+        result["insights"] = [item("negative", "Помилка конфігурації тестової біржі, ордери не надсилаються: " + "; ".join(errors) + ".")]
+        return result
     if not (key and secret):
         result["insights"] = [item("neutral", "Тестова торгівля вимкнена: немає ключів Binance Testnet. Це ненастоящі гроші: отримайте безкоштовні ключі на testnet.binance.vision і додайте їх секретами BINANCE_TESTNET_API_KEY та BINANCE_TESTNET_API_SECRET.")]
         return result
-    if not sim or kb["strategy"] not in sim["paper"]["strategies"]:
-        raise RuntimeError("агент «Симуляція» ще не дав рішень для правила «%s»" % kb["strategy"])
+    if not sim or not isinstance(sim.get("paper"), dict):
+        raise RuntimeError("агент «Симуляція» ще не дав даних паперового рахунку")
+    view, events_file = wallet_view(sim["paper"], kb["wallet"])
 
     api = api_factory(kb["base_url"], key, secret)
-    state = sim["paper"]["strategies"][kb["strategy"]]["state"]
+    state = view["strategies"][kb["strategy"]]["state"]
     wanted = {c: bool(state[c][0]) for c in kb["coins"] if c in state}
 
     acct = api.call("GET", "/api/v3/account", signed=True)
@@ -146,7 +219,7 @@ def run(api_factory=Api):
             continue
 
     log = load(LOG) or []
-    done = reconcile(api, kb, wanted, balances, prices, steps, log, load("paper_events"))
+    done = reconcile(api, kb, wanted, balances, prices, steps, log, load(events_file))
     for d in done:
         d["t"] = now_iso()
     log = (log + done)[-kb["log_size"]:]
@@ -161,7 +234,7 @@ def run(api_factory=Api):
         st = {"start_equity": equity, "since": now_iso()}
     st["last_equity"] = equity
     write_state(NAME, st)
-    paper_eq = sim["paper"]["strategies"][kb["strategy"]]["eq"]
+    paper_eq = view["strategies"][kb["strategy"]]["eq"]
     result.update({
         "equity": round(equity, 2), "start_equity": round(st["start_equity"], 2), "since": st["since"],
         "ret": round(100 * (equity / st["start_equity"] - 1), 3), "paper_ret": round(100 * (paper_eq - 1), 3),

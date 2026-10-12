@@ -137,6 +137,7 @@
       picks.forEach(function (e, i) { const row = rows.filter(function (x) { return x.wallet === c && x.bot === e.bot; })[0]; if (row && row.pr && row.pr.status === "ok" && row.pr.series.length >= 20) series.push({ bot: e.bot, title: e.title, color: COLORS[i % COLORS.length], pts: row.pr.series.map(function (p) { return [p.t, (p.eq / row.pr.eq0 - 1) * 100]; }) }); });
       return { cap: c, series: series, ok: series.length > 0, reason: series.length ? "" : "недостатньо збережених точок (потрібно щонайменше 20)" };
     });
+    rep.analysis = prm.kind === "detailed" ? analysis(model, ops, comp0, norm, per, prm) : null;
     rep.tables = tables(model, rep, norm);
     return rep;
   }
@@ -181,6 +182,32 @@
     T.fees = { id: "fees", title: "Комісії та торгові витрати", columns: [{ key: "wallet", title: "Гаманець", type: "text" }, { key: "fee", title: "Комісії й проковзання (відомі), $", type: "usd" }, { key: "accounts", title: "Рахунків із даними про витрати", type: "int" }, { key: "missing", title: "Операцій без даних про витрати", type: "int" }],
       rows: norm.selectedCaps.map(function (c) { const rs = rep.rows.filter(function (r) { return r.wallet === c && r.hasData; }), known = rs.filter(function (r) { return r.feeUsd !== null; }); return { wallet: capTxt(c), fee: known.length ? known.reduce(function (a, r) { return a + r.feeUsd; }, 0) : null, accounts: known.length, missing: rs.reduce(function (a, r) { return a + (r.feeMissing || 0); }, 0) }; }),
       note: "Комісія біржі й проковзання моделі за підтвердженими операціями поточного раунду в періоді; якщо для події немає даних про витрати, вона не входить у суму (лічильник «без даних»). Сума — по незалежних рахунках одного гаманця, не результат спільного портфеля." };
+    if (rep.analysis) {
+      const an = rep.analysis, c = an.compare, titleOf2 = function (id) { return titles[id] || id; };
+      const sgnD = function (a, b) { return a === null || b === null || a === undefined || b === undefined ? null : a - b; };
+      T.dynamics = { id: "dynamics", title: "Динаміка результативності стратегій (кожен гаманець окремо)", columns: [{ key: "title", title: "Стратегія", type: "text" }, { key: "wallet", title: "Гаманець", type: "text" }, { key: "from", title: "Початок (UTC)", type: "dt" }, { key: "to", title: "Кінець (UTC)", type: "dt" }, { key: "pct", title: "Зміна результату, %", type: "pct" }, { key: "usd", title: "Зміна результату, $", type: "usd" }, { key: "dd", title: "Макс. просідання", type: "dd" }, { key: "ddPrev", title: "Просідання попереднього періоду", type: "dd" }, { key: "ddChange", title: "Зміна просідання, в.п.", type: "pct" },
+        { key: "ops", title: "Операцій за період", type: "int" }, { key: "hold", title: "Buy & Hold, %", type: "pct" }, { key: "vsHold", title: "Різниця зі Buy & Hold, в.п.", type: "pct" }, { key: "r1", title: "Останні 1 год, %", type: "pct" }, { key: "r6", title: "Останні 6 год, %", type: "pct" }, { key: "r24", title: "Останні 24 год, %", type: "pct" }, { key: "note", title: "Примітка", type: "text" }],
+        rows: an.dynamics.map(function (p) { const notes = []; if (p.status !== "ok") notes.push("немає даних: " + (p.reason || "недостатньо точок equity")); else { if (p.coverage === "partial") notes.push("період скорочено до початку даних"); if (p.ddChange === null && p.ddReason) notes.push("зміна просідання: " + p.ddReason); if (p.vsHold === null && p.holdReason) notes.push("Buy & Hold: " + p.holdReason); }
+          const rc = function (i) { return p.recent && p.recent[i] ? p.recent[i].pct : null; };
+          return { title: titleOf2(p.bot), wallet: capTxt(p.cap), from: p.start === undefined ? null : p.start, to: p.end === undefined ? null : p.end, pct: p.status === "ok" ? p.pct : null, usd: p.status === "ok" ? p.usd : null, dd: p.status === "ok" ? p.dd : null, ddPrev: p.ddPrev, ddChange: p.ddChange, ops: p.status === "ok" ? p.opsCount : null, hold: p.holdPct, vsHold: p.vsHold, r1: rc(0), r6: rc(1), r24: rc(2), note: notes.join("; ") }; }),
+        note: "Зміна результату — за збереженими точками кривої equity кожного рахунку окремо (спільної кривої трьох гаманців немає). Просідання попереднього періоду й зміна просідання — лише за повних даних обох періодів. Buy & Hold — лише коли є базові дані для всіх точок періоду. Порожнє значення означає «немає даних», а не нуль." };
+      const status = !c || c.errors.length ? "недоступне" : !c.allowed ? "недоступне" : c.comparableAccounts < c.accounts.length ? "частково доступне (" + c.comparableAccounts + " із " + c.accounts.length + " рахунків)" : "доступне";
+      const nrows = [{ k: "Статус порівняння", v: status }];
+      if (c && c.windows) { nrows.push({ k: "Поточний період (A)", v: c.windows.a.text }); nrows.push({ k: "Попередній період (B)", v: c.windows.b.text }); }
+      if (c && c.allowed) nrows.push({ k: "Зміна місць", v: c.rankComparable ? "порівнюється: правила рейтингу однакові в обох періодах (" + (prm.wallet === "" ? "середня дохідність % трьох незалежних рахунків" : "дохідність % вибраного гаманця") + "), боти без угод не входять" : "не порівнюється: " + c.rankReason });
+      an.unavailable.forEach(function (t) { nrows.push({ k: "Пояснення", v: t }); }); if (c) c.notes.forEach(function (t) { nrows.push({ k: "Примітка", v: t }); });
+      T.cmpnotes = { id: "cmpnotes", title: "Порівняння періодів: доступність і пояснення", columns: [{ key: "k", title: "Показник", type: "text" }, { key: "v", title: "Значення", type: "text" }], rows: nrows };
+      const ok = c && c.allowed;
+      T.cmpsum = { id: "cmpsum", title: "Порівняння періодів за гаманцями (лише порівнянні рахунки)", columns: [{ key: "wallet", title: "Гаманець", type: "text" }, { key: "accounts", title: "Порівнянних рахунків", type: "int" }, { key: "pctA", title: "Сер. дохідність A, %", type: "pct" }, { key: "pctB", title: "Сер. дохідність B, %", type: "pct" }, { key: "delta", title: "Зміна, в.п.", type: "pct" }, { key: "ddA", title: "Сер. просідання A", type: "dd" }, { key: "ddB", title: "Сер. просідання B", type: "dd" }, { key: "opsA", title: "Операцій A", type: "int" }, { key: "opsB", title: "Операцій B", type: "int" }],
+        rows: ok ? c.summary.map(function (s) { return { wallet: capTxt(s.wallet), accounts: s.accounts, pctA: s.pctA, pctB: s.pctB, delta: sgnD(s.pctA, s.pctB), ddA: s.ddA, ddB: s.ddB, opsA: s.opsA, opsB: s.opsB }; }) : [],
+        note: "Середнє — просте середнє порівнянних рахунків одного гаманця; це статистика, а не результат спільного портфеля." };
+      T.compare = { id: "compare", title: "Порівняння періодів за рахунками", columns: [{ key: "title", title: "Стратегія", type: "text" }, { key: "wallet", title: "Гаманець", type: "text" }, { key: "pctA", title: "A, %", type: "pct" }, { key: "pctB", title: "B, %", type: "pct" }, { key: "dPct", title: "Зміна, в.п.", type: "pct" }, { key: "usdA", title: "A, $", type: "usd" }, { key: "usdB", title: "B, $", type: "usd" }, { key: "ddA", title: "Просідання A", type: "dd" }, { key: "ddB", title: "Просідання B", type: "dd" }, { key: "opsA", title: "Операцій A", type: "int" }, { key: "opsB", title: "Операцій B", type: "int" }, { key: "small", title: "Мала вибірка", type: "text" }, { key: "state", title: "Порівнянний", type: "text" }, { key: "reason", title: "Причина", type: "text" }],
+        rows: c && c.accounts ? c.accounts.map(function (a) { const k = a.comparable; return { title: a.title, wallet: capTxt(a.wallet), pctA: k ? a.a.pct : null, pctB: k ? a.b.pct : null, dPct: k ? a.delta.pct : null, usdA: k ? a.a.usd : null, usdB: k ? a.b.usd : null, ddA: k ? a.a.dd : null, ddB: k ? a.b.dd : null, opsA: k ? a.a.ops : null, opsB: k ? a.b.ops : null, small: k ? (a.a.smallSample || a.b.smallSample ? "так" : "ні") : null, state: k ? "так" : "ні", reason: a.reason }; }) : [],
+        note: "Рахунок порівнюється лише коли в обох періодах є збережені точки equity на межах, період не скорочено до початку раунду й у вікні достатньо точок. Відсутні точки не інтерполюються, раунди не змішуються. Якщо порівняння неможливе, показано причину, а не нульовий результат." };
+      T.rankchg = { id: "rankchg", title: "Зміна місць стратегій у рейтингу", columns: [{ key: "title", title: "Стратегія", type: "text" }, { key: "rankA", title: "Місце A", type: "text" }, { key: "rankB", title: "Місце B", type: "text" }, { key: "change", title: "Зміна", type: "text" }, { key: "pctA", title: "Дохідність A, %", type: "pct" }, { key: "pctB", title: "Дохідність B, %", type: "pct" }, { key: "reason", title: "Причина", type: "text" }],
+        rows: ok ? c.strategies.map(function (s) { const rk = c.rankComparable; return { title: s.title, rankA: rk && s.rankA !== null ? (s.tieA ? "=" : "") + s.rankA : null, rankB: rk && s.rankB !== null ? (s.tieB ? "=" : "") + s.rankB : null, change: (s.change === "up" ? "▲ " : s.change === "down" ? "▼ " : s.change === "same" ? "= " : "? ") + CHG_TXT[s.change], pctA: s.pctA, pctB: s.pctB, reason: !rk && s.change === "insufficient" ? "місця не порівнюються (причина — у таблиці доступності порівняння)" : s.reason }; }) : [],
+        note: "Місця в обох періодах визначаються за однаковими правилами (боти без угод не входять; рівні значення ділять місце). Якщо склад стратегій або повнота даних у періодах різні, місця не порівнюються." };
+    }
     // операції
     const ocols = [{ key: "t", title: "Час (UTC)", type: "dt" }, { key: "title", title: "Стратегія", type: "text" }, { key: "wallet", title: "Гаманець", type: "text" }, { key: "coin", title: "Монета", type: "text" }, { key: "side", title: "Операція", type: "text" }, { key: "price", title: "Ціна, USDT", type: "price" }, { key: "vol", title: "Обсяг, $", type: "usd" }, { key: "qty", title: "Кількість", type: "num6" },
       { key: "fee", title: "Комісія й проковзання, $", type: "usd" }, { key: "pnl", title: "Результат, $", type: "usd" }, { key: "pnlPct", title: "Результат, %", type: "pct" }, { key: "exit", title: "Причина виходу", type: "text" }, { key: "round", title: "Раунд", type: "text" }, { key: "compl", title: "Повнота рахунку в раунді", type: "text" }, { key: "src", title: "Джерело", type: "text" }];
@@ -293,9 +320,9 @@
     const mp = prevPer ? makeRows(model, ops, comp0, norm, prevPer) : null;
     norm.selectedCaps.forEach(function (cap) {
       const row = mr.rows.filter(function (r) { return r.wallet === cap && r.bot === rule.id; })[0]; if (!row) return;
-      const panel = { tim: row.timeInMarket, timReason: row.timeInMarket === null ? "історія операцій рахунку в раунді неповна (немає доказу повноти) або період поза раундом" : "", cap: cap, bot: rule.id, title: rule.title, status: row.hasData ? "ok" : "nodata", reason: row.reason, coverage: row.coverage, pct: row.resultPct, usd: row.resultUsd, dd: row.dd, opsCount: row.opsInPeriod, closed: row.status === "insufficient" ? null : row.closed, wins: row.wins, losses: row.losses, realized: row.realized, feeUsd: row.feeUsd, smallSample: row.smallSample, complStatus: row.status, series: null, hold: null, holdReason: "", holdPct: null, vsHold: null, recent: [], ddPrev: null, ddChange: null, ddReason: "" };
+      const panel = { tim: row.timeInMarket, timReason: row.timeInMarket === null ? "історія операцій рахунку в раунді неповна (немає доказу повноти) або період поза раундом" : "", cap: cap, bot: rule.id, title: rule.title, status: row.hasData ? "ok" : "nodata", reason: row.reason, coverage: row.coverage, pct: row.resultPct, usd: row.resultUsd, dd: row.dd, opsCount: row.opsInPeriod, closed: row.status === "insufficient" ? null : row.closed, wins: row.wins, losses: row.losses, realized: row.realized, feeUsd: row.feeUsd, smallSample: row.smallSample, complStatus: row.status, start: null, end: null, series: null, hold: null, holdReason: "", holdPct: null, vsHold: null, recent: [], ddPrev: null, ddChange: null, ddReason: "" };
       if (row.hasData) {
-        const pr = row.pr, pts = pr.series, hold0 = pr.basis === "deposit" ? 1 : (pts[0] ? pts[0].hold : null);
+        const pr = row.pr, pts = pr.series; panel.start = pr.startT; panel.end = pr.endT; const hold0 = pr.basis === "deposit" ? 1 : (pts[0] ? pts[0].hold : null);
         panel.series = { pct: pts.map(function (p) { return [p.t, (p.eq / pr.eq0 - 1) * 100]; }), usd: pts.map(function (p) { return [p.t, cap * (p.eq - pr.eq0)]; }) };
         if (pts.length && num(hold0) && pts.every(function (p) { return num(p.hold); })) { panel.hold = pts.map(function (p) { return [p.t, (p.hold / hold0 - 1) * 100]; }); panel.holdPct = panel.hold[panel.hold.length - 1][1]; panel.vsHold = panel.pct - panel.holdPct; }
         else panel.holdReason = "немає базових даних Buy & Hold для всіх точок періоду";
@@ -306,6 +333,27 @@
       }
       out.panels.push(panel);
     });
+    return out;
+  }
+
+
+  // ---------- аналітика для детальних звітів: динаміка, порівняння періодів, зміна місць (ті самі функції compare/dynamics, що й в інтерфейсі) ----------
+  const CHG_TXT = { up: "піднялась", down: "опустилась", same: "без змін", insufficient: "недостатньо даних" };
+  function analysis(model, ops, comp0, norm, per, prm) {
+    const out = { dynamics: [], compare: null, label: per.label, unavailable: [], windowsText: "" }, wal = prm.wallet === "" ? undefined : prm.wallet;
+    const custom = per.from !== null && per.to !== null && per.to > per.from;
+    norm.selectedRules.forEach(function (r) {
+      const d = dynamics(model, ops, comp0, { bot: r.id, wallet: wal, period: custom ? "custom" : "all", from: custom ? per.from : undefined, to: custom ? per.to : undefined });
+      if (d.errors.length) { out.unavailable.push("Динаміка «" + r.title + "» недоступна: " + d.errors.join(" ")); return; }
+      d.panels.forEach(function (p) { out.dynamics.push(p); });
+    });
+    if (!custom) out.unavailable.push("Порівняння з попереднім періодом недоступне для періоду «" + per.label + "»: у «увесь доступний період» попереднього періоду немає. Оберіть 24 години, 7 днів, 30 днів або власний діапазон.");
+    else {
+      const len = per.to - per.from, c = compare(model, ops, comp0, { mode: "custom", wallet: wal, bots: prm.bots || undefined, a: { from: per.from, to: per.to }, b: { from: per.from - len, to: per.from }, metric: "pct", idle: false });
+      out.compare = c; out.windowsText = c.windows ? "A: " + c.windows.a.text + "; B: " + c.windows.b.text : "";
+      if (c.errors.length) out.unavailable.push("Порівняння недоступне: " + c.errors.join(" "));
+      else { c.reasons.forEach(function (t) { out.unavailable.push(t); }); }
+    }
     return out;
   }
 

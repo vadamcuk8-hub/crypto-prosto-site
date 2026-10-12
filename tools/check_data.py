@@ -99,7 +99,8 @@ def main():
         status = load("agents").get("agents", {})
     except (OSError, ValueError):
         status = {}
-    bad = 0
+    bad = 0          # агенти з проблемами (з len(CHECKS))
+    extra_bad = 0    # додаткові перевірки з проблемами (архів, розмір data)
     for name, files in CHECKS.items():
         problems = check_agent(name, files, status.get(name))
         bad += bool(problems)
@@ -111,12 +112,13 @@ def main():
     arch_problems = check_archive()                                   # архів Paper Trading: індекс на місці, немає відкладених пошкоджених сегментів, розмір у межах
     for p in arch_problems:
         print("ПРОБЛЕМА  %-12s %s" % ("архів подій", p))
-    bad += bool(arch_problems)
+    extra_bad += bool(arch_problems)
     size = sum(os.path.getsize(os.path.join(p, f)) for p, _, fs in os.walk(DATA) for f in fs)
     print("Розмір папки data: %.1f МБ%s" % (size / 1e6, "  (забагато: перевірте історію й _store.json)" if size > MAX_DATA_MB * 1e6 else ""))
-    bad += size > MAX_DATA_MB * 1e6
+    extra_bad += size > MAX_DATA_MB * 1e6
     print("Агентів з проблемами: %d з %d" % (bad, len(CHECKS)))
-    sys.exit(1 if bad else 0)
+    print("Додаткових перевірок з проблемами: %d з 2 (архів подій, розмір data)" % extra_bad)
+    sys.exit(1 if bad or extra_bad else 0)
 
 
 if __name__ == "__main__":

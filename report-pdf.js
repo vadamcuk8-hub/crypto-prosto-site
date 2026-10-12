@@ -253,14 +253,33 @@
       if (!charts.length) doc.paragraph("Графіки не побудовано: недостатньо збережених точок (потрібно щонайменше 20 на рахунок).", 9); charts.forEach(function (c) { doc.chart("Гаманець " + ReportCoreCap(c.cap) + ": дохідність від початку періоду, %", c.series.map(function (s) { return { title: s.title.length > 42 ? s.title.slice(0, 41) + "…" : s.title, color: s.color, pts: s.pts }; })); });
       rep.charts.filter(function (c) { return !c.ok; }).forEach(function (c) { doc.paragraph("Гаманець " + ReportCoreCap(c.cap) + ": графік не побудовано — " + c.reason + ".", 8, { color: "#5B6573" }); });
       await progress(0.6);
-      doc.heading("6. Історія торгових операцій", 1);
+      if (T.dynamics) {
+        doc.heading("6. Динаміка результативності стратегій", 1);
+        doc.table([{ title: "Стратегія", w: 2.7, get: function (r) { return r.title; } }, { title: "Гаманець", w: 0.9, get: function (r) { return r.wallet; } }, { title: "Результат", w: 0.9, align: "right", get: function (r) { return pct(r.pct); }, color: function (r) { return r.pct === null ? null : tone(r.pct); } }, { title: "Результат $", w: 0.95, align: "right", get: function (r) { return r.usd === null ? "—" : usd(r.usd); }, color: function (r) { return r.usd === null ? null : tone(r.usd); } }, { title: "Просід.", w: 0.8, align: "right", get: function (r) { return ddTxt(r.dd); } }, { title: "Зміна просід.", w: 0.9, align: "right", get: function (r) { return r.ddChange === null ? "—" : fmtNum(r.ddChange, 2) + " в.п."; } }, { title: "Опер.", w: 0.6, align: "right", get: function (r) { return r.ops === null ? "—" : r.ops; } }, { title: "Buy & Hold", w: 0.9, align: "right", get: function (r) { return pct(r.hold); } }, { title: "Примітка", w: 2.2, get: function (r) { return r.note; } }], T.dynamics.rows, { size: 6.8 });
+        doc.paragraph(T.dynamics.note, 7.5, { color: "#5B6573" });
+        await progress(0.55);
+        doc.heading("7. Порівняння періодів і зміна місць", 1);
+        T.cmpnotes.rows.forEach(function (r) { doc.paragraph((r.k === "Пояснення" ? "▲ " : "• ") + r.k + ": " + r.v, 8, { indent: 6, after: 2, color: r.k === "Пояснення" ? "#8A5A00" : "#1E2329" }); });
+        if (T.cmpsum.rows.length) {
+          doc.heading("Гаманці: поточний період проти попереднього", 2);
+          doc.table([{ title: "Гаманець", w: 1.1, get: function (r) { return r.wallet; } }, { title: "Рахунків", w: 0.8, align: "right", get: function (r) { return r.accounts; } }, { title: "A, %", w: 1, align: "right", get: function (r) { return pct(r.pctA); }, color: function (r) { return r.pctA === null ? null : tone(r.pctA); } }, { title: "B, %", w: 1, align: "right", get: function (r) { return pct(r.pctB); }, color: function (r) { return r.pctB === null ? null : tone(r.pctB); } }, { title: "Зміна, в.п.", w: 1, align: "right", get: function (r) { return r.delta === null ? "—" : fmtNum(r.delta, 2); } }, { title: "Просідання A / B", w: 1.6, align: "right", get: function (r) { return ddTxt(r.ddA) + " / " + ddTxt(r.ddB); } }, { title: "Операцій A / B", w: 1.2, align: "right", get: function (r) { return r.opsA + " / " + r.opsB; } }], T.cmpsum.rows);
+          doc.paragraph(T.cmpsum.note, 7.5, { color: "#5B6573" });
+          doc.heading("Зміна місць стратегій", 2);
+          doc.table([{ title: "Стратегія", w: 3.4, get: function (r) { return r.title; } }, { title: "Місце A", w: 0.8, align: "right", get: function (r) { return r.rankA === null ? "—" : r.rankA; } }, { title: "Місце B", w: 0.8, align: "right", get: function (r) { return r.rankB === null ? "—" : r.rankB; } }, { title: "Зміна", w: 1.6, get: function (r) { return r.change; } }, { title: "Причина", w: 2.4, get: function (r) { return r.reason; } }], T.rankchg.rows, { size: 7 });
+          doc.paragraph(T.rankchg.note, 7.5, { color: "#5B6573" });
+          doc.heading("Рахунки: порівнянні та ні", 2);
+          doc.table([{ title: "Стратегія", w: 2.7, get: function (r) { return r.title; } }, { title: "Гаманець", w: 0.9, get: function (r) { return r.wallet; } }, { title: "A, %", w: 0.8, align: "right", get: function (r) { return pct(r.pctA); }, color: function (r) { return r.pctA === null ? null : tone(r.pctA); } }, { title: "B, %", w: 0.8, align: "right", get: function (r) { return pct(r.pctB); }, color: function (r) { return r.pctB === null ? null : tone(r.pctB); } }, { title: "Зміна", w: 0.8, align: "right", get: function (r) { return r.dPct === null ? "—" : fmtNum(r.dPct, 2); } }, { title: "Опер. A / B", w: 0.9, align: "right", get: function (r) { return r.opsA === null ? "—" : r.opsA + " / " + r.opsB; } }, { title: "Примітка", w: 2.2, get: function (r) { return r.reason; } }], T.compare.rows, { size: 6.8 });
+          doc.paragraph(T.compare.note, 7.5, { color: "#5B6573" });
+        }
+      }
+      doc.heading("8. Історія торгових операцій", 1);
       doc.paragraph(T.ops.note, 8, { color: "#5B6573" });
       const rows = T.ops.rows;
       const oc = [{ title: "Час (UTC)", w: 1.05, get: function (r) { return dtTxt(r.t); } }, { title: "Стратегія", w: 2.7, get: function (r) { return r.title; } }, { title: "Гаманець", w: 0.9, get: function (r) { return r.wallet; } }, { title: "Монета", w: 0.65, get: function (r) { return r.coin; } }, { title: "Операція", w: 1, get: function (r) { return r.side; } }, { title: "Ціна", w: 0.9, align: "right", get: function (r) { return fmtNum(r.price, r.price >= 100 ? 2 : 4); } }, { title: "Результат", w: 1.1, align: "right", get: function (r) { return r.pnl === null ? "—" : usd(r.pnl); }, color: function (r) { return r.pnl === null ? null : tone(r.pnl); } }, { title: "Причина виходу", w: 1.3, get: function (r) { return r.exit; } }];
       const CH = 200; for (let i = 0; i < rows.length; i += CH) { if (i === 0) doc.table(oc, rows.slice(0, CH), { size: 6.8 }); else doc.table(oc, rows.slice(i, i + CH), { size: 6.8 }); await progress(0.6 + 0.2 * Math.min(1, i / rows.length)); await tick(); }
       if (!rows.length) doc.paragraph("Підтверджених операцій у вибраному періоді немає.", 9);
     }
-    doc.heading((P.kind === "detailed" ? "7" : "4") + ". Пояснення обмежень даних", 1);
+    doc.heading((P.kind === "detailed" ? "9" : "4") + ". Пояснення обмежень даних", 1);
     T.limits.rows.forEach(function (r) { doc.paragraph((r.k === "Попередження" ? "▲ " : "• ") + r.v, 8, { indent: 6, after: 2, color: r.k === "Попередження" ? "#8A5A00" : "#1E2329" }); });
     if (P.kind === "detailed") { doc.heading("Джерела даних", 2); T.sources.rows.forEach(function (r) { doc.paragraph(r.k + ": " + r.v, 8, { indent: 6, after: 1 }); }); }
     // колонтитули

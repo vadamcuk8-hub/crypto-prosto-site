@@ -3,3 +3,4 @@ data-local/
 __pycache__/
 *.pyc
 .claude/
+report-samples/

@@ -36,7 +36,7 @@
     const lines = [head].concat(table.rows.map(function (r) { return cols.map(function (c) { return csvCell(csvValue(c, r[c.key])); }).join(";"); }));
     return "﻿" + lines.join("\r\n") + "\r\n";
   }
-  const CSV_FILES = [["meta", "01_parametry.csv"], ["wallets", "02_gamantsi.csv"], ["ranking", "03_reiting_stratehii.csv"], ["accounts", "04_rakhunky.csv"], ["ops", "05_torhovi_operatsii.csv"], ["risks", "06_ryzyky.csv"], ["fees", "07_komisii.csv"], ["limits", "08_obmezhennia.csv"], ["sources", "09_dzherela.csv"]];
+  const CSV_FILES = [["meta", "01_parametry.csv"], ["wallets", "02_gamantsi.csv"], ["ranking", "03_reiting_stratehii.csv"], ["accounts", "04_rakhunky.csv"], ["ops", "05_torhovi_operatsii.csv"], ["risks", "06_ryzyky.csv"], ["fees", "07_komisii.csv"], ["limits", "08_obmezhennia.csv"], ["sources", "09_dzherela.csv"], ["dynamics", "10_dynamika_stratehii.csv"], ["compare", "11_porivnyannia_rakhunky.csv"], ["cmpsum", "12_porivnyannia_hamantsi.csv"], ["rankchg", "13_zmina_mists.csv"], ["cmpnotes", "14_poiasnennia_porivnyannia.csv"]];
   function csvFiles(rep) {
     const out = []; CSV_FILES.forEach(function (f) { const t = rep.tables[f[0]]; if (!t) return; if (f[0] === "ops" && rep.params.kind !== "detailed") return; out.push({ name: f[1], text: tableCsv(t) }); });
     return out;
@@ -163,6 +163,10 @@
     s.push({ name: "Рахунки", blocks: [{ kind: "table", table: T.accounts, filter: true }, { kind: "blank" }, { kind: "note", text: T.accounts.note, span: 12 }] });
     s.push({ name: "Торгові операції", blocks: p.kind === "detailed" ? [{ kind: "table", table: T.ops, filter: true }, { kind: "blank" }, { kind: "note", text: T.ops.note, span: 10 }] : [{ kind: "note", text: "У короткому звіті перелік операцій не включено. Оберіть тип «детальний», щоб додати операції.", span: 8 }] });
     s.push({ name: "Ризики", blocks: [{ kind: "table", table: T.risks, filter: true }, { kind: "blank" }, { kind: "note", text: T.risks.note, span: 10 }, { kind: "blank" }, { kind: "title", text: T.fees.title }, { kind: "table", table: T.fees }, { kind: "note", text: T.fees.note, span: 8 }] });
+    if (T.dynamics) {
+      s.push({ name: "Динаміка", blocks: [{ kind: "table", table: T.dynamics, filter: true }, { kind: "blank" }, { kind: "note", text: T.dynamics.note, span: 10 }] });
+      s.push({ name: "Порівняння періодів", blocks: [{ kind: "title", text: T.cmpnotes.title }, { kind: "kv", table: T.cmpnotes }, { kind: "blank" }, { kind: "title", text: T.cmpsum.title }, { kind: "table", table: T.cmpsum }, { kind: "note", text: T.cmpsum.note, span: 8 }, { kind: "blank" }, { kind: "title", text: T.rankchg.title }, { kind: "table", table: T.rankchg, filter: true }, { kind: "note", text: T.rankchg.note, span: 8 }, { kind: "blank" }, { kind: "title", text: T.compare.title }, { kind: "table", table: T.compare, filter: true }, { kind: "note", text: T.compare.note, span: 10 }] });
+    }
     s.push({ name: "Джерела та обмеження", blocks: [{ kind: "title", text: T.limits.title }, { kind: "kv", table: T.limits }, { kind: "blank" }, { kind: "title", text: T.sources.title }, { kind: "kv", table: T.sources }] });
     void per; return s;
   }

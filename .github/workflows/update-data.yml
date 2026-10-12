@@ -77,10 +77,12 @@ jobs:
           git push -q --force "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
           rm -rf .git
 
+      # Резервні (*.prev.json), відкладені пошкоджені (*.bad.json) і недописані (*.tmp) файли не публікуємо: вони лишаються лише в гілці data
+      # (крок вище), де з них відновлюється архів подій. Робочі файли даних і сегменти paper_archive/ сайт отримує як і раніше.
       - name: Зібрати сайт
         run: |
           mkdir _site
-          rsync -a --exclude '.git' --exclude '.github' --exclude 'tools' --exclude '_site' --exclude '*.bat' --exclude 'README.md' ./ _site/
+          rsync -a --exclude '.git' --exclude '.github' --exclude 'tools' --exclude '_site' --exclude '*.bat' --exclude 'README.md' --exclude '*.prev.json' --exclude '*.bad.json' --exclude '*.tmp' ./ _site/
 
       - uses: actions/upload-pages-artifact@v4
         with:

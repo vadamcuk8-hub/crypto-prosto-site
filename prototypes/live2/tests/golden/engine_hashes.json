@@ -1,0 +1,20 @@
+{
+ "agent_signals.ema_series": "761ff5ea1fd3ea51b688c0b741b69a162c469384932c9c9c6774dcbf4dd81528",
+ "agent_signals.indicators": "93b19dcab3ea413d8268ff3e5f249efc10a2301ad7e4f6adc7ad78bc9c8ce65a",
+ "agent_signals.macd_hist": "a0ed09859f7937b6cce1200204880be5cc6c3e59839a2c6bca6c675cc6f49ceb",
+ "agent_signals.rsi": "ce4589e12c9ccfb8e1ffa36034eed1eb09970c232ed1f2efef680b80fe36bf02",
+ "agent_signals.score_of": "c94c3108e451c04b79b00a7e876ac6baa5b70a0629a26c13f15d66a04091875f",
+ "agent_signals.sma": "e0ad1300f97f17109aa16dfd94c9b9787a731d102e193e2bde073eea159cbc34",
+ "agent_simulation.Costs": "bcdcdf33de81102a983352826743565cf9efb8f64cc3de3526356f09faacf7af",
+ "agent_simulation.decide": "ccfc59c58aa7f6228bcb91b927040250c5709802aefcb5305fb14836d4e6746c",
+ "agent_simulation.exit_info": "c8a6f21eb4a6f0236ae0b9662962176c63c7a96bacc42309b169d447e37fe140",
+ "agent_simulation.explain": "9e8e0cf7a485a16dac6863e9a3dff909ed79e7a1d078c988b62e90c2a0212dae",
+ "agent_simulation.make_event": "03691662614978f62d69d340a337470aa603833410bf3d73c32735d436447aa9",
+ "agent_simulation.paper_update": "676cd3023c4f171f339f3b2324fc5df6b9d08725d6bdebc036585f0fc53eb3e9",
+ "agent_simulation.paper_wallets": "c4560663bde53ea27b35d8eb625879bd32f3edb944f359a10a6ec4975e3d8ad0",
+ "agent_simulation.scores_series": "5ec2f82cd4fbca2baa0f945b8949e2a300a1890f4d27c3556b963fb0d3f1ba48",
+ "agent_simulation.setup_entry": "3f200d7d74b604a03674d986d4e977e0aaeec946f0e6fc935e762420a3c6f6f2",
+ "agent_simulation.setup_exit": "eb883971dcd2460b8694d8b3ba4a1f97c90278d5a1cad9b1edb129d3b897b5bb",
+ "agent_simulation.setup_step": "93c2c25a81b7a583d715394f3e15011d4d5d21f8e926ab88ecd11ea879a0dba8",
+ "agent_simulation.volatility_weights": "edee5c51140c6e5bff170fa0fdc458a71fe45a7a80b1a7c4b8b4d016999efda8"
+}

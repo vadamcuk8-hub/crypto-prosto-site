@@ -1,0 +1,2871 @@
+{
+ "variant": "D4",
+ "dataset": "D4",
+ "from_step": 0,
+ "n_steps": 109,
+ "input_sha256": {
+  "klines": "20293ebc8f00a574b8ae2e2f97953a94394d8a1921b14399b2de959b0f8650e3",
+  "kb": "776b373e08e9fa089f3a3da11aa1ae112a668accfcefe12bfd122e719b64b3f6",
+  "sk": "7f4bfc7178e1e6ac713e06eb58645a35fea08b2ad91f669abfa6333ab6186699",
+  "books": "83ddf5b70659074536391785b4e23e11ff0df1026a392353fdad15f56c0591ab",
+  "step_times": "0af178706007a0ba7c332a874323b99653468c2038e3c1327dbc33f6b9cd16d5"
+ },
+ "kb_effective_sha256": "776b373e08e9fa089f3a3da11aa1ae112a668accfcefe12bfd122e719b64b3f6",
+ "kb_override": null,
+ "initial_state_sha256": null,
+ "step_times_sha256": "0af178706007a0ba7c332a874323b99653468c2038e3c1327dbc33f6b9cd16d5",
+ "step_state_sha256": [
+  "5af42fe2baea74973c8f6f14f1852887c43fd5e2e46d4c840fb75db7bd3ed00e",
+  "744977d3da0a7acb1e059597a43224f4fb31589e2ce192e51c020ccea3585fba",
+  "e28d4c119b716e245caef27baaa18e647c9e504994827af64d4fd6f8ac3c3a4b",
+  "126a06e2df7d7d374f9f34d89944ac864c0648a9224b3ff381c3d524d2bd4753",
+  "5cfd73a632aa9e9e4f35bc3622c88448bd6e3db189ae7fa738a234d4e4c6c29a",
+  "a2581a0f3561826c88935b11a0d72f2a65f2f05e64358dc2b16f060f9cf4b225",
+  "5ecd28fa5b011f3527e5195ba437f3002449cd92ba5decd95fc4c909d7cbc993",
+  "b3a9f30c33ddea13ff85bce82e98135902348dc3865b9a14b3928df73786847e",
+  "7764a7233a31a24e1bd4a35dc4a48239b80d76f16a994532961be2f010fd77e2",
+  "0ebf44d5ffcafc523d4e27c760360ecb8b37d536750679599c199c394eb2c947",
+  "a57125569d7ab921e44a44074cd4cc67a146f9f9528fbeb07f82178c582a316c",
+  "b9b85a7c895fa40208dd469bbcff8306795a31234c3ef0d3f19c6d63b1d8a199",
+  "a8013d2b0f290c5de6164f01edd9b0122b86a95b724f9e906fb08d35ca94fd9f",
+  "6cd3e2c275de0b1f6ce4762ccfa41f669673dc42ceff7bb3c4eefdbf90823d8a",
+  "5212164d1b7cbc3c8e94e3dcfbfcbbdb858994ff0c5f5e6c2cb81557d779d391",
+  "12c1bc3fde68f6df8d3c360bceacdb34225bc1644bb4b689e6f4d890747bd4be",
+  "94aaf9df32478fa41f45dfe7361809de255b12241d731ca78c90cd2a3e78471b",
+  "0a6013084cc906be8eaaa55a928b324508c60fb624f650a53ff49b6584e236d6",
+  "5d095728033090668fc464927c691cb3e5a3d8735a648f094631bb5fab4c773d",
+  "8b7263b83172b62123d6743ac1bc23856d91961c1dc3e25606187879be20cf50",
+  "56eed37b5db60ea01cadf7f2ca281aeb52f43c34e56ae83457a10acddee33164",
+  "3036eeeb5ff49a94b28eeba2e2123857bb77213819ebd4b2fb8dedb4094180f7",
+  "7fc0a7f61762897abb7c681dfe5ffd2f2d4434e019fc75b15371e7eea8215b57",
+  "56992e56b31d8749459917a6282c92c151049ea0369e500a8fa06f7ac17d5589",
+  "55801485220f9d03745859a5d5b3e82c446996e2b86a6513e5dff596535d8c95",
+  "655bd65ad12966160232a0739d5c892d571848cce70cc663e7800dd02023bf96",
+  "42039969bfdb570e8e71f371e020c72cf71eeb53a9c00b743a3e59a94071db4e",
+  "6fdfc990537f2bed05c5ec9ed7f482ce400173a6dc80d935aed34aec1c4f3dad",
+  "536b122b9dee11a0ac91458e66be02367e9d08e07d986cfe31e4e0bfd555b16d",
+  "6748639a3ab15b3779e30c3e4152a76e6372597edef593754f9e703cde7404d6",
+  "eb0284e38c3c2f8b311b14cd9d2822d5efd15affb225780d9191c0e973b29be6",
+  "c942aaf85f14a58938e6eb38f363350662b40dab6e09be6b5b8de101053a8b60",
+  "8455a075901a539317077369679140e316fd2acf7eeca15843e586733360e9f3",
+  "c1b30e6d187e955b0aa45a5a9d15f9fb32b949cd4e5e46c38349db243958bee6",
+  "63161f7fca2770f44a5afd7f12ff723b51a76800485263467f13eb9907e96aae",
+  "7ad9fd44afd06fc6eab26b801af6b66d0625b1a1838320942c7c0cacf64a75fc",
+  "5cefd4927c90e2bf5729018a80e8a40c6a0376751f99d0999ad97b309a1da6ff",
+  "c173796f24e292b2a0c1e115e22130428db1190898c803484b98b7c5d9c79e96",
+  "f11bcd1d35e6c3c1537085f428838bea810be71ae449f55c6b0b82320a3826d3",
+  "0da2131ea2685e305d52d5915f9eeb5236dd50c3b9d2f7e7170df5004debd068",
+  "1ab5fd3750dfb80c62b687d7098a43110280f7f418e9ee90e150ae1c82e0a459",
+  "0b0462c08bafb8745d4138695d57a92407dea8f05aed248b319fcbb675514b46",
+  "8b45c54e09e7303428259ac6872ed8643a5e23092c9efd67f2c2ed8ce93ead6d",
+  "f5ba05ff108083daef816fd8dcf5fd9dc90b59fe81a50977a09193731811e58b",
+  "e226491e4ecfd1d734781d34a493789ac73c90d3524cca40f5dd42c7553211be",
+  "3aeb4fd070ad03505cacc78a69234352b1c3fa7ca9825888da00d14f9eddb771",
+  "a7bab99f78ae118a11b2113d93899345936866dff0dc976f8451e969baaabfcd",
+  "819c38fd493323b6b512be4e8d0557d124a130b7f1b10580b9d76e9b156485f1",
+  "fc58d2fdb5e38839dc9f52536bfb739011af82bff6ba20b1c8f757ff03e026c8",
+  "5e4e33a8893b1399814554c9e2b82c087442a7164ea4103468051abd46774152",
+  "d4484b4160448480e43b354ee599ed451de53f9e4c799ad0188e3ba3b2f495eb",
+  "2eaacd01b8d277e1e7d66a241850d888b041653e50a204df68080153c2c85d92",
+  "fd344514d888f6162d8d7c33bb61135eff69860ea25a3066933dd4f6910f53ec",
+  "ea4dbe661d1fc3d426490ca236a48e04c5a374c6d49cbfa4e9e4f77577980317",
+  "78d4c458145ac55f54290e0b3b289245bae3d1a2cf53a05b4919e75fcefefc25",
+  "c3104cb88a299a90201ff6c670ffc4688fe4b0700e4eb2c12fe6478690726bc8",
+  "8faf0afd1b9d384bfbe82e528ee480c8034ad520646b38f129044627cda25ca3",
+  "a743303f6a8d5d0d5d0a99f68184ec6e83dde83fc4028de91ae92699ffcdb500",
+  "b2cfa96569df6b4deff540b8108e55b5a26ce56e40f944cdb95d0cb63a8c4dfb",
+  "4e76bb7d4fe2ba4cca98f3de2fc61a1733de5a8faf8e8dd9baa9951eec46f4e4",
+  "fd77dcbdae28469c749ac76bd564f4be4fa97e01f97e01357090b9d77f538516",
+  "6633a54b711447546ce90fc0e1a8433c5f37e63ac520c6af5714879cf1a537cc",
+  "20681e669ffa5c6f867939e255364b0d4478ca46ee6e537f7e05794602320f6e",
+  "499cb57a4e06d79667c794abe1ab789be746b80fc1e0e625e1b5a44d95f7259b",
+  "fc0b6410800e572c4a709814666a7006a4b4e8191bf75535363974ad223fda4e",
+  "edd4e841e4d1918f0e7e525f16759d7eb919f35ae8abf472cb50c97d94fab23a",
+  "9e1917dbf1d495d6ef97640a25943641b6a6d9d0cbc99d72618d194267733258",
+  "cfb23baec4b70928ad42afa1e9329ebe0c6233a6af14462b07e31ec1348813f2",
+  "42ae4ba6af308aa602ab0c6c7bf854d1e429f02abe02684fd71b751cd4c6dea3",
+  "c1554defed1b82bafc4b19f05b065c8ceecac4b6567c554b62b4609e053f2a88",
+  "2f46ebbdcd6dd72e03a5dd1ff6dbda4a23e71fd17fc2bf2e63fc6e4799591eda",
+  "c62ef1bd4049c50cd261cd55826c5ccda0737d167719c3b2f38e5d1e36b5dcb0",
+  "60dbf55061a8206178c68bc5f9d81f88d8899feedec6ad76f6230f679dd0acdb",
+  "b5d5fd7c7fb956c5f3353cf730438015f8167890e7d625202f19bf6711fad0cd",
+  "70d752e853c45aa6bc0e6778bc34bb76ba120406ec359a59997b2c2f38e95d8b",
+  "eb796b28b0775f8e99d32d01f7b395f52dc3582700efdbbfd7db8e267f1c29a4",
+  "ed4109c8c8b8e23468822869a4b859187fdb4e02f17b69f143942b2fa7db4753",
+  "40f80aeb3aaa44dc31c8842f9a0fbab32396f4f0185b547e4efd6958659807f2",
+  "fcd6e3829a5caa98ddc2072646a8f16bd80371bceefae438079238da93051a94",
+  "63212367f2cf762e8946cdbf08ac902381ff477c65757ffd0ac647012e15c48a",
+  "71f077f49789509cdc22e795172a69155bad8b83680e4bdb4bebd519caba2bfa",
+  "709e54bbce2ef325c1f3f22f4635f5589ac86cd939b85e5c8df2395bf8172f24",
+  "4e948ba0d662b2843a3afebffd1de7d99db1718ad696611322ae2d503d35a9a5",
+  "386839d7c831b7e6d725d70ca91f53d997974da51869cdc5447d07c2a185d240",
+  "dc92cc2e775698b3960342221ea52bb5ae91762fbca0773e6eef622e2af14a7a",
+  "86a3dcd77106f957e3a49e9596d3292d05703f90e3a02a4bc679000f74b910b8",
+  "209d60ba894e17ef7b904d28f065de69bd778b0f3f1282e07961f7109a82f06f",
+  "3d05660fa08852def9426a1fd0ba2111e1ac4d609a0cbe66f1c2cd8a534850fa",
+  "127dc37b7c60ef0a53bc9351081f1cb7f8e322f2dda98476d2d871540a524dc9",
+  "774479758c09106a9f4b3312a26648c67661012e674b47e1104b4a13b52071ac",
+  "bdc7c756b6836fc908be90797b14d68de34e3c121d0361865eda05c06f97e091",
+  "d090543c2344e6b5310dcecca300539d469fb68ef11b18516acb954ac3b75ccf",
+  "47f9577fcdc6283ada6e324837135a66899e86e03e2b343241ce93f71638b570",
+  "18af9fa5b0603cdd5ec341ec692ac2e2a1618ff54cf72205556eadd8cf1b34c3",
+  "8e1112adf833c5dbc23d54cc51f8781c499298c8babf5f6acc3fd07af47e0d21",
+  "d0904be56ea3222558b729a44e5bea906fbe16ccc34d92c5554216b179c4117f",
+  "f1b8866a9b74b278613b1785590dc8a21bb137ab02184f8575fbc10bdc5aefbe",
+  "e65021474d653c9c3913daae6de2742472f90d002de3c2021d81c94236033079",
+  "4a989f27392bd414e908b1496d76c0952ca33e7a3667ea9fed102be99430ea4d",
+  "1182a530be0fcf52572baa258d6caf545323330be0fe32369611d10452b34271",
+  "258fef184c2e441aa8e07eb149f49bdb54c0f17964d0ea85b5ee3bd4beef00d5",
+  "6690f5f8c337b10f51103ed8873b01c504189e0e64cc826db6abfd1ba0d21ca2",
+  "6444e395de477236990f224bc84679bb676493e70551f98a6d69d686abe6000f",
+  "fbbca87a0e86750273f8400c9f29c13c243f1bc2bea116ba122681f992fab9c0",
+  "cbdb6a5699dff51e02f4b71a1e3f820a74b2e9839967399b1dadf11446730d23",
+  "fba6e14b714047d2a3dd143736815f874a49fea803a2fc90ff14d49aa8533800",
+  "5edd99492f2eae7f233c0af4ae10c05418768a4c95dd8119267ace0742a1265c",
+  "5ca32612efc7e808e2cdd1090dd001af2e883ccb73494107f1c71c2663eca7c1",
+  "5809c43a01dd019365d79a23cac65410ada0c7fc9636e0052daf7bdec8b276f4"
+ ],
+ "step_result_sha256": [
+  "3cfa73101bb18a2c952d7f6408cde667f165117563cdfdcc05eae660dd2f2e12",
+  "52ebe16a221dbdff4802955b3c15dbe2974a6ce26bd40ef0db9737a99633e1f5",
+  "d26b78ed9477c720a94f41b912378d047f0cf43c67bab0f87da9d9693425ef67",
+  "b8d70e17398be2c56658ffeed0636b788f9f37e672288c94bbf8876bb0d2a9bb",
+  "5c51c6af62bf5869f469e7d2270df396ca6f15867e1f6193fe529a6750b8a9b1",
+  "3bd3606590b4f7dd015ae6be1649e9e1144af8aebbdec92bec9f8fae5835dfa0",
+  "0537d0cc929f9a188c7e92079b7a1d62bb1e701dcb6b7a9c9e71122d899db3b5",
+  "3ee586b822c17d8ed647314621ef2c075840696ecc4f4ed562123da3701c0f8e",
+  "f2b8e697b244245ef5d3fae9a03d82551ebc99746cef4971cb8665f4b7205ee3",
+  "59dbf1992f668d639294679d55bece1b708fd36797c160c48a3572cd187d9c5a",
+  "8615ece3258db56d8e3675efbc253e9fe02102f77bd564c97f0c2b7a3c295814",
+  "b09ea79d0dc01b49c5558302894b8d3ad34f2a8e60dadf8d883fc1ac01a697c1",
+  "c4830c0731507af80dfb516903974233d452dc8838e93052281452edf0e105a1",
+  "a7b0c6444c00f06047f7e4dff265c42bef5776f29aef6751ffc0da64e9fa2f92",
+  "29c6d09e5ddae4992310eb925a188c5e21b6de9ed2b97ad51679deb03a894f6d",
+  "54cabeb2e78f59c7135ed8697d8e13451fd27c9f6eea9eb0d912faa8dbd3f316",
+  "e75a29a239215782f03f5ac197d0e64ec502eb9aa4dba724844154e04931a711",
+  "d09d0520b1b0d2f084fd23c205619e9ab30a2e3d43de5c3e8027c386f9577371",
+  "2ca138f3d117dec1c42eed41c639f9d698b7cde0278700ac9c0f65784ba3bd30",
+  "82405d5d54805e3c8456a1085399593ba1df6d00180c4f4555a71a7acf75fb7f",
+  "044797b60502308e72f3557f39eca19fbf7e5f04f10996381770ec055d52a8ad",
+  "8eefb7805c128fa77b1ad8d7d4fd32f4651bbbd4a0f98f9f6b2001f39943a5f0",
+  "44de4a9d8d3258218d60313a71c023e96378c4d7942b2b7055ae93e8fc47c201",
+  "6e1126009d89a6eba87513299cc08a3d896f3a324e2fe900eb36f9a86e828df1",
+  "0dea16e05eda07a0fa47ba44fc487c3059ed1225bd4fbb912a48e993a0f533b3",
+  "dd5e1c319be18c4c7affacc70aeef7c9d4712924bea2adbd0079c63b01332660",
+  "d185039ad4ff684d483c97e42c9eebb31a56a1ab40983d447f7aab78587dc717",
+  "86abf5202b57a3edc01c07fbc057f1cef36dd834c461ae2d780e96cb8cae922e",
+  "be5ca24666c76699d5da5a96d32efdc158a7149cf504c711fa9fc3c2f7e8820a",
+  "d8fb42fa66cfd98bf54b1438a5fbb74aaa0ebbe7fc7b2d81e499cfb7c9f4d0c3",
+  "675267735d96fb055acf978add457e3d5f60b9b8e889fc13426d0a6532b8e6a4",
+  "bf0bb68b6210c353c9bd9798a670d08024d2de30406de737f862c5b7c52a2a85",
+  "b017c51c70caf18f78dfa76098cb49ac393d51e03eba4dc50dc53b2afcdd2672",
+  "15706679067799be7147bbf01e1b944a5aa3bb363fe288a2de49b16be65f44ea",
+  "83cc3ba17fd5609d2b9246a467fbaa1dc141a82c77843bd72e276748b3674341",
+  "1757c463677910283826435ba8f7ece7242bc19f7c84c543d8f97cb279db7e3b",
+  "6f1e96d122e8e974e5a640f0e614ddb70f62d7fee67c7a2ce807f92193f8b4c6",
+  "f56fce5ccf81bf93c3d690eb5a87f8b7e5fb4cb67c411a5f86f51f9180711268",
+  "71a6ba1e75a3aa3e29b2867a09a77b74e1d7517165f0fea2f9ee7a83095c249d",
+  "0898eda9b9a0c83dc88399bc5f9da232cd52ffbc36d6fba5c11e2e7bfd7aeb31",
+  "00168b99bd84bf218dec892b7694db5b1e356386c4956cb6c409b31908f52e58",
+  "e24b85c8d934e110c5ccb0408c979139631116eafdd472f305799969d46668d1",
+  "b81eed214d0cc86d3f0e50bc493bdb492159754cb725f360377bb7b98dc9542e",
+  "30cb96f1a11adb0a80a347659965586c27b007235d3930f5da6eb46363ba3617",
+  "414b88c93cb865aa55813650f0301a99b1538fb59b497b36018b03ab274da7aa",
+  "27a56fddc6a486de11bf95674416a923305e0e1fd9eb5c9b8bcb974e7923c614",
+  "a002960f2e04783eea9252e76edd0da1644bf560f4dfb605dbc2072ab2623f99",
+  "9fd3e390ae2fda981fd51ee432cfb6a6a3b3763f16e7561a735d23c0e2f9721d",
+  "8eeb4f2cf110ba49cce476c6f53918b8364c8b19119a850c85b76d367e7f1209",
+  "03164702aa5965ad71ed62efa2125b97d00e804e39f1449edbf252d49df2d5a4",
+  "cb2f8091625eb349a282d98d909f0b025dd505953623f668acaf33fca142d9d0",
+  "c0ec4c94d2e405734346640d6a0763e2cd1d9db48d08e5633e81e4b7b869424d",
+  "032bf94bd271b97440b0dba136d1625bb27cd352cd2c6cbadd84fa950d6e812d",
+  "19bd4e4d7de3b725e260e12d50b305cb16147488fca8a6e69e88a0b8664caaa6",
+  "10dfc98e7bb0568aa46740c525afe374a1437840d8a00116a602ada974a97ee9",
+  "13ee98703b34f8d4c016545b1c46b319bdbdae311d7a7d828c9d8753c3e7945a",
+  "b0c6d100923c30435e72d551e2de99588c4d5bb317a24dc58ee94db19c0e96f7",
+  "597ddf30418529d7af6519dc7b6e1a349ddc8a4a8015f8811336468ad9615035",
+  "a5044a88d2d63b08bce4e54fbc0971409dd46e4ac14a3ae8aeb661a620c8e180",
+  "7c94a90dedc00bf3817a2e58499a15bd6b5c3ae872b1389c437f7760643f96d6",
+  "c2aea6d98b332cba5764e044dd3e2e2e47973b6109b6dc11ae8a3b8f27bba974",
+  "866f61a5cc70e9ec925886a0fb60a090d6b501cc984602f6a50a6652590b910a",
+  "30c450d401d2962701d1d88d1ade5872fa8e9d8469ee16666056be5614a92919",
+  "4678aae62e08b7468d13c7d1211b4d230001a91514578ece334ef7a0ff71d425",
+  "b0cdf2db4f0f601d53d31c53747fc804b665911b4c17e1e9af30795cdfe283f6",
+  "56a766ecafbe057264b8eb2cee1a8593912240825aba53d9d96b7c0af9f38194",
+  "42a04288a14663dccca6f9e8c56e437e044b45402229d6c484bb6a3f4b757cf1",
+  "4f1356ed14f9da9fff8f403c9bef594a17bf8ede31c031cbe0fd419acd4ad541",
+  "8830d48011625400c3d8111a72ecfeedde0db45ea0191cdad24101d98c78d9a9",
+  "e5f82bc7509b211a513de230a3185a0dd83ceec284eb79290906f330c624ab79",
+  "b6c1b4b9e12e7f799b86eb5a06068cd0d9cc73b58f9dda818bebfab0740ad9fd",
+  "5dd7342196468954561c0394f1a673d9ae7bdc45d6d7735f86de660b9c11f9e7",
+  "ab736712f15a34046c3544161dec3629b89de21855ba3502e8e2d1fbece0124c",
+  "7fc7d6ea522e18b886dc1f8d62f6b97819f6607b851ecbccd1d252d4fe034155",
+  "c0cfe015817c598547600cdc9b0b3404a8c370f70c2e68752c2399a7ddf74394",
+  "5ab46e0b3f380bc8ee0facf8d8f9cdfdd7987a7545f4edeecb8ce3f94e9fed59",
+  "cce0533e7dc83a786ef207b26525408533e8d4ea144bd705b4f776e456471bf2",
+  "cf414aa6ed4a6636e2f8db04755df7499b64609b2448e04fcf436b1e297a4208",
+  "77c689aabcb9c41c8b017bd7517f6853b147f9da877c89e9b5d939931420a632",
+  "deed5572b6e5406d4333cc2c8c77a2ea8fd77b5335ee3b513df0a8787252fd43",
+  "5c3c0ac16ba37965f480ba81a337bbdd26b27f3c141b735086718deff87f8f7a",
+  "cfae97674df98a71c814c869980fe1b2a331be7e1b98ca1423719d8836670e37",
+  "f5d877559e60a33bf10ab8de405bd23137616c135d5f7dc8e5d665a6e4b29ac0",
+  "4a086f0f51afd631352c2cb5992460dea5afa4648e2ab6da9e5b66188b030d62",
+  "1849815259b7e3a7de650bb98ba22ce2187af71153dbcf175014611ce0c780bd",
+  "5c1211c345b07e5631dd211a285f8e587cee20d6f2b29db65451e806414427e5",
+  "910fbf05692e9d603c9f3f956f9b5d12be6b89f84e5605063f745068e66a67b1",
+  "2f2f00a817a4308991be01bbc89547608d5dc9c494d72c47ed8b507c68f83582",
+  "f3e0eb8e00c8f40613bdffd91b237fe7207d59081ca889e01a8524ba10eeedbb",
+  "99ddc79ee5dbd7e722a25dfc058f7fbef6cf2887f5d6ef5f7d0ef80b08e8320a",
+  "c45d25674774d14b305e81b3ea2c15f37bdffa7d3e11eed7157d2647930d2493",
+  "65143e52ca8c1f5aba099502d65e450198d538d69f2375cdf8db1c8b77e69cf5",
+  "a55ddadfe8543d61b76cd6ca76a014ef005a12475d6f346d11d04bbf563dff7a",
+  "6bf5a3e29f205c32988f075e1204685099c4adac96411ebb8f32eff761ad2bd0",
+  "d2f3b2b94abbf5d266fec5e0bcde2d0e770cf90933aff0de46c2f05d1b9ee311",
+  "66f328f162966504c2484b37824dce13c4aa6eb83042d0ae6a13f2a63022429d",
+  "8fc42e067c5f59630b0015fe711d876a4fdcf3bf1962a95a4ac626a89edef8bf",
+  "143ff2081e26498f7c4378cdb69a8408b9588af909ac348e5bb56a326a3b3481",
+  "7b965f1cc52be6c0fe1f545660a7abdba4f100bdd7ee7fb4532f4b9f14c0280c",
+  "f3d0b0f106cc92f908ea837af266c1318ad2ea1e9221f6c4e81ee1b90fb944b5",
+  "282abaf478e46bde3aff814b24bf09aaaf57489627d01bd66ce4c7ab32cfc4ef",
+  "8285436bf7c28136d017ceaf7ccf655c229a0a8895358374514abded842fe379",
+  "1db1b64e1161f6dc5d75b55194ba440e0d9dba03b966d791c3de9bc1c880d6ce",
+  "4fab60f651655d679891f12cee8d9e0740f9da1cb64e23b1d72111bbc8095eae",
+  "daafb0423aacc03c88459dce7aefd74cb49e55ee140aaec6782ea29a3b362597",
+  "7b41ae672b7c5094f27e04ffda9bc9f69b532f20ab96adffe1f7c8de12ebeb5a",
+  "abcd8723aab3155b8c8326bbf0bee681092b6f45e1869a135b1bc93d754f2f0e",
+  "3500acf87317efb726f1fd04920e124fa5e7102b9539dab6d7bc9df8eb2f4106",
+  "1b9dbe9668c374fbcddc8d9853b50ba990906ab40c8504dd7a2c8b285ee2a88c"
+ ],
+ "final_files_sha256": {
+  "_paper": "985e479775cc8eac3f0d13d4056c65bedad21f6aff5bcff329456e1eacccc5ac",
+  "_paper_100": "c840c2904ec422ed2c964a6ed859ce539f1ef90ffba8bc7fede0b7b543359e1f",
+  "_paper_10000": "2f1cd4e375826f39920085d1f2263c2c30beb744358efe4912995953a91eb853",
+  "paper_events": "1603df898f21bca9eb88e8ead195f2a43b365efd015770808ea8f1743b5c9e73",
+  "paper_events_100": "62f91bc52525bbf965a1dab58fd73858919616c3e0060beed8e52c106c146124",
+  "paper_events_10000": "eb286122e359a1865825391885d5ef3c2b6e006212661c8286832ea20411896a"
+ },
+ "final_state_sha256": "5809c43a01dd019365d79a23cac65410ada0c7fc9636e0052daf7bdec8b276f4",
+ "accounts_table_sha256": "99fa1edbd4af8de08ef1906eab965504ea82b39dbf31ab79cee9c86c6311a49c",
+ "accounts_table": [
+  {
+   "wallet": 100,
+   "rule": "lean",
+   "equity_fraction": 0.97884,
+   "hold_fraction": 0.98499,
+   "value_usd": 97.884,
+   "pnl_usd": -2.116,
+   "max_drawdown": -0.03449203,
+   "trades": 3,
+   "events_kept": 3,
+   "buys": 2,
+   "sells": 1,
+   "exit_reasons": {
+    "signal": 1
+   },
+   "fees_usd": 0.101274,
+   "realized_usd": -1.984468,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "BTC": {
+     "pos": true,
+     "entry": 83871.7,
+     "peak": null,
+     "eq": 0.9749193721820283,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "ETH": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SOL": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.940463785621959,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 100,
+   "rule": "random_1h",
+   "equity_fraction": 0.98717,
+   "hold_fraction": 0.98499,
+   "value_usd": 98.717,
+   "pnl_usd": -1.283,
+   "max_drawdown": -0.01353039,
+   "trades": 6,
+   "events_kept": 6,
+   "buys": 4,
+   "sells": 2,
+   "exit_reasons": {
+    "signal": 2
+   },
+   "fees_usd": 0.202104,
+   "realized_usd": -1.258874,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "BTC": {
+     "pos": true,
+     "entry": 83453.87,
+     "peak": null,
+     "eq": 1.003118968770303,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "ETH": {
+     "pos": true,
+     "entry": 2531.69,
+     "peak": null,
+     "eq": 0.998998022695501,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SOL": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9608401462985794,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 100,
+   "rule": "score_1h",
+   "equity_fraction": 1.0,
+   "hold_fraction": 0.98499,
+   "value_usd": 100.0,
+   "pnl_usd": 0.0,
+   "max_drawdown": 0.0,
+   "trades": 0,
+   "events_kept": 0,
+   "buys": 0,
+   "sells": 0,
+   "exit_reasons": {},
+   "fees_usd": 0.0,
+   "realized_usd": 0.0,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "BTC": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "ETH": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SOL": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 100,
+   "rule": "setup_dip",
+   "equity_fraction": 0.99408,
+   "hold_fraction": 0.98499,
+   "value_usd": 99.408,
+   "pnl_usd": -0.592,
+   "max_drawdown": -0.01709562,
+   "trades": 10,
+   "events_kept": 10,
+   "buys": 5,
+   "sells": 5,
+   "exit_reasons": {
+    "stop": 3,
+    "take": 2
+   },
+   "fees_usd": 0.34553,
+   "realized_usd": -0.591274,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "BTC": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9855610690317081,
+     "t": 1791870300000,
+     "cool": 1791828060000,
+     "blocked": null
+    },
+    "ETH": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.984586605975689,
+     "t": 1791870300000,
+     "cool": 1791826860000,
+     "blocked": null
+    },
+    "SOL": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0121059465392868,
+     "t": 1791870300000,
+     "cool": 1791812460000,
+     "blocked": null
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 100,
+   "rule": "setup_live",
+   "equity_fraction": 0.99104,
+   "hold_fraction": 0.98499,
+   "value_usd": 99.104,
+   "pnl_usd": -0.896,
+   "max_drawdown": -0.01025,
+   "trades": 16,
+   "events_kept": 16,
+   "buys": 9,
+   "sells": 7,
+   "exit_reasons": {
+    "trail": 2,
+    "trend": 5
+   },
+   "fees_usd": 0.539329,
+   "realized_usd": -0.991901,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "BTC": {
+     "pos": true,
+     "entry": 83298.07,
+     "peak": 83740.0,
+     "eq": 0.9863089423709184,
+     "t": 1791870300000,
+     "cool": 1791795660000,
+     "blocked": null
+    },
+    "ETH": {
+     "pos": true,
+     "entry": 2527.19,
+     "peak": 2531.69,
+     "eq": 1.0030449121012175,
+     "t": 1791870300000,
+     "cool": 1791805260000,
+     "blocked": null
+    },
+    "SOL": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9837588310876509,
+     "t": 1791870300000,
+     "cool": 1791795660000,
+     "blocked": null
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 100,
+   "rule": "strong",
+   "equity_fraction": 0.98015,
+   "hold_fraction": 0.98499,
+   "value_usd": 98.015,
+   "pnl_usd": -1.985,
+   "max_drawdown": -0.02275901,
+   "trades": 2,
+   "events_kept": 2,
+   "buys": 1,
+   "sells": 1,
+   "exit_reasons": {
+    "signal": 1
+   },
+   "fees_usd": 0.067944,
+   "realized_usd": -1.984468,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "BTC": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "ETH": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SOL": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.940463785621959,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 100,
+   "rule": "strong_inv",
+   "equity_fraction": 1.0,
+   "hold_fraction": 0.98499,
+   "value_usd": 100.0,
+   "pnl_usd": 0.0,
+   "max_drawdown": 0.0,
+   "trades": 0,
+   "events_kept": 0,
+   "buys": 0,
+   "sells": 0,
+   "exit_reasons": {},
+   "fees_usd": 0.0,
+   "realized_usd": 0.0,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "BTC": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "ETH": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SOL": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 100,
+   "rule": "trend",
+   "equity_fraction": 0.97884,
+   "hold_fraction": 0.98499,
+   "value_usd": 97.884,
+   "pnl_usd": -2.116,
+   "max_drawdown": -0.03449203,
+   "trades": 3,
+   "events_kept": 3,
+   "buys": 2,
+   "sells": 1,
+   "exit_reasons": {
+    "signal": 1
+   },
+   "fees_usd": 0.101274,
+   "realized_usd": -1.984468,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "BTC": {
+     "pos": true,
+     "entry": 83871.7,
+     "peak": null,
+     "eq": 0.9749193721820283,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "ETH": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SOL": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.940463785621959,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 100,
+   "rule": "trend_1h",
+   "equity_fraction": 0.98295,
+   "hold_fraction": 0.98499,
+   "value_usd": 98.295,
+   "pnl_usd": -1.705,
+   "max_drawdown": -0.02464502,
+   "trades": 10,
+   "events_kept": 10,
+   "buys": 6,
+   "sells": 4,
+   "exit_reasons": {
+    "signal": 4
+   },
+   "fees_usd": 0.333357,
+   "realized_usd": -1.729494,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "BTC": {
+     "pos": true,
+     "entry": 83331.17,
+     "peak": null,
+     "eq": 0.9879163595326642,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "ETH": {
+     "pos": true,
+     "entry": 2531.69,
+     "peak": null,
+     "eq": 0.9819762088778831,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SOL": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9803908128292448,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 100,
+   "rule": "trend_1h_band",
+   "equity_fraction": 0.98393,
+   "hold_fraction": 0.98499,
+   "value_usd": 98.393,
+   "pnl_usd": -1.607,
+   "max_drawdown": -0.02300665,
+   "trades": 8,
+   "events_kept": 8,
+   "buys": 5,
+   "sells": 3,
+   "exit_reasons": {
+    "signal": 3
+   },
+   "fees_usd": 0.267531,
+   "realized_usd": -1.582508,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "BTC": {
+     "pos": true,
+     "entry": 83453.87,
+     "peak": null,
+     "eq": 0.9864638524492343,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "ETH": {
+     "pos": true,
+     "entry": 2531.69,
+     "peak": null,
+     "eq": 0.986383338717005,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SOL": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9803908128292448,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 100,
+   "rule": "trend_1h_inv",
+   "equity_fraction": 0.99733,
+   "hold_fraction": 0.98499,
+   "value_usd": 99.733,
+   "pnl_usd": -0.267,
+   "max_drawdown": -0.04286813,
+   "trades": 7,
+   "events_kept": 7,
+   "buys": 4,
+   "sells": 3,
+   "exit_reasons": {
+    "signal": 3
+   },
+   "fees_usd": 0.235456,
+   "realized_usd": 0.347965,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "BTC": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0049005055853966,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "ETH": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.005538068454312,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SOL": {
+     "pos": true,
+     "entry": 110.25,
+     "peak": null,
+     "eq": 0.9827350629605762,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 100,
+   "rule": "trend_1h_sl",
+   "equity_fraction": 0.98295,
+   "hold_fraction": 0.98499,
+   "value_usd": 98.295,
+   "pnl_usd": -1.705,
+   "max_drawdown": -0.02464502,
+   "trades": 10,
+   "events_kept": 10,
+   "buys": 6,
+   "sells": 4,
+   "exit_reasons": {
+    "signal": 4
+   },
+   "fees_usd": 0.333357,
+   "realized_usd": -1.729494,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "BTC": {
+     "pos": true,
+     "entry": 83331.17,
+     "peak": null,
+     "eq": 0.9879163595326642,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "ETH": {
+     "pos": true,
+     "entry": 2531.69,
+     "peak": null,
+     "eq": 0.9819762088778831,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SOL": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9803908128292448,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 100,
+   "rule": "trend_1h_vol",
+   "equity_fraction": 0.98357,
+   "hold_fraction": 0.98725,
+   "value_usd": 98.357,
+   "pnl_usd": -1.643,
+   "max_drawdown": -0.02392235,
+   "trades": 10,
+   "events_kept": 10,
+   "buys": 6,
+   "sells": 4,
+   "exit_reasons": {
+    "signal": 4
+   },
+   "fees_usd": 0.335231,
+   "realized_usd": -1.695195,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "BTC": {
+     "pos": true,
+     "entry": 83331.17,
+     "peak": null,
+     "eq": 0.987916359532664,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "ETH": {
+     "pos": true,
+     "entry": 2531.69,
+     "peak": null,
+     "eq": 0.9819762088778831,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SOL": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9803908128292448,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 100,
+   "rule": "trend_2h",
+   "equity_fraction": 0.97492,
+   "hold_fraction": 0.98499,
+   "value_usd": 97.492,
+   "pnl_usd": -2.508,
+   "max_drawdown": -0.03023034,
+   "trades": 10,
+   "events_kept": 10,
+   "buys": 6,
+   "sells": 4,
+   "exit_reasons": {
+    "signal": 4
+   },
+   "fees_usd": 0.335207,
+   "realized_usd": -2.532747,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "BTC": {
+     "pos": true,
+     "entry": 83331.17,
+     "peak": null,
+     "eq": 0.9875759087325718,
+     "t": 1791864000000,
+     "cool": 0,
+     "blocked": false
+    },
+    "ETH": {
+     "pos": true,
+     "entry": 2531.69,
+     "peak": null,
+     "eq": 0.9772841654768958,
+     "t": 1791864000000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SOL": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9613289421445085,
+     "t": 1791864000000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 100,
+   "rule": "trend_30m_band",
+   "equity_fraction": 0.99191,
+   "hold_fraction": 0.98499,
+   "value_usd": 99.191,
+   "pnl_usd": -0.809,
+   "max_drawdown": -0.01609572,
+   "trades": 8,
+   "events_kept": 8,
+   "buys": 5,
+   "sells": 3,
+   "exit_reasons": {
+    "signal": 3
+   },
+   "fees_usd": 0.268747,
+   "realized_usd": -0.86758,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "BTC": {
+     "pos": true,
+     "entry": 83331.17,
+     "peak": null,
+     "eq": 0.9955273210026151,
+     "t": 1791869400000,
+     "cool": 0,
+     "blocked": false
+    },
+    "ETH": {
+     "pos": true,
+     "entry": 2529.05,
+     "peak": null,
+     "eq": 0.9945145379300777,
+     "t": 1791869400000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SOL": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9871490624233519,
+     "t": 1791869400000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 100,
+   "rule": "trend_inv",
+   "equity_fraction": 1.00594,
+   "hold_fraction": 0.98499,
+   "value_usd": 100.594,
+   "pnl_usd": 0.594,
+   "max_drawdown": -0.02911587,
+   "trades": 2,
+   "events_kept": 2,
+   "buys": 2,
+   "sells": 0,
+   "exit_reasons": {},
+   "fees_usd": 0.068326,
+   "realized_usd": 0.0,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "BTC": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "ETH": {
+     "pos": true,
+     "entry": 2540.93,
+     "peak": null,
+     "eq": 0.9621351202905036,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SOL": {
+     "pos": true,
+     "entry": 105.76,
+     "peak": null,
+     "eq": 0.9989539064300529,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 1000,
+   "rule": "lean",
+   "equity_fraction": 0.9783,
+   "hold_fraction": 0.96829,
+   "value_usd": 978.3,
+   "pnl_usd": -21.7,
+   "max_drawdown": -0.03688332,
+   "trades": 3,
+   "events_kept": 3,
+   "buys": 2,
+   "sells": 1,
+   "exit_reasons": {
+    "signal": 1
+   },
+   "fees_usd": 0.800084,
+   "realized_usd": -7.5875,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "ADA": {
+     "pos": true,
+     "entry": 0.2532,
+     "peak": null,
+     "eq": 0.9195034224970658,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "BNB": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9696486796987608,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "DOGE": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "XRP": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 1000,
+   "rule": "random_1h",
+   "equity_fraction": 0.98668,
+   "hold_fraction": 0.96829,
+   "value_usd": 986.68,
+   "pnl_usd": -13.32,
+   "max_drawdown": -0.03187334,
+   "trades": 14,
+   "events_kept": 14,
+   "buys": 8,
+   "sells": 6,
+   "exit_reasons": {
+    "signal": 6
+   },
+   "fees_usd": 3.803029,
+   "realized_usd": -19.235,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "ADA": {
+     "pos": true,
+     "entry": 0.2381,
+     "peak": null,
+     "eq": 0.9867208758942233,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "BNB": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9877301927930607,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "DOGE": {
+     "pos": true,
+     "entry": 0.08293,
+     "peak": null,
+     "eq": 0.9844495493477223,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "XRP": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9927044221124173,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 1000,
+   "rule": "score_1h",
+   "equity_fraction": 1.0,
+   "hold_fraction": 0.96829,
+   "value_usd": 1000.0,
+   "pnl_usd": 0.0,
+   "max_drawdown": 0.0,
+   "trades": 0,
+   "events_kept": 0,
+   "buys": 0,
+   "sells": 0,
+   "exit_reasons": {},
+   "fees_usd": 0.0,
+   "realized_usd": 0.0,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "ADA": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "BNB": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "DOGE": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "XRP": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 1000,
+   "rule": "setup_dip",
+   "equity_fraction": 0.99195,
+   "hold_fraction": 0.96829,
+   "value_usd": 991.95,
+   "pnl_usd": -8.05,
+   "max_drawdown": -0.01362303,
+   "trades": 8,
+   "events_kept": 8,
+   "buys": 4,
+   "sells": 4,
+   "exit_reasons": {
+    "stop": 3,
+    "take": 1
+   },
+   "fees_usd": 2.084402,
+   "realized_usd": -8.055,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "ADA": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791870300000,
+     "cool": 0,
+     "blocked": null
+    },
+    "BNB": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9846959510727071,
+     "t": 1791870300000,
+     "cool": 1791843660000,
+     "blocked": null
+    },
+    "DOGE": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9976339239633147,
+     "t": 1791870300000,
+     "cool": 1791814860000,
+     "blocked": null
+    },
+    "XRP": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9854525614946062,
+     "t": 1791870300000,
+     "cool": 1791812460000,
+     "blocked": null
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 1000,
+   "rule": "setup_live",
+   "equity_fraction": 0.97643,
+   "hold_fraction": 0.96829,
+   "value_usd": 976.43,
+   "pnl_usd": -23.57,
+   "max_drawdown": -0.02331606,
+   "trades": 28,
+   "events_kept": 28,
+   "buys": 14,
+   "sells": 14,
+   "exit_reasons": {
+    "trail": 2,
+    "trend": 12
+   },
+   "fees_usd": 7.498182,
+   "realized_usd": -23.5675,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "ADA": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9644435791781153,
+     "t": 1791870300000,
+     "cool": 1791805260000,
+     "blocked": null
+    },
+    "BNB": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.980087091558013,
+     "t": 1791870300000,
+     "cool": 1791795660000,
+     "blocked": null
+    },
+    "DOGE": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9821800204117401,
+     "t": 1791870300000,
+     "cool": 1791807660000,
+     "blocked": null
+    },
+    "XRP": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9790224665168601,
+     "t": 1791870300000,
+     "cool": 1791799260000,
+     "blocked": null
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 1000,
+   "rule": "strong",
+   "equity_fraction": 0.98589,
+   "hold_fraction": 0.96829,
+   "value_usd": 985.89,
+   "pnl_usd": -14.11,
+   "max_drawdown": -0.0293208,
+   "trades": 1,
+   "events_kept": 1,
+   "buys": 1,
+   "sells": 0,
+   "exit_reasons": {},
+   "fees_usd": 0.3025,
+   "realized_usd": 0.0,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "ADA": {
+     "pos": true,
+     "entry": 0.2532,
+     "peak": null,
+     "eq": 0.9195034224970658,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "BNB": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "DOGE": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "XRP": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 1000,
+   "rule": "strong_inv",
+   "equity_fraction": 1.0,
+   "hold_fraction": 0.96829,
+   "value_usd": 1000.0,
+   "pnl_usd": 0.0,
+   "max_drawdown": 0.0,
+   "trades": 0,
+   "events_kept": 0,
+   "buys": 0,
+   "sells": 0,
+   "exit_reasons": {},
+   "fees_usd": 0.0,
+   "realized_usd": 0.0,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "ADA": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "BNB": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "DOGE": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "XRP": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 1000,
+   "rule": "trend",
+   "equity_fraction": 0.9783,
+   "hold_fraction": 0.96829,
+   "value_usd": 978.3,
+   "pnl_usd": -21.7,
+   "max_drawdown": -0.03688332,
+   "trades": 3,
+   "events_kept": 3,
+   "buys": 2,
+   "sells": 1,
+   "exit_reasons": {
+    "signal": 1
+   },
+   "fees_usd": 0.800084,
+   "realized_usd": -7.5875,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "ADA": {
+     "pos": true,
+     "entry": 0.2532,
+     "peak": null,
+     "eq": 0.9195034224970658,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "BNB": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9696486796987608,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "DOGE": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "XRP": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 1000,
+   "rule": "trend_1h",
+   "equity_fraction": 0.98233,
+   "hold_fraction": 0.96829,
+   "value_usd": 982.33,
+   "pnl_usd": -17.67,
+   "max_drawdown": -0.01843562,
+   "trades": 12,
+   "events_kept": 12,
+   "buys": 6,
+   "sells": 6,
+   "exit_reasons": {
+    "signal": 6
+   },
+   "fees_usd": 3.328187,
+   "realized_usd": -17.6675,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "ADA": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9636996955745878,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "BNB": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.992986610290356,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "DOGE": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9867574345055883,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "XRP": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9858771846698431,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 1000,
+   "rule": "trend_1h_band",
+   "equity_fraction": 0.98191,
+   "hold_fraction": 0.96829,
+   "value_usd": 981.91,
+   "pnl_usd": -18.09,
+   "max_drawdown": -0.01788376,
+   "trades": 10,
+   "events_kept": 10,
+   "buys": 5,
+   "sells": 5,
+   "exit_reasons": {
+    "signal": 5
+   },
+   "fees_usd": 2.73715,
+   "realized_usd": -18.085,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "ADA": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.96525021710597,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "BNB": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9897716912802892,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "DOGE": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9867574345055883,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "XRP": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9858771846698431,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 1000,
+   "rule": "trend_1h_inv",
+   "equity_fraction": 0.98118,
+   "hold_fraction": 0.96829,
+   "value_usd": 981.18,
+   "pnl_usd": -18.82,
+   "max_drawdown": -0.06486546,
+   "trades": 8,
+   "events_kept": 8,
+   "buys": 6,
+   "sells": 2,
+   "exit_reasons": {
+    "signal": 2
+   },
+   "fees_usd": 2.307042,
+   "realized_usd": 3.465,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "ADA": {
+     "pos": true,
+     "entry": 0.2504,
+     "peak": null,
+     "eq": 0.9697645682127016,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "BNB": {
+     "pos": true,
+     "entry": 750.55,
+     "peak": null,
+     "eq": 0.9924979378893419,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "DOGE": {
+     "pos": true,
+     "entry": 0.08603,
+     "peak": null,
+     "eq": 0.9867489485565051,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "XRP": {
+     "pos": true,
+     "entry": 1.3989,
+     "peak": null,
+     "eq": 0.9826106421031242,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 1000,
+   "rule": "trend_1h_sl",
+   "equity_fraction": 0.98233,
+   "hold_fraction": 0.96829,
+   "value_usd": 982.33,
+   "pnl_usd": -17.67,
+   "max_drawdown": -0.01843562,
+   "trades": 12,
+   "events_kept": 12,
+   "buys": 6,
+   "sells": 6,
+   "exit_reasons": {
+    "signal": 6
+   },
+   "fees_usd": 3.328187,
+   "realized_usd": -17.6675,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "ADA": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9636996955745878,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "BNB": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.992986610290356,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "DOGE": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9867574345055883,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "XRP": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9858771846698431,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 1000,
+   "rule": "trend_1h_vol",
+   "equity_fraction": 0.98537,
+   "hold_fraction": 0.97281,
+   "value_usd": 985.37,
+   "pnl_usd": -14.63,
+   "max_drawdown": -0.01605672,
+   "trades": 12,
+   "events_kept": 12,
+   "buys": 6,
+   "sells": 6,
+   "exit_reasons": {
+    "signal": 6
+   },
+   "fees_usd": 2.805978,
+   "realized_usd": -14.626417,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "ADA": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9636996955745885,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "BNB": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9929866102903562,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "DOGE": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9867574345055883,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "XRP": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9858771846698431,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 1000,
+   "rule": "trend_2h",
+   "equity_fraction": 0.97231,
+   "hold_fraction": 0.96829,
+   "value_usd": 972.31,
+   "pnl_usd": -27.69,
+   "max_drawdown": -0.03275835,
+   "trades": 10,
+   "events_kept": 10,
+   "buys": 5,
+   "sells": 5,
+   "exit_reasons": {
+    "signal": 5
+   },
+   "fees_usd": 2.629131,
+   "realized_usd": -27.6875,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "ADA": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9554271919860731,
+     "t": 1791864000000,
+     "cool": 0,
+     "blocked": false
+    },
+    "BNB": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9782022473126122,
+     "t": 1791864000000,
+     "cool": 0,
+     "blocked": false
+    },
+    "DOGE": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9751728127590972,
+     "t": 1791864000000,
+     "cool": 0,
+     "blocked": false
+    },
+    "XRP": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9804505964062379,
+     "t": 1791864000000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 1000,
+   "rule": "trend_30m_band",
+   "equity_fraction": 0.98825,
+   "hold_fraction": 0.96829,
+   "value_usd": 988.25,
+   "pnl_usd": -11.75,
+   "max_drawdown": -0.01690144,
+   "trades": 8,
+   "events_kept": 8,
+   "buys": 4,
+   "sells": 4,
+   "exit_reasons": {
+    "signal": 4
+   },
+   "fees_usd": 2.14836,
+   "realized_usd": -11.7525,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "ADA": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9865524489621139,
+     "t": 1791869400000,
+     "cool": 0,
+     "blocked": false
+    },
+    "BNB": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9919017405009516,
+     "t": 1791869400000,
+     "cool": 0,
+     "blocked": false
+    },
+    "DOGE": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9867574345055884,
+     "t": 1791869400000,
+     "cool": 0,
+     "blocked": false
+    },
+    "XRP": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9877800143207176,
+     "t": 1791869400000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 1000,
+   "rule": "trend_inv",
+   "equity_fraction": 0.98961,
+   "hold_fraction": 0.96829,
+   "value_usd": 989.61,
+   "pnl_usd": -10.39,
+   "max_drawdown": -0.04234762,
+   "trades": 3,
+   "events_kept": 3,
+   "buys": 3,
+   "sells": 0,
+   "exit_reasons": {},
+   "fees_usd": 0.7775,
+   "realized_usd": 0.0,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "ADA": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "BNB": {
+     "pos": true,
+     "entry": 732.91,
+     "peak": null,
+     "eq": 0.9989932909770348,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "DOGE": {
+     "pos": true,
+     "entry": 0.087,
+     "peak": null,
+     "eq": 0.9441715414315356,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "XRP": {
+     "pos": true,
+     "entry": 1.416,
+     "peak": null,
+     "eq": 0.9468990499764552,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 10000,
+   "rule": "lean",
+   "equity_fraction": 0.96396,
+   "hold_fraction": 0.96396,
+   "value_usd": 9639.6,
+   "pnl_usd": -360.4,
+   "max_drawdown": -0.10267808,
+   "trades": 3,
+   "events_kept": 3,
+   "buys": 3,
+   "sells": 0,
+   "exit_reasons": {},
+   "fees_usd": 11.3322,
+   "realized_usd": 0.0,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "AVAX": {
+     "pos": true,
+     "entry": 10.885,
+     "peak": null,
+     "eq": 0.9309791232906792,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "LINK": {
+     "pos": true,
+     "entry": 13.372,
+     "peak": null,
+     "eq": 0.9431089884004236,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SUI": {
+     "pos": true,
+     "entry": 1.1323,
+     "peak": null,
+     "eq": 0.9072385589137638,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 10000,
+   "rule": "random_1h",
+   "equity_fraction": 0.98941,
+   "hold_fraction": 0.96396,
+   "value_usd": 9894.1,
+   "pnl_usd": -105.9,
+   "max_drawdown": -0.02265665,
+   "trades": 11,
+   "events_kept": 11,
+   "buys": 6,
+   "sells": 5,
+   "exit_reasons": {
+    "signal": 5
+   },
+   "fees_usd": 40.370434,
+   "realized_usd": -91.19088,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "AVAX": {
+     "pos": true,
+     "entry": 10.584,
+     "peak": null,
+     "eq": 0.992475800779493,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "LINK": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.006218237107863,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SUI": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9727373711730787,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 10000,
+   "rule": "score_1h",
+   "equity_fraction": 1.0,
+   "hold_fraction": 0.96396,
+   "value_usd": 10000.0,
+   "pnl_usd": 0.0,
+   "max_drawdown": 0.0,
+   "trades": 0,
+   "events_kept": 0,
+   "buys": 0,
+   "sells": 0,
+   "exit_reasons": {},
+   "fees_usd": 0.0,
+   "realized_usd": 0.0,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "AVAX": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "LINK": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SUI": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 10000,
+   "rule": "setup_dip",
+   "equity_fraction": 0.98192,
+   "hold_fraction": 0.96396,
+   "value_usd": 9819.2,
+   "pnl_usd": -180.8,
+   "max_drawdown": -0.02750349,
+   "trades": 14,
+   "events_kept": 14,
+   "buys": 7,
+   "sells": 7,
+   "exit_reasons": {
+    "stop": 5,
+    "take": 2
+   },
+   "fees_usd": 51.173481,
+   "realized_usd": -180.71526,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "AVAX": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9694371822652234,
+     "t": 1791870300000,
+     "cool": 1791825660000,
+     "blocked": null
+    },
+    "LINK": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9708170035629219,
+     "t": 1791870300000,
+     "cool": 1791818460000,
+     "blocked": null
+    },
+    "SUI": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0055196388312326,
+     "t": 1791870300000,
+     "cool": 1791807660000,
+     "blocked": null
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 10000,
+   "rule": "setup_live",
+   "equity_fraction": 0.98834,
+   "hold_fraction": 0.96396,
+   "value_usd": 9883.4,
+   "pnl_usd": -116.6,
+   "max_drawdown": -0.01402634,
+   "trades": 13,
+   "events_kept": 13,
+   "buys": 7,
+   "sells": 6,
+   "exit_reasons": {
+    "trail": 3,
+    "trend": 3
+   },
+   "fees_usd": 47.104311,
+   "realized_usd": -105.38946,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "AVAX": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0012086389673143,
+     "t": 1791870300000,
+     "cool": 1791807660000,
+     "blocked": null
+    },
+    "LINK": {
+     "pos": true,
+     "entry": 13.131,
+     "peak": 13.178,
+     "eq": 0.9914379302951779,
+     "t": 1791870300000,
+     "cool": 1791805260000,
+     "blocked": null
+    },
+    "SUI": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9723821150929047,
+     "t": 1791870300000,
+     "cool": 1791796860000,
+     "blocked": null
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 10000,
+   "rule": "strong",
+   "equity_fraction": 0.96396,
+   "hold_fraction": 0.96396,
+   "value_usd": 9639.6,
+   "pnl_usd": -360.4,
+   "max_drawdown": -0.10267808,
+   "trades": 3,
+   "events_kept": 3,
+   "buys": 3,
+   "sells": 0,
+   "exit_reasons": {},
+   "fees_usd": 11.3322,
+   "realized_usd": 0.0,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "AVAX": {
+     "pos": true,
+     "entry": 10.885,
+     "peak": null,
+     "eq": 0.9309791232906792,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "LINK": {
+     "pos": true,
+     "entry": 13.372,
+     "peak": null,
+     "eq": 0.9431089884004236,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SUI": {
+     "pos": true,
+     "entry": 1.1323,
+     "peak": null,
+     "eq": 0.9072385589137638,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 10000,
+   "rule": "strong_inv",
+   "equity_fraction": 1.0,
+   "hold_fraction": 0.96396,
+   "value_usd": 10000.0,
+   "pnl_usd": 0.0,
+   "max_drawdown": 0.0,
+   "trades": 0,
+   "events_kept": 0,
+   "buys": 0,
+   "sells": 0,
+   "exit_reasons": {},
+   "fees_usd": 0.0,
+   "realized_usd": 0.0,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "AVAX": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "LINK": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SUI": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 10000,
+   "rule": "trend",
+   "equity_fraction": 0.96396,
+   "hold_fraction": 0.96396,
+   "value_usd": 9639.6,
+   "pnl_usd": -360.4,
+   "max_drawdown": -0.10267808,
+   "trades": 3,
+   "events_kept": 3,
+   "buys": 3,
+   "sells": 0,
+   "exit_reasons": {},
+   "fees_usd": 11.3322,
+   "realized_usd": 0.0,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "AVAX": {
+     "pos": true,
+     "entry": 10.885,
+     "peak": null,
+     "eq": 0.9309791232906792,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "LINK": {
+     "pos": true,
+     "entry": 13.372,
+     "peak": null,
+     "eq": 0.9431089884004236,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SUI": {
+     "pos": true,
+     "entry": 1.1323,
+     "peak": null,
+     "eq": 0.9072385589137638,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 10000,
+   "rule": "trend_1h",
+   "equity_fraction": 0.96421,
+   "hold_fraction": 0.96396,
+   "value_usd": 9642.1,
+   "pnl_usd": -357.9,
+   "max_drawdown": -0.04326212,
+   "trades": 7,
+   "events_kept": 7,
+   "buys": 4,
+   "sells": 3,
+   "exit_reasons": {
+    "signal": 3
+   },
+   "fees_usd": 25.233213,
+   "realized_usd": -335.53311,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "AVAX": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9586026231437754,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "LINK": {
+     "pos": true,
+     "entry": 13.178,
+     "peak": null,
+     "eq": 0.9671158625404783,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SUI": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.972559895077445,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 10000,
+   "rule": "trend_1h_band",
+   "equity_fraction": 0.96421,
+   "hold_fraction": 0.96396,
+   "value_usd": 9642.1,
+   "pnl_usd": -357.9,
+   "max_drawdown": -0.04326212,
+   "trades": 7,
+   "events_kept": 7,
+   "buys": 4,
+   "sells": 3,
+   "exit_reasons": {
+    "signal": 3
+   },
+   "fees_usd": 25.233213,
+   "realized_usd": -335.53311,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "AVAX": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9586026231437754,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "LINK": {
+     "pos": true,
+     "entry": 13.178,
+     "peak": null,
+     "eq": 0.9671158625404783,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SUI": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.972559895077445,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 10000,
+   "rule": "trend_1h_inv",
+   "equity_fraction": 0.99691,
+   "hold_fraction": 0.96396,
+   "value_usd": 9969.1,
+   "pnl_usd": -30.9,
+   "max_drawdown": -0.06712757,
+   "trades": 4,
+   "events_kept": 4,
+   "buys": 3,
+   "sells": 1,
+   "exit_reasons": {
+    "signal": 1
+   },
+   "fees_usd": 15.119423,
+   "realized_usd": 44.6622,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "AVAX": {
+     "pos": true,
+     "entry": 10.458,
+     "peak": null,
+     "eq": 1.010822060078991,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "LINK": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0134002975992598,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SUI": {
+     "pos": true,
+     "entry": 1.1036,
+     "peak": null,
+     "eq": 0.9716532247905597,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 10000,
+   "rule": "trend_1h_sl",
+   "equity_fraction": 0.96421,
+   "hold_fraction": 0.96396,
+   "value_usd": 9642.1,
+   "pnl_usd": -357.9,
+   "max_drawdown": -0.04326212,
+   "trades": 7,
+   "events_kept": 7,
+   "buys": 4,
+   "sells": 3,
+   "exit_reasons": {
+    "signal": 3
+   },
+   "fees_usd": 25.233213,
+   "realized_usd": -335.53311,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "AVAX": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9586026231437754,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "LINK": {
+     "pos": true,
+     "entry": 13.178,
+     "peak": null,
+     "eq": 0.9671158625404783,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SUI": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.972559895077445,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 10000,
+   "rule": "trend_1h_vol",
+   "equity_fraction": 0.96352,
+   "hold_fraction": 0.9664,
+   "value_usd": 9635.2,
+   "pnl_usd": -364.8,
+   "max_drawdown": -0.04391832,
+   "trades": 7,
+   "events_kept": 7,
+   "buys": 4,
+   "sells": 3,
+   "exit_reasons": {
+    "signal": 3
+   },
+   "fees_usd": 26.283618,
+   "realized_usd": -336.48082,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "AVAX": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9586043203808948,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "LINK": {
+     "pos": true,
+     "entry": 13.178,
+     "peak": null,
+     "eq": 0.967073787848588,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SUI": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9725688532666946,
+     "t": 1791867600000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 10000,
+   "rule": "trend_2h",
+   "equity_fraction": 0.95043,
+   "hold_fraction": 0.96396,
+   "value_usd": 9504.3,
+   "pnl_usd": -495.7,
+   "max_drawdown": -0.05693534,
+   "trades": 10,
+   "events_kept": 10,
+   "buys": 6,
+   "sells": 4,
+   "exit_reasons": {
+    "signal": 4
+   },
+   "fees_usd": 36.112804,
+   "realized_usd": -459.58737,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "AVAX": {
+     "pos": true,
+     "entry": 10.584,
+     "peak": null,
+     "eq": 0.9398530311167959,
+     "t": 1791864000000,
+     "cool": 0,
+     "blocked": false
+    },
+    "LINK": {
+     "pos": true,
+     "entry": 13.178,
+     "peak": null,
+     "eq": 0.9615261454809704,
+     "t": 1791864000000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SUI": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9585478414966805,
+     "t": 1791864000000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 10000,
+   "rule": "trend_30m_band",
+   "equity_fraction": 0.98705,
+   "hold_fraction": 0.96396,
+   "value_usd": 9870.5,
+   "pnl_usd": -129.5,
+   "max_drawdown": -0.02059912,
+   "trades": 7,
+   "events_kept": 7,
+   "buys": 4,
+   "sells": 3,
+   "exit_reasons": {
+    "signal": 3
+   },
+   "fees_usd": 25.540439,
+   "realized_usd": -120.38796,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "AVAX": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9917843165438559,
+     "t": 1791869400000,
+     "cool": 0,
+     "blocked": false
+    },
+    "LINK": {
+     "pos": true,
+     "entry": 13.123,
+     "peak": null,
+     "eq": 0.9921997364734645,
+     "t": 1791869400000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SUI": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 0.9829587776090815,
+     "t": 1791869400000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  },
+  {
+   "wallet": 10000,
+   "rule": "trend_inv",
+   "equity_fraction": 1.0,
+   "hold_fraction": 0.96396,
+   "value_usd": 10000.0,
+   "pnl_usd": 0.0,
+   "max_drawdown": 0.0,
+   "trades": 0,
+   "events_kept": 0,
+   "buys": 0,
+   "sells": 0,
+   "exit_reasons": {},
+   "fees_usd": 0.0,
+   "realized_usd": 0.0,
+   "curve_points": 109,
+   "last_ts": "2026-10-13T06:11+00:00",
+   "positions": {
+    "AVAX": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "LINK": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    },
+    "SUI": {
+     "pos": false,
+     "entry": null,
+     "peak": null,
+     "eq": 1.0,
+     "t": 1791763200000,
+     "cool": 0,
+     "blocked": false
+    }
+   },
+   "round_start": "2026-10-11T18:11+00:00",
+   "round_end": "2026-10-18T20:59+00:00",
+   "history_rounds": 0
+  }
+ ]
+}

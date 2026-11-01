@@ -2,6 +2,7 @@
 Для кожної монети й правила (knowledge/simulation.json) рахує результат за періоди 180 / 365 днів і всю історію: підсумок, порівняння з «купив і
 тримав», максимальне просідання, угоди й порівняння з випадковою торгівлею з такою самою часткою часу в ринку. Комісія враховується.
 Це не прогноз і не порада: показує, як правила працювали в минулому. Результат: data/simulation.json (оновлюється раз на cache_hours)."""
+import copy
 import json
 import os
 import random
@@ -325,11 +326,12 @@ class Costs:
     """Витрати однієї угоди: комісія біржі + проковзання. Проковзання рахуємо з книги заявок: ордер «проходить» рівні від найкращої ціни,
     тож більша сума купує гірше за середню. Якщо книги немає, береться фіксоване проковзання. Також: мінімальний розмір ордера."""
 
-    def __init__(self, kb, cap):
+    def __init__(self, kb, cap, books=None):
         self.fee, self.slip, self.cap, self.min_order = kb["fee"], kb.get("slippage", 0.0), cap, kb.get("min_order_usd", 0)
+        self.books = books                                      # None: глобальна BOOKS (як було); словник, навіть порожній: книги лише з нього
 
     def slip_of(self, sym, side, usd):
-        b = BOOKS.get(sym)
+        b = (BOOKS if self.books is None else self.books).get(sym)
         if not b or not b["bids"] or not b["asks"]:
             return self.slip
         mid = (b["bids"][0][0] + b["asks"][0][0]) / 2
@@ -444,18 +446,15 @@ def setup_step(rule, sd, ptf, cost, ctx, events, now):
             "open": sorted(k for k, x in sd["coins"].items() if x["pos"]), "coins": len(sd["coins"])}
 
 
-def paper_update(ptf, kb, now, tag=""):
-    """Цілодобова перевірка вперед у часі на віртуальних грошах.
-    ptf: {масштаб свічок: {монета: (ціни, час відкриття, оцінки, SMA50)}}. Рішення ухвалюються за ЗАКРИТИМИ свічками масштабу правила,
-    а вартість рахунку оцінюється при кожному запуску за поточною ціною (точка на кривій). Раунд триває round_days днів (або до
-    first_round_end), потім іде в архів. Витрати на угоду = комісія + ковзання. Правила можуть мати стоп-лос/тейк-профіт (stop/take у %)
-    і розмір позиції за мінливістю (sizing: vol). Відсотки однакові для будь-якої суми; долари множить сайт.
-    Стан у data/_paper.json, журнал рішень у data/paper_events.json; крива й архів обмежені (самоочищення)."""
+def paper_step(st, events, ctx, ptf, kb, now, books=None):
+    """Один крок паперового рахунку як ЧИСТА функція: нічого не читає й не пише (ні файлів, ні мережі, ні годинника), усе приходить аргументами.
+    st: стан раунду (_paper*.json), events: журнал рішень (paper_events*.json), ctx: контекст «Картини», ptf: ринкові дані (див. paper_update),
+    kb: конфігурація, now: час кроку (datetime з поясом), books: книги заявок для Costs (None: глобальна BOOKS, як у paper_update).
+    Вхідні st і events НЕ змінюються (працюємо з копіями). Повертає (новий стан, новий журнал із обрізкою до EVENTS_PER_RULE, результат кроку)."""
+    st, events = copy.deepcopy(st), copy.deepcopy(events)
     fee = kb["fee"] + kb.get("slippage", 0.0)
     caps_ = kb["accounts"]
-    cost = Costs(kb, caps_[min(1, len(caps_) - 1)] if len(caps_) != 1 else caps_[0])
-    st = load(PAPER + tag) or {}
-    ctx, events = outlook_context(), load(EVENTS + tag) or {}
+    cost = Costs(kb, caps_[min(1, len(caps_) - 1)] if len(caps_) != 1 else caps_[0], books)
     if st and st.get("v") != STATE_V:                       # версія розрахунку змінилась: новий раунд зі спільною стартовою ціною для всіх правил
         st, events = {"history": st.get("history", [])}, {}
     st["v"] = STATE_V
@@ -572,10 +571,25 @@ def paper_update(ptf, kb, now, tag=""):
     st.setdefault("daily", {})[day] = {rid: [o["eq"], o["hold"], o["trades"]] for rid, o in out.items()}
     for old_day in sorted(st["daily"])[:-21]:                 # зберігаємо не більше 21 дня
         st["daily"].pop(old_day, None)
+    return (st, {k: v[-EVENTS_PER_RULE:] for k, v in events.items()},                          # журнал рішень (самоочищується)
+            {"round": rd, "accounts": kb["accounts"], "coins": sorted({s for tf in ptf.values() for s in tf}), "fee": fee, "strategies": out,
+             "history": st.get("history", []), "daily": st.get("daily", {})})
+
+
+def paper_update(ptf, kb, now, tag=""):
+    """Цілодобова перевірка вперед у часі на віртуальних грошах.
+    ptf: {масштаб свічок: {монета: (ціни, час відкриття, оцінки, SMA50)}}. Рішення ухвалюються за ЗАКРИТИМИ свічками масштабу правила,
+    а вартість рахунку оцінюється при кожному запуску за поточною ціною (точка на кривій). Раунд триває round_days днів (або до
+    first_round_end), потім іде в архів. Витрати на угоду = комісія + ковзання. Правила можуть мати стоп-лос/тейк-профіт (stop/take у %)
+    і розмір позиції за мінливістю (sizing: vol). Відсотки однакові для будь-якої суми; долари множить сайт.
+    Стан у data/_paper.json, журнал рішень у data/paper_events.json; крива й архів обмежені (самоочищення).
+    Обгортка над paper_step: читає стан і контекст, викликає чистий крок, записує стан і журнал."""
+    st = load(PAPER + tag) or {}
+    ctx, events = outlook_context(), load(EVENTS + tag) or {}
+    st, events, result = paper_step(st, events, ctx, ptf, kb, now)
     write_json(PAPER + tag + ".json", st)
-    write_json(EVENTS + tag + ".json",{k: v[-EVENTS_PER_RULE:] for k, v in events.items()})     # журнал рішень (самоочищується)
-    return {"round": rd, "accounts": kb["accounts"], "coins": sorted({s for tf in ptf.values() for s in tf}), "fee": fee, "strategies": out,
-            "history": st.get("history", []), "daily": st.get("daily", {})}
+    write_json(EVENTS + tag + ".json", events)
+    return result
 
 
 def thin(arr, n):

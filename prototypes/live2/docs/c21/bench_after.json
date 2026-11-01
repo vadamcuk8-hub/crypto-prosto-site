@@ -1,0 +1,25 @@
+{
+ "engine_file_sha256": "fbfb558cd84fa8e98fb1cee7693097fc919091db634ea0315ed41ae90ca91643",
+ "python": "3.14.8",
+ "reps": 3,
+ "shadow": {
+  "D3": {
+   "steps": 217,
+   "total_s_min": 12.267302599993855,
+   "total_s_median": 12.455505900012213,
+   "step_ms_median": 56.62339999980759
+  },
+  "D7": {
+   "steps": 217,
+   "total_s_min": 12.557237999995777,
+   "total_s_median": 12.930033900003764,
+   "step_ms_median": 57.45329999990645
+  }
+ },
+ "reference": {
+  "D3": {
+   "wall_s_min": 40.93155139999908,
+   "wall_s_median": 41.0492835999994
+  }
+ }
+}
